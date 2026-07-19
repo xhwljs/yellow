@@ -4,6 +4,13 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:videohub/core/constants/app_constants.dart';
 import 'package:videohub/core/theme/design_tokens.dart';
 
+// 默认主题色（pink）— 与 ThemePreset.pink 一致
+// 启动时 ThemeController 尚未就绪，硬编码默认主题色避免依赖 GetX
+const Color _kPrimaryColor = Color(0xFFEC4899);
+const Color _kBackgroundColor = Color(0xFFF5F5F7);
+const Color _kOnBackgroundColor = Color(0xFF1A1A1A);
+const Color _kOnBackgroundMutedColor = Color(0xFF8E8E93);
+
 /// 启动页（Splash Screen）
 ///
 /// App 启动时首先显示此页面，给用户即时视觉反馈，避免黑屏。
@@ -12,7 +19,7 @@ import 'package:videohub/core/theme/design_tokens.dart';
 /// 设计要点：
 /// - **背景色**：与 App 主题背景一致 (#F5F5F7)，避免从 native 黑屏到 App 浅色背景的突兀跳变
 /// - **Logo**：phosphor FilmSlate 图标（视频聚合主题）+ 圆角卡片容器
-/// - **App 名称**：Righteous 字体（与 design-system MASTER.md display 字体一致）
+/// - **App 名称**：Poppins 字体（与 design-system MASTER.md body 字体一致）
 /// - **加载指示**：底部 CircularProgressIndicator + 文案
 /// - **沉浸状态栏**：透明状态栏，让 splash 内容延伸到顶部
 ///
@@ -21,13 +28,6 @@ import 'package:videohub/core/theme/design_tokens.dart';
 class SplashPage extends StatelessWidget {
   const SplashPage({super.key});
 
-  // 默认主题色（pink）— 与 ThemePreset.pink.primaryColor 一致
-  // 启动时 ThemeController 尚未就绪，硬编码默认主题色避免依赖 GetX
-  static const Color _primaryColor = Color(0xFFEC4899);
-  static const Color _backgroundColor = Color(0xFFF5F5F7);
-  static const Color _onBackgroundColor = Color(0xFF1A1A1A);
-  static const Color _onBackgroundMutedColor = Color(0xFF8E8E93);
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -35,10 +35,10 @@ class SplashPage extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.light,
-        scaffoldBackgroundColor: _backgroundColor,
-        colorScheme: ColorScheme.light(
-          primary: _primaryColor,
-          background: _backgroundColor,
+        scaffoldBackgroundColor: _kBackgroundColor,
+        colorScheme: const ColorScheme.light(
+          primary: _kPrimaryColor,
+          surface: _kBackgroundColor,
         ),
       ),
       home: const _SplashBody(),
@@ -52,7 +52,7 @@ class _SplashBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _backgroundColor,
+      backgroundColor: _kBackgroundColor,
       body: SafeArea(
         child: SizedBox(
           width: double.infinity,
@@ -106,7 +106,7 @@ class _SplashBody extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: _primaryColor.withOpacity(0.3),
+            color: _kPrimaryColor.withOpacity(0.3),
             blurRadius: 24,
             offset: const Offset(0, 12),
           ),
@@ -132,7 +132,7 @@ class _SplashBody extends StatelessWidget {
       style: GoogleFonts.poppins(
         fontSize: DesignTokens.textDisplay,
         fontWeight: FontWeight.w700,
-        color: _onBackgroundColor,
+        color: _kOnBackgroundColor,
         letterSpacing: 0.5,
       ),
     );
@@ -145,7 +145,7 @@ class _SplashBody extends StatelessWidget {
       style: GoogleFonts.poppins(
         fontSize: DesignTokens.textBody,
         fontWeight: FontWeight.w400,
-        color: _onBackgroundMutedColor,
+        color: _kOnBackgroundMutedColor,
         letterSpacing: 0.3,
       ),
     );
@@ -162,9 +162,9 @@ class _SplashBody extends StatelessWidget {
           width: 28,
           height: 28,
           child: CircularProgressIndicator(
-            color: _primaryColor,
+            color: _kPrimaryColor,
             strokeWidth: 2.5,
-            backgroundColor: _primaryColor.withOpacity(0.15),
+            backgroundColor: _kPrimaryColor.withOpacity(0.15),
           ),
         ),
         const SizedBox(height: DesignTokens.spaceMd),
@@ -172,7 +172,7 @@ class _SplashBody extends StatelessWidget {
           '正在加载...',
           style: GoogleFonts.poppins(
             fontSize: DesignTokens.textCaption,
-            color: _onBackgroundMutedColor,
+            color: _kOnBackgroundMutedColor,
           ),
         ),
       ],
@@ -185,7 +185,7 @@ class _SplashBody extends StatelessWidget {
       'v${AppConstants.appVersion}',
       style: GoogleFonts.poppins(
         fontSize: DesignTokens.textLabel,
-        color: _onBackgroundMutedColor.withOpacity(0.7),
+        color: _kOnBackgroundMutedColor.withOpacity(0.7),
       ),
     );
   }
