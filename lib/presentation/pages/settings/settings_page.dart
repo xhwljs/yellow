@@ -66,7 +66,7 @@ class SettingsPage extends StatelessWidget {
           Row(
             children: [
               Icon(
-                PhosphorIconsRegular.palette(),
+                PhosphorIconsRegular.palette,
                 size: 20,
                 color: colors.primary,
               ),
@@ -121,7 +121,7 @@ class SettingsPage extends StatelessWidget {
               child: Row(
                 children: [
                   Icon(
-                    PhosphorIconsRegular.info(),
+                    PhosphorIconsRegular.info,
                     size: 14,
                     color: colors.onSurfaceMuted,
                   ),
@@ -157,7 +157,7 @@ class SettingsPage extends StatelessWidget {
           Row(
             children: [
               Icon(
-                PhosphorIconsRegular.info(),
+                PhosphorIconsRegular.info,
                 size: 20,
                 color: colors.primary,
               ),
@@ -229,7 +229,7 @@ class SettingsPage extends StatelessWidget {
           Row(
             children: [
               Icon(
-                PhosphorIconsRegular.trash(),
+                PhosphorIconsRegular.trash,
                 size: 20,
                 color: colors.primary,
               ),
@@ -257,7 +257,7 @@ class SettingsPage extends StatelessWidget {
             width: double.infinity,
             child: FilledButton.icon(
               onPressed: _clearCache,
-              icon: Icon(PhosphorIconsRegular.broom()),
+              icon: Icon(PhosphorIconsRegular.broom),
               label: const Text('清除缓存'),
               style: FilledButton.styleFrom(
                 backgroundColor: colors.destructive,
@@ -304,7 +304,7 @@ class SettingsPage extends StatelessWidget {
 class _ThemeColorBlock extends StatelessWidget {
   final ThemePreset preset;
   final bool selected;
-  final colors;
+  final ThemeColors colors;
   final VoidCallback onTap;
 
   const _ThemeColorBlock({
@@ -342,7 +342,7 @@ class _ThemeColorBlock extends StatelessWidget {
               child: selected
                   ? Center(
                       child: Icon(
-                        PhosphorIconsFill.check(),
+                        PhosphorIconsFill.check,
                         color: colors.surface,
                         size: 24,
                       ),

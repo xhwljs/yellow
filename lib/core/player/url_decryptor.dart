@@ -144,7 +144,7 @@ class UrlDecryptor {
       return utf8.decode(bytes);
     } catch (e) {
       appLogger.e('Base64 解码失败: $e');
-      throw DecryptException('Base64 解码失败');
+      throw const DecryptException('Base64 解码失败');
     }
   }
 

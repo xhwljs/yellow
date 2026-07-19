@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:videohub/core/theme/app_theme.dart';
 import 'package:videohub/core/theme/design_tokens.dart';
+import 'package:videohub/core/theme/theme_presets.dart';
 import 'package:videohub/data/models/video_detail.dart';
 import 'package:videohub/presentation/controllers/video_detail_controller.dart';
 import 'package:videohub/presentation/widgets/video_card.dart';
@@ -50,7 +51,7 @@ class VideoDetailPage extends GetView<VideoDetailController> {
           backgroundColor: colors.primary,
           foregroundColor: colors.onPrimary,
           elevation: 4,
-          icon: Icon(PhosphorIconsFill.play()),
+          icon: Icon(PhosphorIconsFill.play),
           label: const Text(
             '播放',
             style: TextStyle(
@@ -87,7 +88,7 @@ class VideoDetailPage extends GetView<VideoDetailController> {
                     color: DesignTokens.colorSkeleton,
                     child: Center(
                       child: Icon(
-                        PhosphorIconsRegular.filmSlate(),
+                        PhosphorIconsRegular.filmSlate,
                         size: 48,
                         color: colors.onSurfaceMuted,
                       ),
@@ -101,7 +102,7 @@ class VideoDetailPage extends GetView<VideoDetailController> {
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        Colors.black.withValues(alpha: 0.3),
+                        Colors.black.withOpacity(0.3),
                         Colors.transparent,
                         Colors.transparent,
                       ],
@@ -118,8 +119,8 @@ class VideoDetailPage extends GetView<VideoDetailController> {
               return IconButton(
                 icon: Icon(
                   favorited
-                      ? PhosphorIconsFill.heart()
-                      : PhosphorIconsRegular.heart(),
+                      ? PhosphorIconsFill.heart
+                      : PhosphorIconsRegular.heart,
                   color: favorited ? colors.primary : colors.onBackground,
                   size: 24,
                 ),
@@ -169,24 +170,24 @@ class VideoDetailPage extends GetView<VideoDetailController> {
       runSpacing: DesignTokens.spaceSm,
       children: [
         _MetaChip(
-          icon: PhosphorIconsRegular.play(),
+          icon: PhosphorIconsRegular.play,
           text: '${detail.video.playCount} 次播放',
           colors: colors,
         ),
         _MetaChip(
-          icon: PhosphorIconsRegular.heart(),
+          icon: PhosphorIconsRegular.heart,
           text: '${detail.video.likeCount} 喜欢',
           colors: colors,
         ),
         if (detail.video.duration.isNotEmpty)
           _MetaChip(
-            icon: PhosphorIconsRegular.timer(),
+            icon: PhosphorIconsRegular.timer,
             text: detail.video.duration,
             colors: colors,
           ),
         if (detail.video.updateTime.isNotEmpty)
           _MetaChip(
-            icon: PhosphorIconsRegular.calendar(),
+            icon: PhosphorIconsRegular.calendar,
             text: detail.video.updateTime,
             colors: colors,
           ),
@@ -260,7 +261,7 @@ class VideoDetailPage extends GetView<VideoDetailController> {
 class _MetaChip extends StatelessWidget {
   final IconData icon;
   final String text;
-  final colors;
+  final ThemeColors colors;
 
   const _MetaChip({
     required this.icon,

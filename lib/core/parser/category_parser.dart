@@ -1,4 +1,4 @@
-import 'package:html/parser.dart';
+import 'package:html/parser.dart' as html_parser;
 import 'package:videohub/core/error/exceptions.dart';
 import 'package:videohub/data/models/category.dart';
 
@@ -16,7 +16,7 @@ class CategoryParser {
     if (html.isEmpty) return const [];
 
     try {
-      final doc = parse(html);
+      final doc = html_parser.parse(html);
 
       // 优先尝试 .stui-header__menu (macCMS 标准)
       var items = doc.querySelectorAll('.stui-header__menu li a');
@@ -41,12 +41,14 @@ class CategoryParser {
         if (id == null || seenIds.contains(id)) continue;
 
         seenIds.add(id);
-        categories.add(Category(
-          id: id,
-          name: name,
-          url: href,
-          count: 0,
-        ));
+        categories.add(
+          Category(
+            id: id,
+            name: name,
+            url: href,
+            count: 0,
+          ),
+        );
       }
 
       return categories;

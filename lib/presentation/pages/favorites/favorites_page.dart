@@ -36,7 +36,8 @@ class FavoritesPage extends GetView<FavoritesController> {
                 fontSize: DesignTokens.textH1,
                 fontWeight: FontWeight.w700,
               ),
-            )),
+            ),
+        ),
       ),
       body: Obx(() {
         if (controller.isLoading.value && controller.favorites.isEmpty) {
@@ -44,7 +45,7 @@ class FavoritesPage extends GetView<FavoritesController> {
         }
         if (controller.favorites.isEmpty) {
           return EmptyView(
-            icon: PhosphorIconsRegular.heart(),
+            icon: PhosphorIconsRegular.heart,
             title: '暂无收藏',
             subtitle: '去发现喜欢的视频吧',
           );

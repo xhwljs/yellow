@@ -70,7 +70,7 @@ class _CategoryPageState extends State<CategoryPage> {
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: Icon(PhosphorIconsRegular.arrowLeft()),
+          icon: Icon(PhosphorIconsRegular.arrowLeft),
           onPressed: Get.back,
           tooltip: '返回',
         ),
@@ -96,7 +96,7 @@ class _CategoryPageState extends State<CategoryPage> {
         }
         if (_controller.videos.isEmpty) {
           return EmptyView(
-            icon: PhosphorIconsRegular.filmSlate(),
+            icon: PhosphorIconsRegular.filmSlate,
             title: '暂无视频',
             subtitle: '该分类下还没有内容',
             onAction: _controller.refresh,

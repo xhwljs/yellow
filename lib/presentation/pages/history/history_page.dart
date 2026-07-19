@@ -50,7 +50,8 @@ class HistoryPage extends GetView<HistoryController> {
                     ),
                   ),
                 )
-              : const SizedBox.shrink()),
+              : const SizedBox.shrink(),
+          ),
         ],
       ),
       body: Obx(() {
@@ -59,7 +60,7 @@ class HistoryPage extends GetView<HistoryController> {
         }
         if (controller.histories.isEmpty) {
           return EmptyView(
-            icon: PhosphorIconsRegular.clock(),
+            icon: PhosphorIconsRegular.clock,
             title: '暂无历史',
             subtitle: '看完的视频会在这里继续',
           );
@@ -84,7 +85,7 @@ class HistoryPage extends GetView<HistoryController> {
                   borderRadius: BorderRadius.circular(DesignTokens.radiusLg),
                 ),
                 child: Icon(
-                  PhosphorIconsRegular.trash(),
+                  PhosphorIconsRegular.trash,
                   color: colors.surface,
                   size: 24,
                 ),
@@ -190,7 +191,7 @@ class _HistoryItem extends StatelessWidget {
                     errorWidget: (_, __, ___) => Container(
                       color: DesignTokens.colorSkeleton,
                       child: Icon(
-                        PhosphorIconsRegular.filmSlate(),
+                        PhosphorIconsRegular.filmSlate,
                         size: 24,
                         color: colors.onSurfaceMuted,
                       ),
@@ -220,7 +221,7 @@ class _HistoryItem extends StatelessWidget {
                     Row(
                       children: [
                         Icon(
-                          PhosphorIconsRegular.clock(),
+                          PhosphorIconsRegular.clock,
                           size: 12,
                           color: colors.onSurfaceMuted,
                         ),
@@ -241,7 +242,7 @@ class _HistoryItem extends StatelessWidget {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: colors.success.withValues(alpha: 0.12),
+                              color: colors.success.withOpacity(0.12),
                               borderRadius: BorderRadius.circular(
                                 DesignTokens.radiusPill,
                               ),

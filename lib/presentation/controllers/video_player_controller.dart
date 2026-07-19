@@ -120,7 +120,8 @@ class PlayerPageController extends GetxController {
 
       // 3. 记录原始亮度/音量
       try {
-        _originalBrightness = await _screenBrightness.application;
+        // screen_brightness 1.0.1 API：current getter（2.x 改名为 application）
+        _originalBrightness = await _screenBrightness.current;
         brightness.value = _originalBrightness;
       } catch (_) {}
       try {
@@ -183,7 +184,7 @@ class PlayerPageController extends GetxController {
 
     positionMs.value = value.position.inMilliseconds;
     durationMs.value = value.duration.inMilliseconds;
-    bufferedMs.value = value.buffered.last.inMilliseconds;
+    bufferedMs.value = value.buffered.last.end.inMilliseconds;
 
     if (value.isBuffering) {
       if (state.value != PlayerState.buffering) {
@@ -304,7 +305,8 @@ class PlayerPageController extends GetxController {
   Future<void> setBrightness(double value) async {
     brightness.value = value.clamp(0.0, 1.0);
     try {
-      await _screenBrightness.setApplication(brightness.value);
+      // screen_brightness 1.0.1 API：setScreenBrightness（2.x 改名为 setApplicationScreenBrightness）
+      await _screenBrightness.setScreenBrightness(brightness.value);
     } catch (_) {}
   }
 
@@ -330,7 +332,8 @@ class PlayerPageController extends GetxController {
       await WakelockPlus.disable();
     } catch (_) {}
     try {
-      await _screenBrightness.resetApplication();
+      // screen_brightness 1.0.1 API：resetScreenBrightness（2.x 改名为 resetApplicationScreenBrightness）
+      await _screenBrightness.resetScreenBrightness();
     } catch (_) {}
     try {
       await _volumeController.setVolume(_originalVolume);

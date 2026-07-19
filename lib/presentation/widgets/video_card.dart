@@ -1,6 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:videohub/core/theme/app_theme.dart';
@@ -47,7 +46,7 @@ class VideoCard extends StatelessWidget {
                     fit: BoxFit.cover,
                     placeholder: (_, __) => const _ShimmerBox(),
                     errorWidget: (_, __, ___) => _CoverPlaceholder(
-                      icon: PhosphorIconsRegular.filmSlate(),
+                      icon: PhosphorIconsRegular.filmSlate,
                     ),
                   ),
                   // 时长 badge
@@ -87,7 +86,7 @@ class VideoCard extends StatelessWidget {
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
-                          PhosphorIconsFill.heart(),
+                          PhosphorIconsFill.heart,
                           color: colors.onPrimary,
                           size: 14,
                         ),
@@ -262,7 +261,7 @@ class EmptyView extends StatelessWidget {
     super.key,
     required this.title,
     this.subtitle,
-    this.icon = PhosphorIconsRegular.stack(),
+    this.icon = PhosphorIconsRegular.stack,
     this.onAction,
     this.actionLabel,
   });
@@ -337,7 +336,7 @@ class ErrorView extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              PhosphorIconsRegular.warningCircle(),
+              PhosphorIconsRegular.warningCircle,
               size: 64,
               color: colors.destructive,
             ),

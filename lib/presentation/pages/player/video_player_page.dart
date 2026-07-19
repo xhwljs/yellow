@@ -82,7 +82,7 @@ class _DecryptingView extends StatelessWidget {
               ),
               Text(
                 '$countdown',
-                style: TextStyle(
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
@@ -91,7 +91,7 @@ class _DecryptingView extends StatelessWidget {
             ],
           ),
           const SizedBox(height: DesignTokens.spaceLg),
-          Text(
+          const Text(
             '正在解析播放地址',
             style: TextStyle(
               color: Colors.white,
@@ -99,7 +99,7 @@ class _DecryptingView extends StatelessWidget {
             ),
           ),
           const SizedBox(height: DesignTokens.spaceXs),
-          Text(
+          const Text(
             '模拟移动端点击行为，请稍候...',
             style: TextStyle(
               color: Colors.white70,
@@ -222,7 +222,6 @@ class _GestureOverlay extends StatelessWidget {
         controller.seekTo(Duration(milliseconds: target));
       },
       onVerticalDragUpdate: (details) {
-        final dx = details.delta.dx;
         // 左半屏：亮度；右半屏：音量
         final isLeft =
             details.globalPosition.dx < MediaQuery.of(context).size.width / 2;
@@ -254,7 +253,7 @@ class _ExpiredView extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            PhosphorIconsRegular.clockClockwise(),
+            PhosphorIconsRegular.clockClockwise,
             color: colors.warning,
             size: 48,
           ),
@@ -287,12 +286,12 @@ class _ErrorView extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              PhosphorIconsRegular.warningCircle(),
+              PhosphorIconsRegular.warningCircle,
               color: colors.destructive,
               size: 56,
             ),
             const SizedBox(height: DesignTokens.spaceLg),
-            Text(
+            const Text(
               '播放失败',
               style: TextStyle(
                 color: Colors.white,
@@ -304,7 +303,7 @@ class _ErrorView extends StatelessWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 color: Colors.white70,
                 fontSize: DesignTokens.textCaption,
               ),
@@ -416,13 +415,6 @@ class _VideoHubControls extends StatelessWidget {
                       // 倍速按钮
                       PopupMenuButton<double>(
                         color: Colors.black87,
-                        child: Text(
-                          '${controller.playbackSpeed.value}x',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: DesignTokens.textCaption,
-                          ),
-                        ),
                         onSelected: controller.setPlaybackSpeed,
                         itemBuilder: (_) => const [
                           PopupMenuItem(value: 0.5, child: Text('0.5x')),
@@ -432,6 +424,13 @@ class _VideoHubControls extends StatelessWidget {
                           PopupMenuItem(value: 1.5, child: Text('1.5x')),
                           PopupMenuItem(value: 2.0, child: Text('2.0x')),
                         ],
+                        child: Text(
+                          '${controller.playbackSpeed.value}x',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: DesignTokens.textCaption,
+                          ),
+                        ),
                       ),
                       IconButton(
                         icon: Icon(

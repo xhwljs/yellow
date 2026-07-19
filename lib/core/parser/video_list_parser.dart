@@ -1,4 +1,4 @@
-import 'package:html/parser.dart';
+import 'package:html/parser.dart' as html_parser;
 import 'package:videohub/core/error/exceptions.dart';
 import 'package:videohub/data/models/video.dart';
 
@@ -15,7 +15,7 @@ class VideoListParser {
     if (html.isEmpty) return const [];
 
     try {
-      final doc = parse(html);
+      final doc = html_parser.parse(html);
       final items = doc.querySelectorAll('.stui-vodlist__box');
 
       return items
@@ -57,7 +57,7 @@ class VideoListParser {
   /// 提取总页数（用于分页加载）
   int parseTotalPages(String html) {
     try {
-      final doc = parse(html);
+      final doc = html_parser.parse(html);
       // 通用模板站点的分页结构
       final pagination = doc.querySelector('.stui-page, .pagination, .page');
       if (pagination == null) return 1;

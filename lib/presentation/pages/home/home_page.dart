@@ -48,7 +48,7 @@ class HomePage extends GetView<HomeController> {
         }
         if (controller.categories.isEmpty) {
           return EmptyView(
-            icon: PhosphorIconsRegular.filmSlate(),
+            icon: PhosphorIconsRegular.filmSlate,
             title: '暂无内容',
             subtitle: '下拉刷新试试',
             onAction: controller.refresh,
@@ -188,7 +188,7 @@ class HomePage extends GetView<HomeController> {
                         ),
                         const SizedBox(width: DesignTokens.spaceXs),
                         Icon(
-                          PhosphorIconsRegular.caretRight(),
+                          PhosphorIconsRegular.caretRight,
                           size: 14,
                           color: colors.onSurfaceMuted,
                         ),

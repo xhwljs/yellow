@@ -32,10 +32,9 @@ class CookieStorage implements Storage {
   }
 
   @override
-  Future<void> deleteAll() async {
-    final keys = _prefs.getKeys().where((k) => k.startsWith(_keyPrefix));
+  Future<void> deleteAll(List<String> keys) async {
     for (final key in keys) {
-      await _prefs.remove(key);
+      await _prefs.remove('$_keyPrefix$key');
     }
   }
 }

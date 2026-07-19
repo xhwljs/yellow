@@ -1,4 +1,4 @@
-import 'package:html/parser.dart';
+import 'package:html/parser.dart' as html_parser;
 import 'package:videohub/core/error/exceptions.dart';
 import 'package:videohub/data/models/video.dart';
 import 'package:videohub/data/models/video_detail.dart';
@@ -16,12 +16,13 @@ class VideoDetailParser {
     }
 
     try {
-      final doc = parse(html);
+      final doc = html_parser.parse(html);
 
       // 标题
       final title = doc
               .querySelector(
-                  '.stui-content__detail h1, .stui-pannel__head h3, h1.title')
+                '.stui-content__detail h1, .stui-pannel__head h3, h1.title',
+              )
               ?.text
               .trim() ??
           videoId;
@@ -108,7 +109,8 @@ class VideoDetailParser {
   /// 解析相关推荐视频列表
   static List<Video> _parseRelatedVideos(dynamic doc) {
     final items = doc.querySelectorAll(
-        '.stui-vodlist__bd .stui-vodlist__box, .stui-pannel_bd .stui-vodlist__box');
+      '.stui-vodlist__bd .stui-vodlist__box, .stui-pannel_bd .stui-vodlist__box',
+    );
     return items
         .map((element) {
           final link = element.querySelector('a');
