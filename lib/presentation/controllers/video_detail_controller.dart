@@ -66,6 +66,13 @@ class VideoDetailController extends GetxController {
   final RxString inlineErrorMessage = ''.obs;
   bool _inlineStarted = false;
 
+  // 历史记录节流保存
+  //
+  // 监听 video_player 的 position 变化，每 5 秒保存一次播放进度到数据库。
+  // 退出详情页（onClose）时也会保存最后一次进度，确保续播位置准确。
+  Timer? _historySaveTimer;
+  static const Duration _historySaveInterval = Duration(seconds: 5);
+
   /// 当前生效的封面 URL
   ///
   /// 详情页 parser 不提取封面（站点无独立大图），
@@ -91,6 +98,10 @@ class VideoDetailController extends GetxController {
 
   @override
   void onClose() {
+    // 退出详情页前最后一次保存播放进度，确保续播位置准确
+    _saveHistoryFromPlayer();
+    _historySaveTimer?.cancel();
+    _historySaveTimer = null;
     _disposeInlinePlayer();
     super.onClose();
   }
@@ -185,12 +196,26 @@ class VideoDetailController extends GetxController {
             onTimeout: () => throw const TimeoutException('视频初始化超时'),
           );
 
+      // 续播：从历史记录的位置开始播放
+      // 仅当历史进度 < 95%（未看完）且 > 5 秒时才 seek，避免从头开始的无效 seek
+      final resumeMs = initialPositionMs.value;
+      if (resumeMs > 5000) {
+        try {
+          await videoController.seekTo(Duration(milliseconds: resumeMs));
+        } catch (e) {
+          appLogger.w('续播 seekTo 失败，从头播放: $e');
+        }
+      }
+
       // 获取当前主题色（chewie 控件需在 build 时拿到主题色才能跟随切换）
       // 这里取默认 primary，实际颜色通过 Obx 在 UI 层重建 Chewie 时注入
       final chewie = _buildChewieController(videoController, autoPlay: true);
       inlineVideoController.value = videoController;
       inlineChewieController.value = chewie;
       inlineLoading.value = false;
+
+      // 启动历史记录节流保存定时器
+      _startHistorySaveTimer();
     } on UrlExpiredException {
       inlineLoading.value = false;
       inlineErrorMessage.value = '播放地址已过期，请重试';
@@ -239,6 +264,8 @@ class VideoDetailController extends GetxController {
 
   /// 用户点击重试
   Future<void> retryInlinePlay() async {
+    _historySaveTimer?.cancel();
+    _historySaveTimer = null;
     _disposeInlinePlayer();
     _inlineStarted = false;
     await startInlinePlay();
@@ -271,5 +298,48 @@ class VideoDetailController extends GetxController {
     inlineChewieController.value = null;
     inlineVideoController.value = null;
     _inlineStarted = false;
+  }
+
+  // ===== 历史记录节流保存 =====
+
+  /// 启动定时保存播放进度的定时器
+  ///
+  /// 每 [_historySaveInterval]（5 秒）保存一次当前播放位置到数据库。
+  /// 与 [onClose] 中的最后一次保存配合，确保续播位置准确。
+  void _startHistorySaveTimer() {
+    _historySaveTimer?.cancel();
+    _historySaveTimer = Timer.periodic(_historySaveInterval, (_) {
+      _saveHistoryFromPlayer();
+    });
+  }
+
+  /// 从 video_player 当前状态读取 position/duration，写入播放历史
+  ///
+  /// 静默失败：若 videoController 未就绪或异常，直接返回（不影响播放）。
+  /// duration 为 0 时跳过保存（避免误写 progress=1.0）。
+  void _saveHistoryFromPlayer() {
+    final videoController = inlineVideoController.value;
+    if (videoController == null || !videoController.value.isInitialized) {
+      return;
+    }
+    final positionMs = videoController.value.position.inMilliseconds;
+    final durationMs = videoController.value.duration.inMilliseconds;
+    if (durationMs <= 0) return;
+
+    final categoryId = detail.value?.video.categoryId ?? 0;
+    // 异步执行，不阻塞当前调用方
+    _historyRepo
+        .upsertHistory(
+          videoId: videoId,
+          title: effectiveTitle,
+          coverUrl: effectiveCoverUrl,
+          categoryId: categoryId,
+          positionMs: positionMs,
+          durationMs: durationMs,
+        )
+        .catchError((e) {
+      appLogger.w('保存播放历史失败: $e');
+      return null;
+    });
   }
 }

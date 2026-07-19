@@ -30,9 +30,12 @@ class SearchPage extends GetView<SearchController> {
         child: _SearchAppBar(controller: controller),
       ),
       body: Obx(() {
-        // 初始空态
+        // 初始空态（含历史搜索记录）
         if (!controller.hasSearched.value && !controller.isLoading.value) {
-          return _InitialEmptyView(colors: colors);
+          return _InitialEmptyView(
+            colors: colors,
+            controller: controller,
+          );
         }
         // 加载中（首次搜索）
         if (controller.isLoading.value && controller.results.isEmpty) {
@@ -234,42 +237,263 @@ class _SearchAppBar extends StatelessWidget {
 }
 
 /// 初始空态（未搜索时）
+///
+/// 包含两部分：
+/// 1. 顶部：搜索引导图标 + 标题 + 提示文案
+/// 2. 历史搜索区：标题栏（"历史搜索" + "清空"按钮）+ Wrap（chip 列表）
+///    - chip 显示关键字 + 单条删除按钮（x 图标）
+///    - 点击 chip 文本 → 触发搜索
+///    - 点击 x → 删除单条历史
+///    - 点击"清空" → 弹出确认对话框 → 清空全部历史
+///    - 无历史时整个区域不显示
 class _InitialEmptyView extends StatelessWidget {
   final ThemeColors colors;
-  const _InitialEmptyView({required this.colors});
+  final SearchController controller;
+
+  const _InitialEmptyView({
+    required this.colors,
+    required this.controller,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(DesignTokens.spaceXl),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+    return ListView(
+      padding: const EdgeInsets.all(DesignTokens.spaceXl),
+      children: [
+        const SizedBox(height: DesignTokens.spaceXl),
+        // 引导图标
+        Icon(
+          PhosphorIconsRegular.magnifyingGlass,
+          size: 56,
+          color: colors.onSurfaceMuted,
+        ),
+        const SizedBox(height: DesignTokens.spaceMd),
+        Text(
+          '搜索你感兴趣的视频',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: DesignTokens.textH2,
+            fontWeight: FontWeight.w600,
+            color: colors.onSurface,
+          ),
+        ),
+        const SizedBox(height: DesignTokens.spaceXs),
+        Text(
+          '输入关键词，回车或点击搜索按钮',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: DesignTokens.textCaption,
+            color: colors.onSurfaceMuted,
+          ),
+        ),
+        const SizedBox(height: DesignTokens.space2xl),
+        // 历史搜索区（有记录时显示）
+        Obx(() {
+          if (controller.history.isEmpty) {
+            return const SizedBox.shrink();
+          }
+          return _HistorySearchSection(
+            colors: colors,
+            controller: controller,
+          );
+        }),
+      ],
+    );
+  }
+}
+
+/// 历史搜索区
+class _HistorySearchSection extends StatelessWidget {
+  final ThemeColors colors;
+  final SearchController controller;
+
+  const _HistorySearchSection({
+    required this.colors,
+    required this.controller,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 标题栏：历史搜索 + 清空按钮
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Icon(
-              PhosphorIconsRegular.magnifyingGlass,
-              size: 72,
-              color: colors.onSurfaceMuted,
-            ),
-            const SizedBox(height: DesignTokens.spaceLg),
             Text(
-              '搜索你感兴趣的视频',
+              '历史搜索',
               style: TextStyle(
-                fontSize: DesignTokens.textH2,
+                fontSize: DesignTokens.textBody,
                 fontWeight: FontWeight.w600,
                 color: colors.onSurface,
               ),
             ),
-            const SizedBox(height: DesignTokens.spaceXs),
-            Text(
-              '输入关键词，回车或点击搜索按钮',
-              style: TextStyle(
-                fontSize: DesignTokens.textCaption,
-                color: colors.onSurfaceMuted,
+            TextButton.icon(
+              onPressed: _confirmClearAll,
+              icon: Icon(
+                PhosphorIconsRegular.trash,
+                size: 16,
+                color: colors.destructive,
+              ),
+              label: Text(
+                '清空',
+                style: TextStyle(
+                  fontSize: DesignTokens.textCaption,
+                  color: colors.destructive,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: DesignTokens.spaceSm,
+                ),
+                minimumSize: const Size(0, 32),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
             ),
           ],
         ),
+        const SizedBox(height: DesignTokens.spaceSm),
+        // chip 列表
+        Wrap(
+          spacing: DesignTokens.spaceSm,
+          runSpacing: DesignTokens.spaceSm,
+          children: controller.history.map((keyword) {
+            return _HistoryChip(
+              keyword: keyword,
+              colors: colors,
+              onTap: () => controller.search(keyword),
+              onDelete: () => controller.removeHistory(keyword),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  /// 清空全部历史搜索记录确认对话框
+  void _confirmClearAll() {
+    Get.dialog<void>(
+      AlertDialog(
+        backgroundColor: colors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(DesignTokens.radiusLg),
+        ),
+        title: Text(
+          '清空历史搜索',
+          style: TextStyle(
+            color: colors.onSurface,
+            fontSize: DesignTokens.textH2,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        content: Text(
+          '确定要清空所有历史搜索记录吗？此操作不可撤销。',
+          style: TextStyle(
+            color: colors.onSurfaceMuted,
+            fontSize: DesignTokens.textBody,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: Get.back,
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Get.back();
+              controller.clearHistory();
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: colors.destructive,
+              foregroundColor: colors.surface,
+            ),
+            child: const Text('清空'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 单条历史搜索 chip
+///
+/// 设计：
+/// - 圆角胶囊形状（radiusPill）
+/// - 浅色背景 + 边框
+/// - 左侧关键字文本（点击触发搜索）
+/// - 右侧 x 图标（点击删除单条）
+class _HistoryChip extends StatelessWidget {
+  final String keyword;
+  final ThemeColors colors;
+  final VoidCallback onTap;
+  final VoidCallback onDelete;
+
+  const _HistoryChip({
+    required this.keyword,
+    required this.colors,
+    required this.onTap,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(DesignTokens.radiusPill),
+        border: Border.all(color: colors.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 关键字（点击触发搜索）
+          InkWell(
+            onTap: onTap,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(DesignTokens.radiusPill),
+              bottomLeft: Radius.circular(DesignTokens.radiusPill),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.only(
+                left: DesignTokens.spaceMd,
+                top: 6,
+                bottom: 6,
+              ),
+              child: Text(
+                keyword,
+                style: TextStyle(
+                  fontSize: DesignTokens.textCaption,
+                  color: colors.onSurface,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+          // 删除按钮
+          InkWell(
+            onTap: onDelete,
+            borderRadius: const BorderRadius.only(
+              topRight: Radius.circular(DesignTokens.radiusPill),
+              bottomRight: Radius.circular(DesignTokens.radiusPill),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.only(
+                left: DesignTokens.spaceXs,
+                right: 6,
+                top: 6,
+                bottom: 6,
+              ),
+              child: Icon(
+                PhosphorIconsRegular.x,
+                size: 14,
+                color: colors.onSurfaceMuted,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

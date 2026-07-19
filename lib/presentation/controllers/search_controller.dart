@@ -3,13 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:videohub/data/models/video.dart';
 import 'package:videohub/data/repositories/video_repository.dart';
+import 'package:videohub/data/services/search_history_service.dart';
 
 /// 搜索控制器
 ///
 /// 严格遵循 ui-ux-pro-max Search UX 建议：
 /// - Debounced fetch（500ms 防抖，避免每次按键都请求）
 /// - "No results" 时给出建议而非空白屏
-/// - 历史搜索关键字（简化版：仅内存中保留本次会话）
+/// - 历史搜索关键字（SharedPreferences 持久化，最多 20 条）
 class SearchController extends GetxController {
   final VideoRepository _videoRepo;
 
@@ -39,6 +40,13 @@ class SearchController extends GetxController {
   /// 是否正在加载更多
   final RxBool isLoadingMore = false.obs;
 
+  /// 搜索历史（持久化，按最近优先排序）
+  ///
+  /// 用户每次提交搜索后调用 [addToHistory] 上移到列表头部。
+  /// 搜索页初始空态会展示此列表，支持点击 chip 快速搜索、
+  /// 单条删除（x 按钮）和一键清空。
+  final RxList<String> history = <String>[].obs;
+
   /// 搜索防抖 Timer
   Timer? _debounce;
 
@@ -46,10 +54,41 @@ class SearchController extends GetxController {
   final TextEditingController textController = TextEditingController();
 
   @override
+  void onInit() {
+    super.onInit();
+    _loadHistory();
+  }
+
+  @override
   void onClose() {
     _debounce?.cancel();
     textController.dispose();
     super.onClose();
+  }
+
+  /// 加载搜索历史到 Rx
+  Future<void> _loadHistory() async {
+    history.value = await SearchHistoryService.load();
+  }
+
+  /// 添加当前关键字到搜索历史
+  ///
+  /// 由 [submitSearch] / [search] 调用，去重并上移到头部。
+  Future<void> _addKeywordToHistory(String text) async {
+    final updated = await SearchHistoryService.add(text);
+    history.value = updated;
+  }
+
+  /// 删除单条搜索历史
+  Future<void> removeHistory(String keyword) async {
+    final updated = await SearchHistoryService.remove(keyword);
+    history.value = updated;
+  }
+
+  /// 清空全部搜索历史
+  Future<void> clearHistory() async {
+    await SearchHistoryService.clear();
+    history.clear();
   }
 
   /// 输入框文本变化 — 500ms 防抖后触发搜索
@@ -79,6 +118,10 @@ class SearchController extends GetxController {
   /// 执行搜索（首页）
   Future<void> search(String text) async {
     keyword.value = text;
+    textController.text = text;
+    textController.selection = TextSelection.fromPosition(
+      TextPosition(offset: text.length),
+    );
     isLoading.value = true;
     error.value = '';
     hasSearched.value = true;
@@ -90,6 +133,8 @@ class SearchController extends GetxController {
       if (list.isEmpty) {
         hasMore.value = false;
       }
+      // 搜索成功后记录到历史（即使无结果也保留关键字，方便重试）
+      await _addKeywordToHistory(text);
     } catch (e) {
       error.value = e.toString();
       results.clear();
@@ -121,7 +166,7 @@ class SearchController extends GetxController {
     }
   }
 
-  /// 清空搜索
+  /// 清空搜索（保留历史）
   void clear() {
     textController.clear();
     keyword.value = '';

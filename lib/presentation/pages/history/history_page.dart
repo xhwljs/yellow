@@ -102,7 +102,14 @@ class HistoryPage extends GetView<HistoryController> {
               },
               child: _HistoryItem(
                 history: h,
-                onTap: () => Get.toNamed('/detail', arguments: h.videoId),
+                onTap: () => Get.toNamed(
+                  '/detail',
+                  arguments: {
+                    'videoId': h.videoId,
+                    'coverUrl': h.coverUrl,
+                    'title': h.title,
+                  },
+                ),
               ),
             );
           },

@@ -36,6 +36,8 @@ class AppConstants {
   // 缓存
   static const int cacheMaxAgeMinutes = 30;
   static const int historyMaxRecords = 500;
+  // 搜索历史最多保存数量（去重后按时间倒序保留前 N 条）
+  static const int searchHistoryMax = 20;
 
   // 数据库
   static const String databaseName = 'videohub.db';
@@ -45,4 +47,5 @@ class AppConstants {
   static const String keyThemePreset = 'theme_preset';
   static const String keyLastCategoryId = 'last_category_id';
   static const String keyApiBaseUrl = 'api_base_url';
+  static const String keySearchHistory = 'search_history';
 }

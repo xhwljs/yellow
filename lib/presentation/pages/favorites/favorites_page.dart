@@ -68,7 +68,14 @@ class FavoritesPage extends GetView<FavoritesController> {
               child: VideoCard(
                 video: video,
                 isFavorited: true,
-                onTap: () => Get.toNamed('/detail', arguments: fav.videoId),
+                onTap: () => Get.toNamed(
+                  '/detail',
+                  arguments: {
+                    'videoId': fav.videoId,
+                    'coverUrl': fav.coverUrl,
+                    'title': fav.title,
+                  },
+                ),
               ),
             );
           },
