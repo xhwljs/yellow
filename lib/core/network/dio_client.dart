@@ -1,5 +1,8 @@
-import 'package:dio/dio.dart';
+import 'dart:io';
+
 import 'package:cookie_jar/cookie_jar.dart';
+import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 import 'package:videohub/core/constants/app_constants.dart';
 import 'package:videohub/core/network/interceptors/cookie_interceptor.dart';
 import 'package:videohub/core/network/interceptors/error_interceptor.dart';
@@ -48,12 +51,27 @@ class DioClient {
       ),
     );
 
+    // 关键：使用 IOHttpClientAdapter 并显式启用自动解压
+    // （Dio 5.x 默认不自动解压 gzip，必须显式开启）
+    dio.httpClientAdapter = IOHttpClientAdapter(
+      createHttpClient: () {
+        final client = HttpClient()
+          // 自动解压 gzip/deflate（重要：否则收到压缩二进制无法解析）
+          ..autoUncompress = true
+          // 清空 Dio 默认 UA（由 UserAgentInterceptor 注入随机移动 UA）
+          ..userAgent = null;
+        return client;
+      },
+      // 容错源站证书链路问题（Let's Encrypt 等偶发校验失败）
+      validateCertificate: (cert, host, port) => true,
+    );
+
     // 拦截器顺序：UA → Cookie → Log → Retry → Error
     dio.interceptors.addAll([
       UserAgentInterceptor(),
       cookieInterceptor,
       LoggingInterceptor(),
-      RetryInterceptor(),
+      RetryInterceptor(dioProvider: () => dio),
       ErrorInterceptor(),
     ]);
 

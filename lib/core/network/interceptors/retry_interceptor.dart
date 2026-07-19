@@ -7,11 +7,16 @@ import 'package:videohub/core/utils/logger.dart';
 /// - 连接超时自动重试 3 次
 /// - 重试间隔 2 秒（反爬策略）
 /// - 仅对幂等 GET 请求重试
+///
+/// 重要：通过 [dioProvider] 复用原 Dio 实例进行重试，
+/// 否则会丢失 Cookie、UA、baseUrl 等配置，导致重试请求全部失败。
 class RetryInterceptor extends Interceptor {
   final int maxRetries;
   final Duration retryDelay;
+  final Dio Function() dioProvider;
 
   RetryInterceptor({
+    required this.dioProvider,
     this.maxRetries = AppConstants.maxRetryCount,
     this.retryDelay = AppConstants.retryDelay,
   });
@@ -40,9 +45,8 @@ class RetryInterceptor extends Interceptor {
     await Future.delayed(retryDelay);
 
     try {
-      final dio = Dio();
-      // 复制原始 Dio 的所有拦截器与配置（通过 BuildDio 拿到）
-      // 这里通过 extra 标记重试上下文
+      // 复用原 Dio 实例，保留所有拦截器（UA / Cookie / Log）和 baseUrl
+      final dio = dioProvider();
       final response = await dio.fetch(err.requestOptions);
       return handler.resolve(response);
     } on DioException catch (e) {
