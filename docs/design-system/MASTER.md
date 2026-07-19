@@ -224,6 +224,47 @@ https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family
 
 ---
 
+## 7.5 分类菜单 Tab（首页导航）
+
+> **真理源**：所有分类菜单 Tab 必须遵循本节规范，禁止在其它页面定义不同样式。
+> **设计依据**：参考 ui-ux-pro-max `Material You (MD3) Mobile` 风格 — pill-shaped + state-layer 思想。
+
+### 视觉规范
+
+| 状态 | 背景 | 文字 | 边框 | 阴影 |
+|------|------|------|------|------|
+| **选中态** | `colors.primary` | `colors.onPrimary` (w700) | 无 | `elevation-1` |
+| **未选中态** | `colors.surface` | `colors.onSurfaceMuted` (w500) | `colors.border` (1px) | 无 |
+
+### 形状与尺寸
+
+| 属性 | 值 |
+|------|----|
+| 圆角 | `radius-pill` (999) |
+| 高度 | 40pt（含 8pt 上下 padding） |
+| 横向 padding | `space-lg` (16) |
+| 纵向 padding | `space-sm` (8) |
+| Tab 间距 | `space-sm` (8) |
+| 列表左右 padding | `space-md` (12) |
+
+### 内容布局
+
+- **Tab 列表**：横向滚动 `ListView.separated`，第一项固定为 "推荐"，其余依次为各分类
+- **选中"推荐"**：保留原 Section 布局，所有分类横向滚动 6 条
+- **选中具体分类**：网格布局（2 列）+ 分页懒加载（滚动到距底部 200pt 触发加载更多）
+- **切换动效**：`AnimatedContainer` + `motion-fast` (150ms) + `Curves.easeOutCubic`
+- **主题切换**：通过 `Obx` 监听 `ThemeController.presetRx`，自动重建颜色
+
+### 反模式（禁止）
+
+- ❌ 使用下划线 indicator（TabBar 默认风格）— 与 MD3 pill 风格冲突
+- ❌ Tab 跳转到独立页面（除"更多"按钮外）— 应原地切换内容
+- ❌ Tab 高度 < 40pt — 触摸目标不足
+- ❌ 切换动效 > 300ms — 用户感知迟滞
+- ❌ 未选中态使用 `colors.primary.withOpacity(0.1)` 之类的临时色 — 必须用语义令牌
+
+---
+
 ## 8. Pre-Delivery Checklist（交付前必查）
 
 ### 视觉质量
