@@ -147,8 +147,8 @@ class VideoDetailParser {
   static String _extractCoverUrl(dom.Document doc) {
     // 预留：未来若站点恢复 .stui-content__thumb img 结构，从这里取
     final thumbImg = doc.querySelector('.stui-content__thumb img');
-    final cover = thumbImg?.attributes['data-original'] ??
-        thumbImg?.attributes['src'];
+    final cover =
+        thumbImg?.attributes['data-original'] ?? thumbImg?.attributes['src'];
     if (cover != null && cover.isNotEmpty) return cover;
     return '';
   }

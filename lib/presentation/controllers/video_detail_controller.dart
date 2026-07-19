@@ -21,8 +21,10 @@ class VideoDetailController extends GetxController {
   });
 
   final String videoId;
+
   /// 列表页传入的封面（详情页无独立封面时用此）
   final String initialCoverUrl;
+
   /// 列表页传入的标题（加载中显示）
   final String initialTitle;
 

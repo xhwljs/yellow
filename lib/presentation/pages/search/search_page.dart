@@ -39,8 +39,7 @@ class SearchPage extends GetView<SearchController> {
           return _buildSkeletonGrid();
         }
         // 错误
-        if (controller.error.value.isNotEmpty &&
-            controller.results.isEmpty) {
+        if (controller.error.value.isNotEmpty && controller.results.isEmpty) {
           return ErrorView(
             message: controller.error.value,
             onRetry: () => controller.search(controller.keyword.value),
@@ -150,58 +149,58 @@ class _SearchAppBar extends StatelessWidget {
               ),
               Expanded(
                 child: Obx(() => TextField(
-                  controller: controller.textController,
-                  autofocus: true,
-                  textInputAction: TextInputAction.search,
-                  onChanged: controller.onKeywordChanged,
-                  onSubmitted: (_) => controller.submitSearch(),
-                  style: TextStyle(
-                    color: colors.onSurface,
-                    fontSize: DesignTokens.textBody,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: '搜索视频…',
-                    hintStyle: TextStyle(
-                      color: colors.onSurfaceMuted,
-                      fontSize: DesignTokens.textBody,
-                    ),
-                    prefixIcon: Icon(
-                      PhosphorIconsRegular.magnifyingGlass,
-                      color: colors.primary,
-                      size: 20,
-                    ),
-                    suffixIcon: controller.keyword.value.isNotEmpty
-                        ? IconButton(
-                            icon: Icon(
-                              PhosphorIconsRegular.xCircle,
-                              color: colors.onSurfaceMuted,
-                              size: 20,
-                            ),
-                            onPressed: controller.clear,
-                            tooltip: '清空',
-                          )
-                        : null,
-                    filled: true,
-                    fillColor: colors.background,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: DesignTokens.spaceMd,
-                      vertical: DesignTokens.spaceSm,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius:
-                          BorderRadius.circular(DesignTokens.radiusPill),
-                      borderSide: BorderSide.none,
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius:
-                          BorderRadius.circular(DesignTokens.radiusPill),
-                      borderSide: BorderSide(
-                        color: colors.primary,
-                        width: 1.5,
+                      controller: controller.textController,
+                      autofocus: true,
+                      textInputAction: TextInputAction.search,
+                      onChanged: controller.onKeywordChanged,
+                      onSubmitted: (_) => controller.submitSearch(),
+                      style: TextStyle(
+                        color: colors.onSurface,
+                        fontSize: DesignTokens.textBody,
                       ),
-                    ),
-                  ),
-                )),
+                      decoration: InputDecoration(
+                        hintText: '搜索视频…',
+                        hintStyle: TextStyle(
+                          color: colors.onSurfaceMuted,
+                          fontSize: DesignTokens.textBody,
+                        ),
+                        prefixIcon: Icon(
+                          PhosphorIconsRegular.magnifyingGlass,
+                          color: colors.primary,
+                          size: 20,
+                        ),
+                        suffixIcon: controller.keyword.value.isNotEmpty
+                            ? IconButton(
+                                icon: Icon(
+                                  PhosphorIconsRegular.xCircle,
+                                  color: colors.onSurfaceMuted,
+                                  size: 20,
+                                ),
+                                onPressed: controller.clear,
+                                tooltip: '清空',
+                              )
+                            : null,
+                        filled: true,
+                        fillColor: colors.background,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: DesignTokens.spaceMd,
+                          vertical: DesignTokens.spaceSm,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius:
+                              BorderRadius.circular(DesignTokens.radiusPill),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius:
+                              BorderRadius.circular(DesignTokens.radiusPill),
+                          borderSide: BorderSide(
+                            color: colors.primary,
+                            width: 1.5,
+                          ),
+                        ),
+                      ),
+                    )),
               ),
               const SizedBox(width: DesignTokens.spaceXs),
               Obx(() => TextButton(
