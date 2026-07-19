@@ -184,18 +184,15 @@ class HomePage extends GetView<HomeController> {
                 decoration: BoxDecoration(
                   color: isSelected ? colors.primary : colors.surface,
                   borderRadius: BorderRadius.circular(DesignTokens.radiusPill),
-                  border: isSelected
-                      ? null
-                      : Border.all(color: colors.border),
+                  border: isSelected ? null : Border.all(color: colors.border),
                   boxShadow: isSelected ? DesignTokens.elevation1 : null,
                 ),
                 child: Center(
                   child: Text(
                     tab.name,
                     style: TextStyle(
-                      color: isSelected
-                          ? colors.onPrimary
-                          : colors.onSurfaceMuted,
+                      color:
+                          isSelected ? colors.onPrimary : colors.onSurfaceMuted,
                       fontSize: DesignTokens.textBody,
                       fontWeight:
                           isSelected ? FontWeight.w700 : FontWeight.w500,
