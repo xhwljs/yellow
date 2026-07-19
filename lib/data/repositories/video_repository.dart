@@ -66,4 +66,24 @@ class VideoRepository {
     }
     return result;
   }
+
+  /// 搜索视频
+  ///
+  /// 调用站点 /vodsearch/{keyword}-------------.html 接口，
+  /// 解析返回的 HTML（结构与分类页一致，复用 VideoListParser）。
+  /// 搜索结果不缓存（实时性要求 + 节省存储）。
+  ///
+  /// [keyword] 搜索关键字（不为空才会请求）
+  /// [page] 页码，从 1 开始
+  Future<List<Video>> searchVideos(
+    String keyword, {
+    int page = 1,
+  }) async {
+    if (keyword.trim().isEmpty) return const [];
+    appLogger.i('搜索视频 keyword="$keyword" page=$page');
+    final html = await _apiService.searchVideosHtml(keyword, page);
+    // 搜索结果的 categoryId 用 0 标记（不属于任何分类）
+    final parser = VideoListParser(categoryId: 0);
+    return parser.parse(html);
+  }
 }

@@ -41,4 +41,22 @@ class ApiEndpoints {
 
   /// 首页推荐
   static String get home => base;
+
+  /// 搜索视频
+  ///
+  /// 站点搜索接口（实测）：
+  /// - 首页：`/vodsearch/{keyword}-------------.html`（13 个连字符）
+  /// - 分页：`/vodsearch/{keyword}----------{page}---.html`
+  ///   （关键字与页码之间用 10 个连字符 + 页码 + 3 个连字符分隔）
+  /// - 关键字需 URL 编码（中文/特殊字符）
+  ///
+  /// [keyword] 搜索关键字
+  /// [page] 页码（从 1 开始），为 null 或 1 时返回首页格式
+  static String search(String keyword, [int? page]) {
+    final encoded = Uri.encodeComponent(keyword);
+    if (page == null || page <= 1) {
+      return '$base/vodsearch/$encoded-------------.html';
+    }
+    return '$base/vodsearch/$encoded----------$page---.html';
+  }
 }

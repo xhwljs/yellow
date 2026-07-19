@@ -137,18 +137,20 @@ class VideoDetailParser {
 
   /// 提取封面
   ///
-  /// 当前详情页无独立大图封面，从相关推荐第一张 a[data-original] 取占位。
-  /// 上层应优先使用列表页传入的 coverUrl。
+  /// 详情页本身**没有独立大封面**（实测结构）：
+  /// - `.stui-content__thumb` 不存在
+  /// - 相关推荐 `.stui-vodlist__box` 里第一个 a 标签是广告，其 data-original
+  ///   是广告图（gif）—— 不能用作视频封面
+  ///
+  /// 因此这里**直接返回空**，由上层 VideoDetailController 用列表页
+  /// 传入的 coverUrl 覆盖 detail.video.coverUrl。
   static String _extractCoverUrl(dom.Document doc) {
-    // 详情页有时有 .stui-content__thumb img
+    // 预留：未来若站点恢复 .stui-content__thumb img 结构，从这里取
     final thumbImg = doc.querySelector('.stui-content__thumb img');
-    final cover =
-        thumbImg?.attributes['data-original'] ?? thumbImg?.attributes['src'];
+    final cover = thumbImg?.attributes['data-original'] ??
+        thumbImg?.attributes['src'];
     if (cover != null && cover.isNotEmpty) return cover;
-
-    // 降级：相关推荐第一张 a[data-original]
-    final a = doc.querySelector('a.stui-vodlist__thumb[data-original]');
-    return a?.attributes['data-original'] ?? '';
+    return '';
   }
 
   /// 从 `<script>` 中提取 `AK='xxx'` 的 token

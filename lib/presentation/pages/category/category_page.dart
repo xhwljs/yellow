@@ -129,7 +129,11 @@ class _CategoryPageState extends State<CategoryPage> {
               final v = _controller.videos[i];
               return VideoCard(
                 video: v,
-                onTap: () => Get.toNamed('/detail', arguments: v.id),
+                onTap: () => Get.toNamed('/detail', arguments: {
+                  'videoId': v.id,
+                  'coverUrl': v.coverUrl,
+                  'title': v.title,
+                }),
               );
             },
           ),

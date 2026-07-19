@@ -80,7 +80,7 @@ class VideoDetailPage extends GetView<VideoDetailController> {
               fit: StackFit.expand,
               children: [
                 CachedNetworkImage(
-                  imageUrl: detail.video.coverUrl,
+                  imageUrl: controller.effectiveCoverUrl,
                   fit: BoxFit.cover,
                   placeholder: (_, __) =>
                       Container(color: DesignTokens.colorSkeleton),
@@ -246,7 +246,11 @@ class VideoDetailPage extends GetView<VideoDetailController> {
                 width: 160,
                 child: VideoCard(
                   video: v,
-                  onTap: () => Get.toNamed('/detail', arguments: v.id),
+                  onTap: () => Get.toNamed('/detail', arguments: {
+                    'videoId': v.id,
+                    'coverUrl': v.coverUrl,
+                    'title': v.title,
+                  }),
                 ),
               );
             },

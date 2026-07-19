@@ -63,6 +63,8 @@ class HomePage extends GetView<HomeController> {
               vertical: DesignTokens.spaceMd,
             ),
             children: [
+              _buildSearchEntry(colors),
+              const SizedBox(height: DesignTokens.spaceLg),
               _buildCategoryChips(colors, controller.categories),
               const SizedBox(height: DesignTokens.spaceLg),
               ...controller.categories.map(
@@ -77,6 +79,58 @@ class HomePage extends GetView<HomeController> {
           ),
         );
       }),
+    );
+  }
+
+  /// 顶部搜索入口
+  ///
+  /// 设计参考 ui-ux-pro-max Search UX 建议：
+  /// - 视觉上像搜索框（点击跳转搜索页），降低交互成本
+  /// - 左侧搜索图标 + 占位文案 + 右侧快捷过滤 icon
+  Widget _buildSearchEntry(colors) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: DesignTokens.spaceMd,
+      ),
+      child: GestureDetector(
+        onTap: () => Get.toNamed('/search'),
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: DesignTokens.spaceLg,
+            vertical: DesignTokens.spaceMd,
+          ),
+          decoration: BoxDecoration(
+            color: colors.surface,
+            borderRadius: BorderRadius.circular(DesignTokens.radiusPill),
+            boxShadow: DesignTokens.elevation1,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                PhosphorIconsRegular.magnifyingGlass,
+                size: 20,
+                color: colors.primary,
+              ),
+              const SizedBox(width: DesignTokens.spaceSm),
+              Expanded(
+                child: Text(
+                  '搜索视频…',
+                  style: TextStyle(
+                    color: colors.onSurfaceMuted,
+                    fontSize: DesignTokens.textBody,
+                  ),
+                ),
+              ),
+              Icon(
+                PhosphorIconsRegular.slidersHorizontal,
+                size: 18,
+                color: colors.onSurfaceMuted,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -230,7 +284,11 @@ class HomePage extends GetView<HomeController> {
                     width: 160,
                     child: VideoCard(
                       video: v,
-                      onTap: () => Get.toNamed('/detail', arguments: v.id),
+                      onTap: () => Get.toNamed('/detail', arguments: {
+                        'videoId': v.id,
+                        'coverUrl': v.coverUrl,
+                        'title': v.title,
+                      }),
                     ),
                   );
                 },

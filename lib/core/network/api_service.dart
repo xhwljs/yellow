@@ -41,6 +41,16 @@ class ApiService {
     return response.data ?? '';
   }
 
+  /// 搜索视频 — 返回搜索结果页 HTML
+  ///
+  /// HTML 结构与分类页一致（含 .stui-vodlist__box，混杂广告），
+  /// 由 VideoListParser 解析（categoryId = 0 表示搜索结果）。
+  Future<String> searchVideosHtml(String keyword, [int? page]) async {
+    final url = ApiEndpoints.search(keyword, page);
+    final response = await _dio.get<String>(url);
+    return response.data ?? '';
+  }
+
   /// POST 获取播放地址（解密接口）
   ///
   /// 参数: id, sid, nid, tk, g, x, y, dt, sw, sh, tz, t
