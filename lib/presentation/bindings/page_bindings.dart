@@ -59,6 +59,7 @@ class VideoDetailBinding extends Bindings {
         Get.find<VideoRepository>(),
         Get.find<FavoriteRepository>(),
         Get.find<HistoryRepository>(),
+        Get.find<UrlDecryptor>(),
         videoId: videoId,
         initialCoverUrl: initialCoverUrl,
         initialTitle: initialTitle,

@@ -1,4 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:chewie/chewie.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -12,11 +13,18 @@ import 'package:videohub/presentation/widgets/video_card.dart';
 /// 视频详情页
 ///
 /// 严格遵循 design-system/videohub/MASTER.md：
-/// - CustomScrollView + SliverAppBar（封面背景 + 标题）
-/// - 视频封面 16:9 CachedNetworkImage
+/// - CustomScrollView + SliverAppBar（顶部内联播放器）
 /// - 标题、简介、相关推荐
-/// - 浮动 "播放" FAB，颜色用 colors.primary
+/// - 浮动 "全屏播放" FAB，颜色用 colors.primary
 /// - 收藏 IconButton：已收藏 solid / 未收藏 outline
+///
+/// 顶部 SliverAppBar 区域集成了 video_player + chewie 内联播放器：
+/// - 初始态：封面略缩图 + 中央播放按钮（chewie 内置略缩图能力）
+/// - 加载态：封面 + Loading 圈
+/// - 播放态：chewie 播放器（自带播放/暂停/进度/全屏/倍速按钮）
+/// - 错误态：封面 + 错误图标 + 重试按钮
+///
+/// 现有功能保持不变：FAB 全屏跳转 / 收藏 / 相关推荐 / 标题简介。
 class VideoDetailPage extends GetView<VideoDetailController> {
   const VideoDetailPage({super.key});
 
@@ -53,7 +61,7 @@ class VideoDetailPage extends GetView<VideoDetailController> {
           elevation: 4,
           icon: const Icon(PhosphorIconsFill.play),
           label: const Text(
-            '播放',
+            '全屏播放',
             style: TextStyle(
               fontSize: DesignTokens.textBody,
               fontWeight: FontWeight.w600,
@@ -76,41 +84,9 @@ class VideoDetailPage extends GetView<VideoDetailController> {
           scrolledUnderElevation: 0,
           automaticallyImplyLeading: true,
           flexibleSpace: FlexibleSpaceBar(
-            background: Stack(
-              fit: StackFit.expand,
-              children: [
-                CachedNetworkImage(
-                  imageUrl: controller.effectiveCoverUrl,
-                  fit: BoxFit.cover,
-                  placeholder: (_, __) =>
-                      Container(color: DesignTokens.colorSkeleton),
-                  errorWidget: (_, __, ___) => Container(
-                    color: DesignTokens.colorSkeleton,
-                    child: Center(
-                      child: Icon(
-                        PhosphorIconsRegular.filmSlate,
-                        size: 48,
-                        color: colors.onSurfaceMuted,
-                      ),
-                    ),
-                  ),
-                ),
-                // 底部渐变遮罩（提升返回按钮可见度）
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.black.withOpacity(0.3),
-                        Colors.transparent,
-                        Colors.transparent,
-                      ],
-                      stops: const [0, 0.4, 1],
-                    ),
-                  ),
-                ),
-              ],
+            background: _InlinePlayerArea(
+              controller: controller,
+              colors: colors,
             ),
           ),
           actions: [
@@ -291,6 +267,281 @@ class _MetaChip extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// 详情页顶部内联播放器区域
+///
+/// 集成 video_player + chewie，使用 chewie 自带控件（播放/暂停/进度/全屏/倍速）。
+///
+/// 状态机：
+/// - 初始态（_inlineStarted == false）：封面 + 中央播放按钮
+/// - 加载态（inlineLoading == true）：封面 + 半透明遮罩 + Loading 圈
+/// - 播放态（inlineChewieController != null）：chewie 播放器
+/// - 错误态（inlineErrorMessage != ''）：封面 + 错误图标 + 重试按钮
+///
+/// 用户点击中央播放按钮 → 调用 [VideoDetailController.startInlinePlay]。
+/// 该方法会调用 [UrlDecryptor.decryptPlayUrl] 解密播放地址，然后初始化
+/// video_player + chewie，autoPlay 自动播放。
+class _InlinePlayerArea extends StatelessWidget {
+  final VideoDetailController controller;
+  final ThemeColors colors;
+
+  const _InlinePlayerArea({
+    required this.controller,
+    required this.colors,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      final videoController = controller.inlineVideoController.value;
+      final chewieController = controller.inlineChewieController.value;
+      final isLoading = controller.inlineLoading.value;
+      final errorMessage = controller.inlineErrorMessage.value;
+
+      // 错误态：封面 + 重试按钮
+      if (errorMessage.isNotEmpty) {
+        return _buildThumbnail(
+          coverUrl: controller.effectiveCoverUrl,
+          overlay: _ErrorOverlay(
+            message: errorMessage,
+            onRetry: controller.retryInlinePlay,
+            colors: colors,
+          ),
+        );
+      }
+
+      // 加载态：封面 + Loading 圈
+      if (isLoading) {
+        return _buildThumbnail(
+          coverUrl: controller.effectiveCoverUrl,
+          overlay: _LoadingOverlay(colors: colors),
+        );
+      }
+
+      // 播放态：chewie 播放器
+      if (videoController != null &&
+          chewieController != null &&
+          videoController.value.isInitialized) {
+        return Container(
+          color: Colors.black,
+          child: Chewie(controller: chewieController),
+        );
+      }
+
+      // 初始态：封面 + 中央播放按钮
+      return _buildThumbnail(
+        coverUrl: controller.effectiveCoverUrl,
+        overlay: _PlayButtonOverlay(
+          onTap: controller.startInlinePlay,
+          colors: colors,
+        ),
+      );
+    });
+  }
+
+  /// 构建封面略缩图（含底部渐变遮罩 + 叠加层）
+  ///
+  /// 与原详情页 SliverAppBar 背景视觉一致：
+  /// - CachedNetworkImage 全屏 cover
+  /// - 顶部 30% 黑色渐变（提升返回按钮可见度）
+  /// - 中央叠加 [overlay] 内容（播放按钮 / loading / 错误）
+  Widget _buildThumbnail({
+    required String coverUrl,
+    required Widget overlay,
+  }) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // 封面
+        if (coverUrl.isNotEmpty)
+          CachedNetworkImage(
+            imageUrl: coverUrl,
+            fit: BoxFit.cover,
+            placeholder: (_, __) =>
+                Container(color: DesignTokens.colorSkeleton),
+            errorWidget: (_, __, ___) => Container(
+              color: Colors.black,
+              child: Center(
+                child: Icon(
+                  PhosphorIconsRegular.filmSlate,
+                  size: 48,
+                  color: colors.onSurfaceMuted,
+                ),
+              ),
+            ),
+          )
+        else
+          Container(
+            color: Colors.black,
+            child: Center(
+              child: Icon(
+                PhosphorIconsRegular.filmSlate,
+                size: 48,
+                color: colors.onSurfaceMuted,
+              ),
+            ),
+          ),
+        // 底部渐变遮罩（提升返回按钮可见度）
+        Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.black.withOpacity(0.3),
+                Colors.transparent,
+                Colors.transparent,
+              ],
+              stops: const [0, 0.4, 1],
+            ),
+          ),
+        ),
+        // 叠加层（播放按钮 / loading / 错误）
+        overlay,
+      ],
+    );
+  }
+}
+
+/// 中央播放按钮叠加层（初始态）
+///
+/// 大号圆形按钮，点击触发 [VideoDetailController.startInlinePlay]。
+/// 半透明黑色边框 + 主题色填充，符合 Material Design FilledButton 风格。
+class _PlayButtonOverlay extends StatelessWidget {
+  final VoidCallback onTap;
+  final ThemeColors colors;
+
+  const _PlayButtonOverlay({
+    required this.onTap,
+    required this.colors,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(36),
+          child: Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: colors.primary.withOpacity(0.9),
+              border: Border.all(color: Colors.white, width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: const Icon(
+              PhosphorIconsFill.play,
+              size: 36,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 加载叠加层（解密 + 视频初始化阶段）
+class _LoadingOverlay extends StatelessWidget {
+  final ThemeColors colors;
+  const _LoadingOverlay({required this.colors});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Colors.black54,
+      alignment: Alignment.center,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 44,
+            height: 44,
+            child: CircularProgressIndicator(
+              color: colors.primary,
+              strokeWidth: 3,
+            ),
+          ),
+          const SizedBox(height: DesignTokens.spaceSm),
+          const Text(
+            '正在解析播放地址...',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: DesignTokens.textCaption,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 错误叠加层（含重试按钮）
+class _ErrorOverlay extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+  final ThemeColors colors;
+
+  const _ErrorOverlay({
+    required this.message,
+    required this.onRetry,
+    required this.colors,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Colors.black.withOpacity(0.7),
+      alignment: Alignment.center,
+      padding: const EdgeInsets.all(DesignTokens.spaceLg),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            PhosphorIconsRegular.warningCircle,
+            color: colors.destructive,
+            size: 40,
+          ),
+          const SizedBox(height: DesignTokens.spaceSm),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: DesignTokens.textCaption,
+            ),
+          ),
+          const SizedBox(height: DesignTokens.spaceMd),
+          FilledButton.icon(
+            onPressed: onRetry,
+            style: FilledButton.styleFrom(
+              backgroundColor: colors.primary,
+              foregroundColor: colors.onPrimary,
+              minimumSize: const Size(0, 36),
+              padding: const EdgeInsets.symmetric(
+                horizontal: DesignTokens.spaceMd,
+              ),
+            ),
+            icon: const Icon(Icons.refresh, size: 18),
+            label: const Text('重试'),
+          ),
+        ],
+      ),
     );
   }
 }
