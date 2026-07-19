@@ -1,4 +1,6 @@
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:videohub/core/constants/app_constants.dart';
 import 'package:videohub/core/network/api_service.dart';
 import 'package:videohub/core/network/dio_client.dart';
 import 'package:videohub/core/player/url_decryptor.dart';
@@ -16,24 +18,32 @@ import 'package:videohub/presentation/controllers/main_shell_controller.dart';
 /// 应用初始化（在 runApp 之前调用）
 ///
 /// 严格按依赖顺序注入：
-/// 1. Dio 客户端
-/// 2. ApiService
-/// 3. AppDatabase (Floor)
-/// 4. 4 个 Repository
-/// 5. 全局 Controller（Theme / MainShell / Home / Favorites / History）
-/// 6. UrlDecryptor
+/// 1. SharedPreferences 加载用户覆盖的 baseUrl
+/// 2. Dio 客户端
+/// 3. ApiService
+/// 4. AppDatabase (Floor)
+/// 5. 4 个 Repository
+/// 6. 全局 Controller（Theme / MainShell / Home / Favorites / History）
+/// 7. UrlDecryptor
 Future<void> initializeApp() async {
-  // 1. Dio
+  // 1. 加载用户保存的 baseUrl（运行时切换 API 域名功能）
+  final prefs = await SharedPreferences.getInstance();
+  final savedBaseUrl = prefs.getString(AppConstants.keyApiBaseUrl);
+  if (savedBaseUrl != null && savedBaseUrl.isNotEmpty) {
+    AppConstants.baseUrl = savedBaseUrl;
+  }
+
+  // 2. Dio
   await DioClient.ensureInitialized();
 
-  // 2. ApiService
+  // 3. ApiService
   Get.put<ApiService>(ApiService(), permanent: true);
 
-  // 3. 数据库
+  // 4. 数据库
   final database = await AppDatabase.build();
   Get.put<AppDatabase>(database, permanent: true);
 
-  // 4. Repository
+  // 5. Repository
   Get.put<CategoryRepository>(
     CategoryRepository(Get.find<ApiService>(), Get.find<AppDatabase>()),
     permanent: true,
@@ -51,19 +61,19 @@ Future<void> initializeApp() async {
     permanent: true,
   );
 
-  // 5. 解密器
+  // 6. 解密器
   Get.put<UrlDecryptor>(
     UrlDecryptor(Get.find<ApiService>()),
     permanent: true,
   );
 
-  // 6. 全局控制器
+  // 7. 全局控制器
   final themeController = ThemeController();
   themeController.onInit();
   Get.put<ThemeController>(themeController, permanent: true);
   Get.put<MainShellController>(MainShellController(), permanent: true);
 
-  // 7. Shell 内 3 个常驻控制器
+  // 8. Shell 内 3 个常驻控制器
   Get.put<HomeController>(
     HomeController(
       Get.find<CategoryRepository>(),

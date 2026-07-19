@@ -90,6 +90,55 @@ class DioClient {
     return interceptor.cookieJar;
   }
 
+  /// 重建 Dio 实例（切换 baseUrl 后调用）
+  ///
+  /// 保留所有拦截器配置，仅关闭旧 Dio、创建新 Dio、重新注入拦截器。
+  /// 调用前需先更新 [AppConstants.baseUrl]。
+  static Future<Dio> rebuildWithBaseUrl(String newBaseUrl) async {
+    // 关闭旧 Dio
+    _instance?.close();
+
+    // 重新创建（沿用 ensureInitialized 的所有配置）
+    final cookieInterceptor = await CookieInterceptor.create();
+
+    final dio = Dio(
+      BaseOptions(
+        baseUrl: newBaseUrl,
+        connectTimeout:
+            const Duration(milliseconds: AppConstants.connectTimeoutMs),
+        receiveTimeout:
+            const Duration(milliseconds: AppConstants.receiveTimeoutMs),
+        sendTimeout: const Duration(milliseconds: AppConstants.sendTimeoutMs),
+        responseType: ResponseType.plain,
+        followRedirects: true,
+        maxRedirects: 5,
+        validateStatus: (status) =>
+            status != null && status >= 200 && status < 400,
+      ),
+    );
+
+    dio.httpClientAdapter = IOHttpClientAdapter(
+      createHttpClient: () {
+        final client = HttpClient()
+          ..autoUncompress = true
+          ..userAgent = null;
+        return client;
+      },
+      validateCertificate: (cert, host, port) => true,
+    );
+
+    dio.interceptors.addAll([
+      UserAgentInterceptor(),
+      cookieInterceptor,
+      LoggingInterceptor(),
+      RetryInterceptor(dioProvider: () => dio),
+      ErrorInterceptor(),
+    ]);
+
+    _instance = dio;
+    return dio;
+  }
+
   /// 仅用于测试或重置
   static void resetForTesting() {
     _instance = null;
