@@ -330,13 +330,13 @@ class VideoDetailController extends GetxController {
     // 异步执行，不阻塞当前调用方
     _historyRepo
         .upsertHistory(
-          videoId: videoId,
-          title: effectiveTitle,
-          coverUrl: effectiveCoverUrl,
-          categoryId: categoryId,
-          positionMs: positionMs,
-          durationMs: durationMs,
-        )
+      videoId: videoId,
+      title: effectiveTitle,
+      coverUrl: effectiveCoverUrl,
+      categoryId: categoryId,
+      positionMs: positionMs,
+      durationMs: durationMs,
+    )
         .catchError((e) {
       appLogger.w('保存播放历史失败: $e');
       return null;
