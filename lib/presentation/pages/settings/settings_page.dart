@@ -291,8 +291,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   vertical: DesignTokens.spaceMd,
                 ),
                 shape: RoundedRectangleBorder(
-                  borderRadius:
-                      BorderRadius.circular(DesignTokens.radiusMd),
+                  borderRadius: BorderRadius.circular(DesignTokens.radiusMd),
                 ),
               ),
             ),
@@ -314,8 +313,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   vertical: DesignTokens.spaceMd,
                 ),
                 shape: RoundedRectangleBorder(
-                  borderRadius:
-                      BorderRadius.circular(DesignTokens.radiusMd),
+                  borderRadius: BorderRadius.circular(DesignTokens.radiusMd),
                 ),
               ),
             ),
