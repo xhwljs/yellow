@@ -33,8 +33,7 @@ class ParseException extends AppException {
 }
 
 class DecryptException extends AppException {
-  const DecryptException([super.message = '播放地址解密失败'])
-      : super(code: 'DECRYPT');
+  const DecryptException([super.message = '播放地址解密失败']) : super(code: 'DECRYPT');
 }
 
 class UrlExpiredException extends AppException {
@@ -43,8 +42,7 @@ class UrlExpiredException extends AppException {
 }
 
 class NotFoundException extends AppException {
-  const NotFoundException([super.message = '资源不存在'])
-      : super(code: 'NOT_FOUND');
+  const NotFoundException([super.message = '资源不存在']) : super(code: 'NOT_FOUND');
 }
 
 class DatabaseException extends AppException {

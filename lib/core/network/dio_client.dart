@@ -35,8 +35,10 @@ class DioClient {
 
     final dio = Dio(
       BaseOptions(
-        connectTimeout: const Duration(milliseconds: AppConstants.connectTimeoutMs),
-        receiveTimeout: const Duration(milliseconds: AppConstants.receiveTimeoutMs),
+        connectTimeout:
+            const Duration(milliseconds: AppConstants.connectTimeoutMs),
+        receiveTimeout:
+            const Duration(milliseconds: AppConstants.receiveTimeoutMs),
         sendTimeout: const Duration(milliseconds: AppConstants.sendTimeoutMs),
         responseType: ResponseType.plain, // 返回原始字符串用于 HTML 解析
         followRedirects: true,
