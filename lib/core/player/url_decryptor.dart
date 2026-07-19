@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:videohub/core/constants/app_constants.dart';
 import 'package:videohub/core/error/exceptions.dart';
+import 'package:videohub/core/network/api_server_switcher.dart';
 import 'package:videohub/core/network/api_service.dart';
 import 'package:videohub/core/parser/video_detail_parser.dart';
 import 'package:videohub/core/utils/logger.dart';
@@ -40,6 +42,11 @@ class UrlDecryptor {
   /// 3. Base64 解码
   /// 4. 地址时效性校验
   ///
+  /// **自动 fallback**：若当前 baseUrl 提取 AK Token 失败（用户持久化了
+  /// 未列入 [ApiServerSwitcher._deadMirrors] 的失效镜像），自动切换到
+  /// [AppConstants.defaultBaseUrl] 并持久化，然后重试一次。这是用户报告
+  /// "未找到 AK Token，无法解密"的最后兜底。
+  ///
   /// 返回 (playUrl, videoDetail)
   Future<({String playUrl, VideoDetail detail})> decryptPlayUrl(
     String videoId, {
@@ -47,6 +54,36 @@ class UrlDecryptor {
   }) async {
     appLogger.i('开始解密播放地址: videoId=$videoId');
 
+    try {
+      return await _decryptPlayUrlInternal(
+        videoId,
+        existingDetail: existingDetail,
+      );
+    } on DecryptException catch (e) {
+      // 仅在 "未找到 AK Token" 且当前 baseUrl 非默认时 fallback
+      final shouldFallback = e.message.contains('未找到 AK Token') &&
+          AppConstants.baseUrl != AppConstants.defaultBaseUrl;
+
+      if (!shouldFallback) rethrow;
+
+      appLogger.w(
+        '当前 baseUrl=${AppConstants.baseUrl} 提取 AK Token 失败，'
+        '自动 fallback 到 defaultBaseUrl=${AppConstants.defaultBaseUrl} 重试',
+      );
+
+      // 切换到 defaultBaseUrl（含 Dio 重建 + SharedPreferences 持久化）
+      await ApiServerSwitcher.switchTo(AppConstants.defaultBaseUrl);
+
+      // 强制重新拉取详情页（existingDetail 可能是用旧 baseUrl 拉取的）
+      return await _decryptPlayUrlInternal(videoId, existingDetail: null);
+    }
+  }
+
+  /// 内部解密实现（不含 fallback 逻辑）
+  Future<({String playUrl, VideoDetail detail})> _decryptPlayUrlInternal(
+    String videoId, {
+    VideoDetail? existingDetail,
+  }) async {
     // 1. 拉取详情页（若未提供已有详情）
     VideoDetail detail;
     if (existingDetail != null &&
