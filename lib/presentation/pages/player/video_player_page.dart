@@ -251,8 +251,8 @@ class _GestureOverlay extends StatelessWidget {
         controller.seekTo(Duration(milliseconds: target));
       },
       onVerticalDragUpdate: (details) {
-        final isLeft = details.globalPosition.dx <
-            MediaQuery.of(context).size.width / 2;
+        final isLeft =
+            details.globalPosition.dx < MediaQuery.of(context).size.width / 2;
         if (isLeft) {
           controller.setBrightness(
             controller.brightness.value - details.delta.dy / 500,
