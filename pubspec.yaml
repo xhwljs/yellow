@@ -33,7 +33,7 @@ dependencies:
   chewie: ^1.8.1
   wakelock_plus: ^1.2.4
   screen_brightness: ^1.0.1
-  volume_controller: ^1.0.4
+  volume_controller: ^3.4.4
 
   # UI / 设计系统
   google_fonts: ^6.2.1
