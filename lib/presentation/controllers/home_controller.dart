@@ -27,7 +27,8 @@ class HomeController extends GetxController {
     error?.value = '';
     try {
       // 1. 分类
-      final cats = await _categoryRepo.getCategories(forceRefresh: forceRefresh);
+      final cats =
+          await _categoryRepo.getCategories(forceRefresh: forceRefresh);
       categories.value = cats;
 
       // 2. 各分类首页视频（并发拉取前 3 个分类）

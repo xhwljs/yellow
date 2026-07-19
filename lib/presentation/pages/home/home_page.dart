@@ -120,8 +120,7 @@ class HomePage extends GetView<HomeController> {
               ),
               decoration: BoxDecoration(
                 color: colors.primaryContainer,
-                borderRadius:
-                    BorderRadius.circular(DesignTokens.radiusPill),
+                borderRadius: BorderRadius.circular(DesignTokens.radiusPill),
               ),
               child: Center(
                 child: Text(
@@ -170,8 +169,7 @@ class HomePage extends GetView<HomeController> {
                   ),
                 ),
                 GestureDetector(
-                  onTap: () =>
-                      Get.toNamed('/category', arguments: category.id),
+                  onTap: () => Get.toNamed('/category', arguments: category.id),
                   behavior: HitTestBehavior.opaque,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
@@ -232,8 +230,7 @@ class HomePage extends GetView<HomeController> {
                     width: 160,
                     child: VideoCard(
                       video: v,
-                      onTap: () =>
-                          Get.toNamed('/detail', arguments: v.id),
+                      onTap: () => Get.toNamed('/detail', arguments: v.id),
                     ),
                   );
                 },

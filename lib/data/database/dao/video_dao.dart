@@ -3,7 +3,8 @@ import 'package:videohub/data/models/video.dart';
 
 @dao
 abstract class VideoDao {
-  @Query('SELECT * FROM Video WHERE categoryId = :categoryId ORDER BY updateTime DESC')
+  @Query(
+      'SELECT * FROM Video WHERE categoryId = :categoryId ORDER BY updateTime DESC')
   Future<List<Video>> findByCategoryId(int categoryId);
 
   @Query('SELECT * FROM Video WHERE id = :id')

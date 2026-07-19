@@ -109,8 +109,7 @@ class _CategoryPageState extends State<CategoryPage> {
           child: GridView.builder(
             controller: _scrollController,
             padding: const EdgeInsets.all(DesignTokens.spaceMd),
-            gridDelegate:
-                const SliverGridDelegateWithFixedCrossAxisCount(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: DesignTokens.videoGridCrossAxisCount,
               mainAxisSpacing: DesignTokens.videoGridMainAxisSpacing,
               crossAxisSpacing: DesignTokens.videoGridSpacing,
@@ -123,8 +122,7 @@ class _CategoryPageState extends State<CategoryPage> {
                 return Center(
                   child: Padding(
                     padding: const EdgeInsets.all(DesignTokens.spaceLg),
-                    child:
-                        CircularProgressIndicator(color: colors.primary),
+                    child: CircularProgressIndicator(color: colors.primary),
                   ),
                 );
               }

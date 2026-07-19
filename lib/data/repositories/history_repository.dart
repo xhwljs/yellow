@@ -54,7 +54,8 @@ class HistoryRepository {
 
     // 自动裁剪
     await _db.historyDao.trimOld(AppConstants.historyMaxRecords);
-    appLogger.d('更新播放历史: $videoId progress=${positionMs / (durationMs > 0 ? durationMs : 1)}');
+    appLogger.d(
+        '更新播放历史: $videoId progress=${positionMs / (durationMs > 0 ? durationMs : 1)}');
   }
 
   /// 删除单条历史

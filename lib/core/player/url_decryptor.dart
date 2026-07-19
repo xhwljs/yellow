@@ -137,9 +137,8 @@ class UrlDecryptor {
 
       // 补齐 padding
       final padding = normalized.length % 4;
-      final padded = padding == 0
-          ? normalized
-          : normalized + ('=' * (4 - padding));
+      final padded =
+          padding == 0 ? normalized : normalized + ('=' * (4 - padding));
 
       final bytes = base64Decode(padded);
       return utf8.decode(bytes);

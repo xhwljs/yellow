@@ -6,7 +6,8 @@ abstract class HistoryDao {
   @Query('SELECT * FROM PlayHistory ORDER BY updatedAt DESC LIMIT :limit')
   Future<List<PlayHistory>> findAll({int limit = 500});
 
-  @Query('SELECT * FROM PlayHistory ORDER BY updatedAt DESC LIMIT :limit OFFSET :offset')
+  @Query(
+      'SELECT * FROM PlayHistory ORDER BY updatedAt DESC LIMIT :limit OFFSET :offset')
   Future<List<PlayHistory>> findPage({int limit = 20, int offset = 0});
 
   @Query('SELECT * FROM PlayHistory WHERE videoId = :videoId')

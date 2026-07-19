@@ -43,9 +43,8 @@ class VideoDetailBinding extends Bindings {
 class PlayerBinding extends Bindings {
   @override
   void dependencies() {
-    final args = Get.arguments is Map
-        ? Get.arguments as Map
-        : <String, dynamic>{};
+    final args =
+        Get.arguments is Map ? Get.arguments as Map : <String, dynamic>{};
 
     Get.lazyPut<PlayerPageController>(
       () => PlayerPageController(

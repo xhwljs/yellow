@@ -18,30 +18,33 @@ class VideoListParser {
       final doc = parser.parse(html);
       final items = doc.querySelectorAll('.stui-vodlist__box');
 
-      return items.map((element) {
-        final link = element.querySelector('a');
-        final img = element.querySelector('img');
-        final detail = element.querySelector('.stui-vodlist__detail');
-        final picText = element.querySelector('.pic-text');
+      return items
+          .map((element) {
+            final link = element.querySelector('a');
+            final img = element.querySelector('img');
+            final detail = element.querySelector('.stui-vodlist__detail');
+            final picText = element.querySelector('.pic-text');
 
-        final href = link?.attributes['href'] ?? '';
-        final id = _extractVideoId(href);
+            final href = link?.attributes['href'] ?? '';
+            final id = _extractVideoId(href);
 
-        return Video(
-          id: id,
-          title: detail?.querySelector('h4 a')?.text.trim() ??
-              link?.text.trim() ??
-              '',
-          coverUrl: img?.attributes['data-original'] ??
-              img?.attributes['src'] ??
-              '',
-          duration: picText?.text.trim() ?? '',
-          updateTime: '',
-          playCount: 0,
-          likeCount: 0,
-          categoryId: categoryId,
-        );
-      }).where((v) => v.id.isNotEmpty).toList();
+            return Video(
+              id: id,
+              title: detail?.querySelector('h4 a')?.text.trim() ??
+                  link?.text.trim() ??
+                  '',
+              coverUrl: img?.attributes['data-original'] ??
+                  img?.attributes['src'] ??
+                  '',
+              duration: picText?.text.trim() ?? '',
+              updateTime: '',
+              playCount: 0,
+              likeCount: 0,
+              categoryId: categoryId,
+            );
+          })
+          .where((v) => v.id.isNotEmpty)
+          .toList();
     } catch (e) {
       throw ParseException(
         '视频列表解析失败',

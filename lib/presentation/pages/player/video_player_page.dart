@@ -224,8 +224,8 @@ class _GestureOverlay extends StatelessWidget {
       onVerticalDragUpdate: (details) {
         final dx = details.delta.dx;
         // 左半屏：亮度；右半屏：音量
-        final isLeft = details.globalPosition.dx <
-            MediaQuery.of(context).size.width / 2;
+        final isLeft =
+            details.globalPosition.dx < MediaQuery.of(context).size.width / 2;
         if (isLeft) {
           controller.setBrightness(
             controller.brightness.value - details.delta.dy / 500,
@@ -377,7 +377,9 @@ class _VideoHubControls extends StatelessWidget {
                 iconSize: 48,
                 color: Colors.white,
                 icon: Icon(
-                  isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
+                  isPlaying
+                      ? Icons.pause_circle_filled
+                      : Icons.play_circle_filled,
                 ),
                 onPressed: controller.togglePlayPause,
               ),

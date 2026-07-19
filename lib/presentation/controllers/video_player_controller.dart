@@ -139,9 +139,9 @@ class PlayerPageController extends GetxController {
       );
 
       await _videoController!.initialize().timeout(
-        const Duration(seconds: 30),
-        onTimeout: () => throw const TimeoutException('视频初始化超时'),
-      );
+            const Duration(seconds: 30),
+            onTimeout: () => throw const TimeoutException('视频初始化超时'),
+          );
 
       // 5. 续播
       if (args.initialPositionMs > 0) {
@@ -204,8 +204,7 @@ class PlayerPageController extends GetxController {
 
     if (value.hasError) {
       state.value = PlayerState.error;
-      errorMessage.value =
-          '播放错误：${value.errorDescription ?? '未知错误'}';
+      errorMessage.value = '播放错误：${value.errorDescription ?? '未知错误'}';
     }
   }
 

@@ -20,13 +20,15 @@ class VideoDetailParser {
 
       // 标题
       final title = doc
-              .querySelector('.stui-content__detail h1, .stui-pannel__head h3, h1.title')
+              .querySelector(
+                  '.stui-content__detail h1, .stui-pannel__head h3, h1.title')
               ?.text
               .trim() ??
           videoId;
 
       // 封面
-      final coverImg = doc.querySelector('.stui-content__thumb img, .thumb img, .pic img');
+      final coverImg =
+          doc.querySelector('.stui-content__thumb img, .thumb img, .pic img');
       final coverUrl = coverImg?.attributes['data-original'] ??
           coverImg?.attributes['src'] ??
           '';
@@ -105,31 +107,35 @@ class VideoDetailParser {
 
   /// 解析相关推荐视频列表
   static List<Video> _parseRelatedVideos(dynamic doc) {
-    final items = doc.querySelectorAll('.stui-vodlist__bd .stui-vodlist__box, .stui-pannel_bd .stui-vodlist__box');
-    return items.map((element) {
-      final link = element.querySelector('a');
-      final img = element.querySelector('img');
-      final detail = element.querySelector('.stui-vodlist__detail');
-      final picText = element.querySelector('.pic-text');
-      final href = link?.attributes['href'] ?? '';
+    final items = doc.querySelectorAll(
+        '.stui-vodlist__bd .stui-vodlist__box, .stui-pannel_bd .stui-vodlist__box');
+    return items
+        .map((element) {
+          final link = element.querySelector('a');
+          final img = element.querySelector('img');
+          final detail = element.querySelector('.stui-vodlist__detail');
+          final picText = element.querySelector('.pic-text');
+          final href = link?.attributes['href'] ?? '';
 
-      final idMatch = RegExp(r'voddetail/([A-Za-z0-9]+)').firstMatch(href);
-      final id = idMatch?.group(1) ?? '';
+          final idMatch = RegExp(r'voddetail/([A-Za-z0-9]+)').firstMatch(href);
+          final id = idMatch?.group(1) ?? '';
 
-      return Video(
-        id: id,
-        title: detail?.querySelector('h4 a')?.text.trim() ??
-            link?.text.trim() ??
-            '',
-        coverUrl: img?.attributes['data-original'] ??
-            img?.attributes['src'] ??
-            '',
-        duration: picText?.text.trim() ?? '',
-        updateTime: '',
-        playCount: 0,
-        likeCount: 0,
-        categoryId: 0,
-      );
-    }).where((v) => v.id.isNotEmpty).toList();
+          return Video(
+            id: id,
+            title: detail?.querySelector('h4 a')?.text.trim() ??
+                link?.text.trim() ??
+                '',
+            coverUrl: img?.attributes['data-original'] ??
+                img?.attributes['src'] ??
+                '',
+            duration: picText?.text.trim() ?? '',
+            updateTime: '',
+            playCount: 0,
+            likeCount: 0,
+            categoryId: 0,
+          );
+        })
+        .where((v) => v.id.isNotEmpty)
+        .toList();
   }
 }

@@ -41,7 +41,8 @@ class DioClient {
         responseType: ResponseType.plain, // 返回原始字符串用于 HTML 解析
         followRedirects: true,
         maxRedirects: 5,
-        validateStatus: (status) => status != null && status >= 200 && status < 400,
+        validateStatus: (status) =>
+            status != null && status >= 200 && status < 400,
       ),
     );
 

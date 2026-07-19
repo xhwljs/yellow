@@ -62,13 +62,11 @@ class FavoritesPage extends GetView<FavoritesController> {
             final fav = controller.favorites[i];
             final video = _favoriteToVideo(fav);
             return GestureDetector(
-              onLongPress: () =>
-                  _confirmDelete(fav.videoId, fav.title),
+              onLongPress: () => _confirmDelete(fav.videoId, fav.title),
               child: VideoCard(
                 video: video,
                 isFavorited: true,
-                onTap: () =>
-                    Get.toNamed('/detail', arguments: fav.videoId),
+                onTap: () => Get.toNamed('/detail', arguments: fav.videoId),
               ),
             );
           },

@@ -101,8 +101,7 @@ class SettingsPage extends StatelessWidget {
                   preset: preset,
                   selected: selected,
                   colors: colors,
-                  onTap: () =>
-                      themeController.switchPreset(preset),
+                  onTap: () => themeController.switchPreset(preset),
                 );
               }).toList(),
             );
@@ -117,8 +116,7 @@ class SettingsPage extends StatelessWidget {
               ),
               decoration: BoxDecoration(
                 color: colors.surfaceVariant,
-                borderRadius:
-                    BorderRadius.circular(DesignTokens.radiusMd),
+                borderRadius: BorderRadius.circular(DesignTokens.radiusMd),
               ),
               child: Row(
                 children: [
@@ -357,8 +355,7 @@ class _ThemeColorBlock extends StatelessWidget {
             preset.name,
             style: TextStyle(
               fontSize: DesignTokens.textLabel,
-              fontWeight:
-                  selected ? FontWeight.w600 : FontWeight.w400,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
               color: selected ? colors.onBackground : colors.onSurfaceMuted,
             ),
           ),

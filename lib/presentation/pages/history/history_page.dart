@@ -81,8 +81,7 @@ class HistoryPage extends GetView<HistoryController> {
                 ),
                 decoration: BoxDecoration(
                   color: colors.destructive,
-                  borderRadius:
-                      BorderRadius.circular(DesignTokens.radiusLg),
+                  borderRadius: BorderRadius.circular(DesignTokens.radiusLg),
                 ),
                 child: Icon(
                   PhosphorIconsRegular.trash(),
@@ -101,8 +100,7 @@ class HistoryPage extends GetView<HistoryController> {
               },
               child: _HistoryItem(
                 history: h,
-                onTap: () =>
-                    Get.toNamed('/detail', arguments: h.videoId),
+                onTap: () => Get.toNamed('/detail', arguments: h.videoId),
               ),
             );
           },
@@ -179,8 +177,7 @@ class _HistoryItem extends StatelessWidget {
             children: [
               // 左侧封面缩略图 80x60 圆角 8
               ClipRRect(
-                borderRadius:
-                    BorderRadius.circular(DesignTokens.radiusSm),
+                borderRadius: BorderRadius.circular(DesignTokens.radiusSm),
                 child: SizedBox(
                   width: 80,
                   height: 60,
@@ -269,8 +266,7 @@ class _HistoryItem extends StatelessWidget {
                         value: history.progress,
                         minHeight: 3,
                         backgroundColor: colors.border,
-                        valueColor:
-                            AlwaysStoppedAnimation(colors.primary),
+                        valueColor: AlwaysStoppedAnimation(colors.primary),
                       ),
                     ),
                   ],
