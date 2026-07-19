@@ -36,6 +36,10 @@ class ApiService {
   ///
   /// 参数: id, sid, nid, tk, g, x, y, dt, sw, sh, tz, t
   /// 返回: JSON {ok: boolean, u: string}
+  ///
+  /// 注意：不要在此处设置 `X-Requested-With: XMLHttpRequest`，
+  /// 否则会覆盖拦截器注入的 `com.mmbox.xbrowser` 反爬识别头，
+  /// 导致源站 connection reset。Referer 也由拦截器统一注入。
   Future<Map<String, dynamic>> postDecryptPlayUrl(
     Map<String, dynamic> params,
   ) async {
@@ -46,8 +50,6 @@ class ApiService {
         responseType: ResponseType.json,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          'Referer': ApiEndpoints.base,
-          'X-Requested-With': 'XMLHttpRequest',
         },
       ),
     );
