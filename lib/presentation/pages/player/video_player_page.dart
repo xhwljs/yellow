@@ -53,7 +53,7 @@ class VideoPlayerPage extends GetView<PlayerPageController> {
     switch (controller.state.value) {
       case PlayerState.idle:
       case PlayerState.decrypting:
-        return _DecryptingView(message: '正在解析播放地址...');
+        return const _DecryptingView(message: '正在解析播放地址...');
       case PlayerState.loading:
         return const _LoadingView(message: '加载视频中...');
       case PlayerState.buffering:
