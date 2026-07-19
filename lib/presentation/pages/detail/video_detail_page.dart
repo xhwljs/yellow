@@ -51,7 +51,7 @@ class VideoDetailPage extends GetView<VideoDetailController> {
           backgroundColor: colors.primary,
           foregroundColor: colors.onPrimary,
           elevation: 4,
-          icon: Icon(PhosphorIconsFill.play),
+          icon: const Icon(PhosphorIconsFill.play),
           label: const Text(
             '播放',
             style: TextStyle(

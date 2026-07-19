@@ -68,7 +68,7 @@ class _ShellBody extends GetView<MainShellController> {
           unselectedItemColor: colors.onSurfaceMuted,
           showSelectedLabels: true,
           showUnselectedLabels: true,
-          items: [
+          items: const [
             BottomNavigationBarItem(
               icon: Icon(PhosphorIconsRegular.house),
               activeIcon: Icon(PhosphorIconsFill.house),

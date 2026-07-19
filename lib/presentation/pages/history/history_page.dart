@@ -60,7 +60,7 @@ class HistoryPage extends GetView<HistoryController> {
           return const LoadingView(message: '加载中...');
         }
         if (controller.histories.isEmpty) {
-          return EmptyView(
+          return const EmptyView(
             icon: PhosphorIconsRegular.clock,
             title: '暂无历史',
             subtitle: '看完的视频会在这里继续',

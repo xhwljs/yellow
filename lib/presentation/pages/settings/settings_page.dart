@@ -257,7 +257,7 @@ class SettingsPage extends StatelessWidget {
             width: double.infinity,
             child: FilledButton.icon(
               onPressed: _clearCache,
-              icon: Icon(PhosphorIconsRegular.broom),
+              icon: const Icon(PhosphorIconsRegular.broom),
               label: const Text('清除缓存'),
               style: FilledButton.styleFrom(
                 backgroundColor: colors.destructive,

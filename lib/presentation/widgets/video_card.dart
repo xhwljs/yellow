@@ -45,7 +45,7 @@ class VideoCard extends StatelessWidget {
                     imageUrl: video.coverUrl,
                     fit: BoxFit.cover,
                     placeholder: (_, __) => const _ShimmerBox(),
-                    errorWidget: (_, __, ___) => _CoverPlaceholder(
+                    errorWidget: (_, __, ___) => const _CoverPlaceholder(
                       icon: PhosphorIconsRegular.filmSlate,
                     ),
                   ),

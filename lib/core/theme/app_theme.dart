@@ -23,8 +23,6 @@ class AppTheme {
       onTertiary: colors.onAccent,
       surface: colors.surface,
       onSurface: colors.onSurface,
-      background: colors.background,
-      onBackground: colors.onBackground,
       error: colors.destructive,
       onError: const Color(0xFFFFFFFF),
       outline: colors.border,

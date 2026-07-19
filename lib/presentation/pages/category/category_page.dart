@@ -70,7 +70,7 @@ class _CategoryPageState extends State<CategoryPage> {
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: Icon(PhosphorIconsRegular.arrowLeft),
+          icon: const Icon(PhosphorIconsRegular.arrowLeft),
           onPressed: Get.back,
           tooltip: '返回',
         ),

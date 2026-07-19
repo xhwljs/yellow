@@ -45,7 +45,7 @@ class FavoritesPage extends GetView<FavoritesController> {
           return const LoadingView(message: '加载中...');
         }
         if (controller.favorites.isEmpty) {
-          return EmptyView(
+          return const EmptyView(
             icon: PhosphorIconsRegular.heart,
             title: '暂无收藏',
             subtitle: '去发现喜欢的视频吧',
