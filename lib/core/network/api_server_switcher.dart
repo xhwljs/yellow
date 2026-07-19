@@ -13,20 +13,23 @@ class ApiServerSwitcher {
   /// 内置推荐镜像列表（用户可在设置页一键切换）
   ///
   /// 实测（2026-07-19）：
-  /// - 555975.xyz ✅ 当前真实源站
+  /// - 555976.xyz ✅ 当前真实源站
   /// - 555972.xyz ⚠️ 未验证，保留作为候选
-  /// - 555974.xyz ❌ 已变跳转壳（→ cktongji.com:8899 → 404），列入 [_deadMirrors]
+  /// - 555975.xyz ❌ 已变跳转壳，列入 [_deadMirrors]
+  /// - 555974.xyz ❌ 已变跳转壳，列入 [_deadMirrors]
   /// - 555973.xyz ❌ 已是跳转壳
   static const List<String> presetMirrors = [
-    'http://555975.xyz',
+    'http://555976.xyz',
     'http://555972.xyz',
   ];
 
   /// 已知失效镜像列表
   ///
   /// 用于 [loadFromPrefs] 自动迁移：用户旧版 App 持久化过这些 URL，
-  /// 升级后启动时若检测到，自动回退到 [AppConstants.defaultBaseUrl]。
+  /// 升级后启动时若检测到，自动回退到 [AppConstants.defaultBaseUrl]，
+  /// 避免用户在死链上一直拿不到内容（这是 AK Token 提取失败的最常见根因）。
   static const List<String> _deadMirrors = [
+    'http://555975.xyz',
     'http://555974.xyz',
     'http://555973.xyz',
   ];

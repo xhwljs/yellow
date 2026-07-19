@@ -9,13 +9,15 @@ class AppConstants {
   // API base URL（默认源站点根路径）
   //
   // 实测（2026-07-19）：
-  // - http://555973.xyz/ 是跳转壳（返回 JS 跳转到 cktongji.com，无视频内容）
-  // - http://555974.xyz/ 已变为跳转壳（JS 跳转到 cktongji.com:8899 → 404）
-  // - http://555975.xyz/ 是当前真正的源站（返回含 .stui-vodlist__box 的视频列表 HTML）
+  // - http://555976.xyz/ ✅ 当前真实源站（返回含 .stui-vodlist__box 的视频列表 HTML）
+  // - http://555975.xyz/ ❌ 已变为跳转壳（JS 跳转到 cktongji.com:8899，Dio 无法处理）
+  // - http://555974.xyz/ ❌ 已变跳转壳（JS 跳转到 cktongji.com:8899 → 404）
+  // - http://555973.xyz/ ❌ 已是跳转壳
   // - https://shturl.cc/idpALdXm 是短链，需要 JS 跳转，Dio 无法处理
   //
-  // 因此默认用 555975.xyz；用户可在设置页运行时切换到其他镜像（keyApiBaseUrl）。
-  static const String defaultBaseUrl = 'http://555975.xyz';
+  // 因此默认用 555976.xyz；用户可在设置页运行时切换到其他镜像（keyApiBaseUrl）。
+  // 历史镜像在 [ApiServerSwitcher._deadMirrors] 中维护，启动时自动迁移到默认值。
+  static const String defaultBaseUrl = 'http://555976.xyz';
 
   /// 当前生效的 baseUrl（运行时可通过 SharedPreferences 覆盖）
   static String baseUrl = defaultBaseUrl;
