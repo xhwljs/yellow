@@ -43,17 +43,16 @@ class VideoListParser {
   ///
   /// 返回 null 表示该项是广告（href 不是 `/v5/`）。
   Video? _parseItem(dom.Element element) {
-    // 优先取指向 /v5/ 的 a 标签（真实视频）
-    var link = element.querySelector('a[href*="/v5/"]');
-    if (link == null) {
-      // 兼容旧路径 /voddetail/
-      link = element.querySelector('a[href*="/voddetail/"]');
-    }
+    // 优先取指向 /v5/ 的 a 标签（真实视频），降级到旧路径 /voddetail/
+    final link = element.querySelector('a[href*="/v5/"]') ??
+        element.querySelector('a[href*="/voddetail/"]');
     if (link == null) return null;
 
     final href = link.attributes['href'] ?? '';
     final id = _extractVideoId(href);
-    if (id.isEmpty) return null;
+    if (id.isEmpty) {
+      return null;
+    }
 
     // 封面优先取 a[data-original]，降级到 img[data-original] / img[src]
     final coverUrl = link.attributes['data-original'] ??

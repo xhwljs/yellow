@@ -94,7 +94,8 @@ class VideoDetailParser {
   static String? _extractTitle(dom.Document doc) {
     // 优先 .stui-pannel__head h3.title
     final heads = doc.querySelectorAll(
-        '.stui-pannel__head h3.title, .stui-pannel__head .title');
+      '.stui-pannel__head h3.title, .stui-pannel__head .title',
+    );
     for (final h in heads) {
       final text = h.text.trim();
       if (text.isNotEmpty && text.length > 5 && text != '目录') {
@@ -209,16 +210,16 @@ class VideoDetailParser {
     final items = doc.querySelectorAll('.stui-vodlist__box');
     return items
         .map((element) {
-          // 优先取指向 /v5/ 的 a 标签
-          var link = element.querySelector('a[href*="/v5/"]');
-          if (link == null) {
-            link = element.querySelector('a[href*="/voddetail/"]');
-          }
+          // 优先取指向 /v5/ 的 a 标签，降级到旧路径 /voddetail/
+          final link = element.querySelector('a[href*="/v5/"]') ??
+              element.querySelector('a[href*="/voddetail/"]');
           if (link == null) return null;
 
           final href = link.attributes['href'] ?? '';
           final id = _extractVideoId(href);
-          if (id.isEmpty) return null;
+          if (id.isEmpty) {
+            return null;
+          }
 
           final coverUrl = link.attributes['data-original'] ??
               element.querySelector('img')?.attributes['data-original'] ??
