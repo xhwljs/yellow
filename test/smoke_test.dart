@@ -76,9 +76,8 @@ void main() {
     });
 
     test('每个预设应有不同的 primaryColor', () {
-      final colors = ThemePreset.values
-          .map((p) => p.primaryColor.value)
-          .toSet();
+      final colors =
+          ThemePreset.values.map((p) => p.primaryColor.value).toSet();
       expect(colors.length, ThemePreset.values.length);
     });
   });
