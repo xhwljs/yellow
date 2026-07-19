@@ -67,7 +67,6 @@ class PlayerPageController extends GetxController {
   // 状态
   final Rx<PlayerState> state = PlayerState.idle.obs;
   final RxString errorMessage = ''.obs;
-  final RxInt countdown = 0.obs;
   final RxDouble brightness = 0.5.obs;
   final RxDouble volume = 0.5.obs;
   final RxDouble playbackSpeed = 1.0.obs;
@@ -109,11 +108,9 @@ class PlayerPageController extends GetxController {
       final result = await decryptor.decryptPlayUrl(
         args.videoId,
         existingDetail: args.existingDetail,
-        onCountdown: (s) => countdown.value = s,
       );
       _detail = result.detail;
       _currentPlayUrl = result.playUrl;
-      countdown.value = 0;
 
       // 2. 开启屏幕常亮
       await WakelockPlus.enable();

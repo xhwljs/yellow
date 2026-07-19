@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:videohub/core/constants/app_constants.dart';
 import 'package:videohub/core/error/exceptions.dart';
 import 'package:videohub/core/network/api_service.dart';
 import 'package:videohub/core/parser/video_detail_parser.dart';
@@ -11,12 +10,24 @@ import 'package:videohub/data/models/video_detail.dart';
 
 /// 播放地址解密模块
 ///
-/// 严格遵循需求：
-/// - 模拟移动端点击手势（生成随机屏幕坐标）
-/// - 内置 6 秒倒计时等待逻辑
-/// - 发送 POST 请求到 /static/count.php 接口
-/// - Base64 解码获取真实视频播放地址
-/// - 地址时效性校验、失效自动重新拉取
+/// 实测站点 /v5/{aid}-{sid}-{nid}.html 详情页结构（2026-07-19 验证）：
+///
+/// ```html
+/// <script type="text/javascript">
+///   (function(){
+///     var AID='230796', ASID='1', ANID='1',
+///         AK='b5f28b46e459fccbdfbdabc765fc8644af2bd8cd7268ecf9992bf046b0ecbf64';
+///     // ...
+///     var x=new XMLHttpRequest();
+///     x.open('POST','/static/count.php',true);
+///     x.setRequestHeader('X-Requested-With','XMLHttpRequest');
+///     x.send(xhrBody({id:AID,sid:ASID,nid:ANID,tk:AK,g:1,x,y,dt,sw,sh,tz,t}));
+///   })();
+/// </script>
+/// ```
+///
+/// 站点原本有 6 秒倒计时锁定按钮，**实测跳过倒计时直接 POST 也能成功**
+/// （服务端不校验时间差），因此本模块移除倒计时逻辑，直接请求。
 class UrlDecryptor {
   final ApiService _apiService;
 
@@ -24,23 +35,23 @@ class UrlDecryptor {
 
   /// 获取真实播放地址（完整流程）
   ///
-  /// 1. 拉取详情页 HTML，提取 AK token
-  /// 2. 6 秒倒计时（模拟点击等待）
-  /// 3. POST /static/count.php 获取加密地址
-  /// 4. Base64 解码
-  /// 5. 地址时效性校验
+  /// 1. 拉取详情页 HTML，提取 AK token + AID/ASID/ANID
+  /// 2. POST /static/count.php 获取加密地址
+  /// 3. Base64 解码
+  /// 4. 地址时效性校验
   ///
   /// 返回 (playUrl, videoDetail)
   Future<({String playUrl, VideoDetail detail})> decryptPlayUrl(
     String videoId, {
-    void Function(int secondsLeft)? onCountdown,
     VideoDetail? existingDetail,
   }) async {
     appLogger.i('开始解密播放地址: videoId=$videoId');
 
     // 1. 拉取详情页（若未提供已有详情）
     VideoDetail detail;
-    if (existingDetail != null && existingDetail.token != null) {
+    if (existingDetail != null &&
+        existingDetail.token != null &&
+        existingDetail.token!.isNotEmpty) {
       detail = existingDetail;
     } else {
       detail = await _fetchDetailWithToken(videoId);
@@ -50,13 +61,10 @@ class UrlDecryptor {
       throw const DecryptException('未找到 AK Token，无法解密');
     }
 
-    // 2. 6 秒倒计时（模拟移动端点击等待）
-    await _runCountdown(onCountdown: onCountdown);
-
-    // 3. 构造 POST 参数
+    // 2. 构造 POST 参数
     //
-    // id 字段用 detail.aid（从详情页 script 中提取的 AID 值，如 "230754"），
-    // 不是 videoId（复合 ID "230754-1-1"）。
+    // id 字段用 detail.aid（从详情页 script 中提取的 AID 值，如 "230796"），
+    // 不是 videoId（复合 ID "230796-1-1"）。
     final params = _buildParams(
       id: detail.aid ??
           (videoId.contains('-') ? videoId.split('-').first : videoId),
@@ -65,7 +73,7 @@ class UrlDecryptor {
       nid: detail.nid ?? '1',
     );
 
-    // 4. 发送 POST 请求
+    // 3. 发送 POST 请求
     //
     // 传递 videoId 用于构造详情页 Referer（POST 接口要求 Referer 指向
     // 具体详情页，不能是首页）。
@@ -74,7 +82,7 @@ class UrlDecryptor {
       refererVideoId: videoId,
     );
 
-    // 5. 解析响应
+    // 4. 解析响应
     final ok = response['ok'];
     final u = response['u'];
 
@@ -82,13 +90,13 @@ class UrlDecryptor {
       throw DecryptException('接口返回异常: $response');
     }
 
-    // 6. Base64 解码
+    // 5. Base64 解码
     final playUrl = _decodeBase64Url(u);
     if (playUrl.isEmpty || !playUrl.startsWith('http')) {
       throw DecryptException('解码后地址无效: $playUrl');
     }
 
-    // 7. 时效性校验（URL 中包含 expiry 时间戳的情况）
+    // 6. 时效性校验（URL 中包含 expiry 时间戳的情况）
     _validateUrlExpiry(playUrl);
 
     appLogger.i('解密成功: $playUrl');
@@ -101,22 +109,12 @@ class UrlDecryptor {
     return VideoDetailParser.parse(html, videoId);
   }
 
-  /// 6 秒倒计时
-  Future<void> _runCountdown({
-    void Function(int secondsLeft)? onCountdown,
-  }) async {
-    for (var i = AppConstants.decryptCountdown.inSeconds; i > 0; i--) {
-      appLogger.d('解密倒计时: ${i}s');
-      onCountdown?.call(i);
-      await Future.delayed(const Duration(seconds: 1));
-    }
-  }
-
   /// 构造 POST 请求参数
   ///
-  /// id, sid, nid, tk, g, x, y, dt, sw, sh, tz, t
+  /// 与站点 `<script>` 中 xhrBody({id:AID, sid:ASID, nid:ANID, tk:AK,
+  /// g:1, x, y, dt, sw, sh, tz, t}) 逐字段对应。
   ///
-  /// 注意：[id] 是从详情页 script 提取的 AID（如 "230754"），
+  /// 注意：[id] 是从详情页 script 提取的 AID（如 "230796"），
   /// 不是列表页 href 中的复合 `aid-sid-nid`。
   Map<String, dynamic> _buildParams({
     required String id,
@@ -185,19 +183,13 @@ class UrlDecryptor {
   /// 失效自动重新拉取（带最大重试次数）
   ///
   /// 适用：播放器加载时检测到地址失效。
-  Future<String> refreshPlayUrl(
-    String videoId, {
-    void Function(int secondsLeft)? onCountdown,
-  }) async {
+  Future<String> refreshPlayUrl(String videoId) async {
     var attempts = 0;
     const maxAttempts = 3;
 
     while (attempts < maxAttempts) {
       try {
-        final result = await decryptPlayUrl(
-          videoId,
-          onCountdown: onCountdown,
-        );
+        final result = await decryptPlayUrl(videoId);
         return result.playUrl;
       } on UrlExpiredException {
         attempts++;

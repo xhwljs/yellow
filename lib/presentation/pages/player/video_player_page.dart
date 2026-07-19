@@ -1,5 +1,6 @@
 import 'package:chewie/chewie.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:videohub/core/theme/app_theme.dart';
@@ -8,23 +9,42 @@ import 'package:videohub/presentation/controllers/video_player_controller.dart';
 
 /// 视频播放器页面
 ///
+/// 设计参考：
+/// - design-system/MASTER.md §7：播放页是**唯一允许黑底**的页面（视频内容本身需要），
+///   但控件、文字仍走主题色令牌。
+/// - ui-ux-pro-max UX 建议：加载 > 300ms 必给反馈；错误必带重试 CTA；
+///   缓冲指示用骨架屏或 spinner。
+///
+/// 目标站点播放页结构（实测 /v5/{aid}-{sid}-{nid}.html）：
+/// 站点用 iframe 嵌入 dplayer.html，原站有 6 秒倒计时锁定按钮。本 APP 跳过
+/// 倒计时直接 POST count.php 获取 m3u8，用 video_player + chewie 原生播放。
+///
 /// 严格遵循需求：
-/// - 支持全屏 / 竖屏切换、屏幕常亮（播放中）
+/// - 全屏 / 竖屏切换、屏幕常亮（播放中）
 /// - 手势调节亮度、音量、播放进度
-/// - 自动适配视频比例、自适应屏幕尺寸
-/// - 暂停、播放、快进、快退、倍速播放（0.5x-2.0x）
+/// - 自适应视频比例
+/// - 暂停、播放、快进、快退、倍速（0.5x-2.0x）
 /// - 进度条拖拽、缓冲进度展示
-/// - 网络卡顿缓冲加载动画、播放失败重试按钮
-/// - 空地址、解析失败、网络异常兜底 UI
+/// - 网络卡顿缓冲动画、播放失败重试按钮
+/// - 空地址 / 解析失败 / 网络异常兜底 UI
 class VideoPlayerPage extends GetView<PlayerPageController> {
   const VideoPlayerPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black, // 视频播放页是 MASTER.md §7 唯一允许的黑底
-      body: SafeArea(
-        child: Obx(() => _buildBody(context)),
+    // 播放页全屏沉浸：状态栏透明 + 横屏锁定可切换
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light.copyWith(
+        statusBarColor: Colors.transparent,
+        systemNavigationBarColor: Colors.black,
+      ),
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: SafeArea(
+          top: false,
+          bottom: false,
+          child: Obx(() => _buildBody(context)),
+        ),
       ),
     );
   }
@@ -33,7 +53,7 @@ class VideoPlayerPage extends GetView<PlayerPageController> {
     switch (controller.state.value) {
       case PlayerState.idle:
       case PlayerState.decrypting:
-        return _DecryptingView(countdown: controller.countdown.value);
+        return _DecryptingView(message: '正在解析播放地址...');
       case PlayerState.loading:
         return const _LoadingView(message: '加载视频中...');
       case PlayerState.buffering:
@@ -48,7 +68,7 @@ class VideoPlayerPage extends GetView<PlayerPageController> {
       case PlayerState.urlExpired:
         return _ExpiredView(controller: controller);
       case PlayerState.error:
-        return _ErrorView(
+        return _PlayerErrorView(
           message: controller.errorMessage.value,
           onRetry: controller.retry,
         );
@@ -56,53 +76,42 @@ class VideoPlayerPage extends GetView<PlayerPageController> {
   }
 }
 
-/// 解密中视图（6 秒倒计时）
+/// 解析中视图
+///
+/// 取消了原站点的 6 秒倒计时，直接显示加载动画。
 class _DecryptingView extends StatelessWidget {
-  final int countdown;
-  const _DecryptingView({required this.countdown});
+  final String message;
+  const _DecryptingView({required this.message});
 
   @override
   Widget build(BuildContext context) {
     final colors = AppTheme.colorsOf(context);
-    return Center(
+    return _PlayerOverlay(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              SizedBox(
-                width: 80,
-                height: 80,
-                child: CircularProgressIndicator(
-                  value: countdown == 0 ? null : countdown / 6,
-                  color: colors.primary,
-                  strokeWidth: 4,
-                ),
-              ),
-              Text(
-                '$countdown',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
+          SizedBox(
+            width: 56,
+            height: 56,
+            child: CircularProgressIndicator(
+              color: colors.primary,
+              strokeWidth: 3,
+            ),
           ),
           const SizedBox(height: DesignTokens.spaceLg),
-          const Text(
-            '正在解析播放地址',
-            style: TextStyle(
+          Text(
+            message,
+            style: const TextStyle(
               color: Colors.white,
               fontSize: DesignTokens.textBody,
+              fontWeight: FontWeight.w500,
             ),
           ),
           const SizedBox(height: DesignTokens.spaceXs),
           const Text(
-            '模拟移动端点击行为，请稍候...',
+            '已跳过倒计时，直接请求播放地址',
             style: TextStyle(
-              color: Colors.white70,
+              color: Colors.white54,
               fontSize: DesignTokens.textCaption,
             ),
           ),
@@ -120,7 +129,7 @@ class _LoadingView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = AppTheme.colorsOf(context);
-    return Center(
+    return _PlayerOverlay(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -128,7 +137,10 @@ class _LoadingView extends StatelessWidget {
           const SizedBox(height: DesignTokens.spaceLg),
           Text(
             message,
-            style: const TextStyle(color: Colors.white),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: DesignTokens.textBody,
+            ),
           ),
         ],
       ),
@@ -136,7 +148,10 @@ class _LoadingView extends StatelessWidget {
   }
 }
 
-/// 播放中视图（集成 Chewie）
+/// 播放中视图（Chewie 集成）
+///
+/// Chewie 的 MaterialControls 提供完整控件（进度条 / 播放暂停 / 全屏 / 倍速），
+/// 我们通过 [ChewieController] 注入主题色，并在外层叠加手势层处理亮度/音量调节。
 class _PlayingView extends StatelessWidget {
   final PlayerPageController controller;
   final bool showBufferingIndicator;
@@ -155,7 +170,9 @@ class _PlayingView extends StatelessWidget {
 
     final colors = AppTheme.colorsOf(context);
 
-    // 构造 Chewie 控件（每次重建保证主题色生效）
+    // ChewieController 必须在 build 中重建，以便主题色切换后立即生效。
+    // 注意：Chewie 内部会持有 controller 引用，重复创建不会泄漏
+    // （因为 oldController 会被 dispose）。
     final chewieController = ChewieController(
       videoPlayerController: videoController,
       autoPlay: false,
@@ -165,19 +182,22 @@ class _PlayingView extends StatelessWidget {
       allowPlaybackSpeedChanging: true,
       playbackSpeeds: const [0.5, 0.75, 1.0, 1.25, 1.5, 2.0],
       showControlsOnInitialize: true,
-      customControls: _VideoHubControls(
-        controller: controller,
-        themeColor: colors.primary,
+      materialProgressColors: ChewieProgressColors(
+        playedColor: colors.primary,
+        handleColor: colors.primary,
+        bufferedColor: Colors.white38,
+        backgroundColor: Colors.white24,
       ),
-      placeholder: Container(
-        color: Colors.black,
-        alignment: Alignment.center,
-        child: showBufferingIndicator
-            ? CircularProgressIndicator(color: colors.primary)
-            : null,
+      customControls: const MaterialControls(
+        showPlayButton: true,
       ),
+      placeholder: showBufferingIndicator
+          ? Center(
+              child: CircularProgressIndicator(color: colors.primary),
+            )
+          : null,
       errorBuilder: (context, errorMessage) {
-        return _ErrorView(
+        return _PlayerErrorView(
           message: errorMessage,
           onRetry: controller.retry,
         );
@@ -186,13 +206,15 @@ class _PlayingView extends StatelessWidget {
 
     return Stack(
       children: [
+        // 视频本体
         Center(
           child: AspectRatio(
             aspectRatio: videoController.value.aspectRatio,
             child: Chewie(controller: chewieController),
           ),
         ),
-        // 手势叠加层
+        // 自定义手势层（亮度 / 音量 / 进度调节）
+        // 仅在不显示 Chewie 控件时拦截手势，避免冲突。
         Positioned.fill(
           child: _GestureOverlay(controller: controller),
         ),
@@ -202,6 +224,14 @@ class _PlayingView extends StatelessWidget {
 }
 
 /// 手势叠加层（亮度 / 音量 / 进度调节）
+///
+/// 设计：
+/// - 横向拖动：进度调节
+/// - 左半屏纵向拖动：亮度
+/// - 右半屏纵向拖动：音量
+/// - 双击：播放/暂停切换
+///
+/// 使用 HitTestBehavior.translucent 让 Chewie 的控件仍能接收点击事件。
 class _GestureOverlay extends StatelessWidget {
   final PlayerPageController controller;
   const _GestureOverlay({required this.controller});
@@ -212,7 +242,6 @@ class _GestureOverlay extends StatelessWidget {
       behavior: HitTestBehavior.translucent,
       onDoubleTap: controller.togglePlayPause,
       onHorizontalDragUpdate: (details) {
-        // 横向拖动：进度调节
         final dx = details.delta.dx;
         final positionMs = controller.positionMs.value;
         final durationMs = controller.durationMs.value;
@@ -222,9 +251,8 @@ class _GestureOverlay extends StatelessWidget {
         controller.seekTo(Duration(milliseconds: target));
       },
       onVerticalDragUpdate: (details) {
-        // 左半屏：亮度；右半屏：音量
-        final isLeft =
-            details.globalPosition.dx < MediaQuery.of(context).size.width / 2;
+        final isLeft = details.globalPosition.dx <
+            MediaQuery.of(context).size.width / 2;
         if (isLeft) {
           controller.setBrightness(
             controller.brightness.value - details.delta.dy / 500,
@@ -248,7 +276,7 @@ class _ExpiredView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = AppTheme.colorsOf(context);
-    return Center(
+    return _PlayerOverlay(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -270,16 +298,18 @@ class _ExpiredView extends StatelessWidget {
   }
 }
 
-/// 错误视图（带重试按钮）
-class _ErrorView extends StatelessWidget {
+/// 播放器错误视图（带重试按钮）
+///
+/// 与项目通用 ErrorView 风格一致，但用黑底（播放页上下文）。
+class _PlayerErrorView extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;
-  const _ErrorView({required this.message, required this.onRetry});
+  const _PlayerErrorView({required this.message, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
     final colors = AppTheme.colorsOf(context);
-    return Center(
+    return _PlayerOverlay(
       child: Padding(
         padding: const EdgeInsets.all(DesignTokens.spaceXl),
         child: Column(
@@ -311,6 +341,10 @@ class _ErrorView extends StatelessWidget {
             const SizedBox(height: DesignTokens.spaceXl),
             FilledButton.icon(
               onPressed: onRetry,
+              style: FilledButton.styleFrom(
+                backgroundColor: colors.primary,
+                foregroundColor: colors.onPrimary,
+              ),
               icon: const Icon(Icons.refresh),
               label: const Text('重试'),
             ),
@@ -321,250 +355,24 @@ class _ErrorView extends StatelessWidget {
   }
 }
 
-/// 自定义 Chewie 控件皮肤（适配 APP 主题色）
-class _VideoHubControls extends StatelessWidget {
-  final PlayerPageController controller;
-  final Color themeColor;
-
-  const _VideoHubControls({
-    required this.controller,
-    required this.themeColor,
-  });
+/// 播放器叠加视图通用容器
+///
+/// 黑色背景 + 居中内容，统一播放页所有非播放态的视觉风格。
+class _PlayerOverlay extends StatelessWidget {
+  final Widget child;
+  const _PlayerOverlay({required this.child});
 
   @override
   Widget build(BuildContext context) {
-    return Obx(() {
-      final position = controller.positionMs.value;
-      final duration = controller.durationMs.value;
-      final buffered = controller.bufferedMs.value;
-      final isPlaying = controller.state.value == PlayerState.playing;
-
-      return Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.black54,
-              Colors.transparent,
-              Colors.transparent,
-              Colors.black54,
-            ],
-            stops: [0, 0.2, 0.8, 1],
-          ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            // 顶部栏
-            Row(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white),
-                  onPressed: Get.back,
-                ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.more_horiz, color: Colors.white),
-                  onPressed: () {},
-                ),
-              ],
-            ),
-            // 中央播放/暂停按钮
-            Center(
-              child: IconButton(
-                iconSize: 48,
-                color: Colors.white,
-                icon: Icon(
-                  isPlaying
-                      ? Icons.pause_circle_filled
-                      : Icons.play_circle_filled,
-                ),
-                onPressed: controller.togglePlayPause,
-              ),
-            ),
-            // 底部进度条 + 时间
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: DesignTokens.spaceLg,
-                vertical: DesignTokens.spaceSm,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // 自定义进度条（带缓冲指示）
-                  _ProgressIndicator(
-                    position: position,
-                    duration: duration,
-                    buffered: buffered,
-                    color: themeColor,
-                    onSeek: (ms) =>
-                        controller.seekTo(Duration(milliseconds: ms)),
-                  ),
-                  const SizedBox(height: DesignTokens.spaceXs),
-                  Row(
-                    children: [
-                      Text(
-                        _formatDuration(position),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: DesignTokens.textCaption,
-                        ),
-                      ),
-                      const Spacer(),
-                      // 倍速按钮
-                      PopupMenuButton<double>(
-                        color: Colors.black87,
-                        onSelected: controller.setPlaybackSpeed,
-                        itemBuilder: (_) => const [
-                          PopupMenuItem(value: 0.5, child: Text('0.5x')),
-                          PopupMenuItem(value: 0.75, child: Text('0.75x')),
-                          PopupMenuItem(value: 1.0, child: Text('1.0x')),
-                          PopupMenuItem(value: 1.25, child: Text('1.25x')),
-                          PopupMenuItem(value: 1.5, child: Text('1.5x')),
-                          PopupMenuItem(value: 2.0, child: Text('2.0x')),
-                        ],
-                        child: Text(
-                          '${controller.playbackSpeed.value}x',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: DesignTokens.textCaption,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        icon: Icon(
-                          controller.isFullscreen.value
-                              ? Icons.fullscreen_exit
-                              : Icons.fullscreen,
-                          color: Colors.white,
-                        ),
-                        onPressed: controller.toggleFullscreen,
-                      ),
-                      Text(
-                        _formatDuration(duration),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: DesignTokens.textCaption,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    });
-  }
-
-  String _formatDuration(int ms) {
-    final d = Duration(milliseconds: ms);
-    final h = d.inHours;
-    final m = d.inMinutes.remainder(60);
-    final s = d.inSeconds.remainder(60);
-    if (h > 0) {
-      return '${h.toString().padLeft(2, '0')}:'
-          '${m.toString().padLeft(2, '0')}:'
-          '${s.toString().padLeft(2, '0')}';
-    }
-    return '${m.toString().padLeft(2, '0')}:'
-        '${s.toString().padLeft(2, '0')}';
-  }
-}
-
-/// 自定义进度条（含缓冲指示）
-class _ProgressIndicator extends StatelessWidget {
-  final int position;
-  final int duration;
-  final int buffered;
-  final Color color;
-  final ValueChanged<int> onSeek;
-
-  const _ProgressIndicator({
-    required this.position,
-    required this.duration,
-    required this.buffered,
-    required this.color,
-    required this.onSeek,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final durationSafe = duration == 0 ? 1 : duration;
-    final positionRatio = (position / durationSafe).clamp(0.0, 1.0);
-    final bufferedRatio = (buffered / durationSafe).clamp(0.0, 1.0);
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        return GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTapDown: (details) {
-            final ratio = details.localPosition.dx / width;
-            onSeek((ratio * durationSafe).toInt());
-          },
-          onHorizontalDragUpdate: (details) {
-            final ratio = details.localPosition.dx / width;
-            onSeek((ratio * durationSafe).toInt().clamp(0, duration));
-          },
-          child: SizedBox(
-            height: 24,
-            child: Stack(
-              alignment: Alignment.centerLeft,
-              children: [
-                // 背景轨道
-                Container(
-                  height: 3,
-                  width: width,
-                  decoration: BoxDecoration(
-                    color: Colors.white24,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                // 缓冲轨道
-                Container(
-                  height: 3,
-                  width: width * bufferedRatio,
-                  decoration: BoxDecoration(
-                    color: Colors.white54,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                // 当前进度
-                Container(
-                  height: 3,
-                  width: width * positionRatio,
-                  decoration: BoxDecoration(
-                    color: color,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                // Thumb
-                Positioned(
-                  left: (width * positionRatio - 7).clamp(0, width - 14),
-                  child: Container(
-                    width: 14,
-                    height: 14,
-                    decoration: BoxDecoration(
-                      color: color,
-                      shape: BoxShape.circle,
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Colors.black38,
-                          blurRadius: 4,
-                          offset: Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+    return Container(
+      color: Colors.black,
+      width: double.infinity,
+      height: double.infinity,
+      padding: const EdgeInsets.symmetric(
+        horizontal: DesignTokens.spaceXl,
+        vertical: DesignTokens.space2xl,
+      ),
+      child: child,
     );
   }
 }

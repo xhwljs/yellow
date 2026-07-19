@@ -8,13 +8,14 @@ class AppConstants {
 
   // API base URL（默认源站点根路径）
   //
-  // 实测：
+  // 实测（2026-07-19）：
   // - http://555973.xyz/ 是跳转壳（返回 JS 跳转到 cktongji.com，无视频内容）
-  // - http://555974.xyz/ 是真正的源站（返回含 .stui-vodlist__box 的视频列表 HTML）
+  // - http://555974.xyz/ 已变为跳转壳（JS 跳转到 cktongji.com:8899 → 404）
+  // - http://555975.xyz/ 是当前真正的源站（返回含 .stui-vodlist__box 的视频列表 HTML）
   // - https://shturl.cc/idpALdXm 是短链，需要 JS 跳转，Dio 无法处理
   //
-  // 因此默认用 555974.xyz；用户可在设置页运行时切换到其他镜像（keyApiBaseUrl）。
-  static const String defaultBaseUrl = 'http://555974.xyz';
+  // 因此默认用 555975.xyz；用户可在设置页运行时切换到其他镜像（keyApiBaseUrl）。
+  static const String defaultBaseUrl = 'http://555975.xyz';
 
   /// 当前生效的 baseUrl（运行时可通过 SharedPreferences 覆盖）
   static String baseUrl = defaultBaseUrl;
@@ -31,7 +32,6 @@ class AppConstants {
 
   // 播放器
   static const List<double> playbackSpeeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
-  static const Duration decryptCountdown = Duration(seconds: 6);
 
   // 缓存
   static const int cacheMaxAgeMinutes = 30;
