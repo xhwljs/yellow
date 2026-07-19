@@ -125,6 +125,11 @@ jobs:
       - name: Generate native platform scaffolding (android only)
         run: flutter create --platforms=android --project-name=videohub --org com.videohub .
 
+      - name: Bump Kotlin to 1.9.22 for plugin compatibility
+        run: |
+          sed -i 's/org.jetbrains.kotlin.android" version "1\.[0-9]\+\.[0-9]\+"/org.jetbrains.kotlin.android" version "1.9.22"/' android/settings.gradle
+          grep kotlin android/settings.gradle
+
       - name: Run Floor codegen
         run: dart run build_runner build --delete-conflicting-outputs
 
