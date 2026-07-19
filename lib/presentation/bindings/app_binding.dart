@@ -1,6 +1,5 @@
 import 'package:get/get.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:videohub/core/constants/app_constants.dart';
+import 'package:videohub/core/network/api_server_switcher.dart';
 import 'package:videohub/core/network/api_service.dart';
 import 'package:videohub/core/network/dio_client.dart';
 import 'package:videohub/core/player/url_decryptor.dart';
@@ -18,7 +17,7 @@ import 'package:videohub/presentation/controllers/main_shell_controller.dart';
 /// 应用初始化（在 runApp 之前调用）
 ///
 /// 严格按依赖顺序注入：
-/// 1. SharedPreferences 加载用户覆盖的 baseUrl
+/// 1. ApiServerSwitcher.loadFromPrefs 加载用户覆盖的 baseUrl（含死链自动迁移）
 /// 2. Dio 客户端
 /// 3. ApiService
 /// 4. AppDatabase (Floor)
@@ -26,12 +25,12 @@ import 'package:videohub/presentation/controllers/main_shell_controller.dart';
 /// 6. 全局 Controller（Theme / MainShell / Home / Favorites / History）
 /// 7. UrlDecryptor
 Future<void> initializeApp() async {
-  // 1. 加载用户保存的 baseUrl（运行时切换 API 域名功能）
-  final prefs = await SharedPreferences.getInstance();
-  final savedBaseUrl = prefs.getString(AppConstants.keyApiBaseUrl);
-  if (savedBaseUrl != null && savedBaseUrl.isNotEmpty) {
-    AppConstants.baseUrl = savedBaseUrl;
-  }
+  // 1. 加载用户保存的 baseUrl（含死链自动迁移到 defaultBaseUrl）
+  //
+  // 重要：必须通过 ApiServerSwitcher.loadFromPrefs，它会检查旧版本持久化的
+  // 已知失效镜像（如 555974.xyz）并自动迁移。直接读 SharedPreferences 会绕过
+  // 这个迁移逻辑，导致用户升级后仍死链拿不到 AK Token。
+  await ApiServerSwitcher.loadFromPrefs();
 
   // 2. Dio
   await DioClient.ensureInitialized();
