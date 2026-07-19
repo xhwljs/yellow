@@ -256,8 +256,8 @@ class _BrightnessVolumeGesture extends StatelessWidget {
       behavior: HitTestBehavior.translucent,
       // 仅注册纵向拖动 — 横向拖动/双击/点击会被 chewie 处理
       onVerticalDragUpdate: (details) {
-        final isLeft = details.globalPosition.dx <
-            MediaQuery.of(context).size.width / 2;
+        final isLeft =
+            details.globalPosition.dx < MediaQuery.of(context).size.width / 2;
         if (isLeft) {
           controller.setBrightness(
             controller.brightness.value - details.delta.dy / 500,
