@@ -284,11 +284,14 @@ class HomePage extends GetView<HomeController> {
                     width: 160,
                     child: VideoCard(
                       video: v,
-                      onTap: () => Get.toNamed('/detail', arguments: {
-                        'videoId': v.id,
-                        'coverUrl': v.coverUrl,
-                        'title': v.title,
-                      }),
+                      onTap: () => Get.toNamed(
+                        '/detail',
+                        arguments: {
+                          'videoId': v.id,
+                          'coverUrl': v.coverUrl,
+                          'title': v.title,
+                        },
+                      ),
                     ),
                   );
                 },
