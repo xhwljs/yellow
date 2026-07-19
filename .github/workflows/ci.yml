@@ -122,6 +122,9 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Generate native platform scaffolding (android)
+        run: flutter create --platforms=android --project-name=videohub --org com.videohub .
+
       - name: Run Floor codegen
         run: dart run build_runner build --delete-conflicting-outputs
 
@@ -175,6 +178,9 @@ jobs:
 
       - name: Install dependencies
         run: flutter pub get
+
+      - name: Generate native platform scaffolding (ios)
+        run: flutter create --platforms=ios --project-name=videohub --org com.videohub .
 
       - name: Run Floor codegen
         run: dart run build_runner build --delete-conflicting-outputs
