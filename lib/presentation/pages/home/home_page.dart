@@ -4,6 +4,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:videohub/core/constants/app_constants.dart';
 import 'package:videohub/core/theme/app_theme.dart';
 import 'package:videohub/core/theme/design_tokens.dart';
+import 'package:videohub/core/theme/theme_presets.dart';
 import 'package:videohub/data/models/category.dart';
 import 'package:videohub/data/models/video.dart';
 import 'package:videohub/presentation/controllers/home_controller.dart';
@@ -18,6 +19,11 @@ import 'package:videohub/presentation/widgets/video_card.dart';
 ///   - 选中态：primary 背景 + onPrimary 文字（pill 形状）
 ///   - 未选中态：surface 背景 + onSurfaceMuted 文字 + outline 边框
 ///   - 切换 Tab 时切换内容，不跳转
+/// - **悬浮目录按钮**（FAB，右下角）：
+///   - 点击弹出卷帘式 BottomSheet，展示首页"目录"区块所有分类
+///   - 每个分类显示名称 + 视频数量（来自站点 .stui-pannel__menu 的 count）
+///   - 点击分类项跳转到独立分类页（保留完整分页能力）
+///   - 不破坏现有首页结构（Tab 栏 + 内容区不变）
 /// - "推荐"Tab：保留原 Section 布局，每个分类横向滚动 6 条
 /// - 具体分类 Tab：网格布局 + 分页懒加载
 /// - 下拉刷新 / 加载骨架屏 / 错误 / 空数据三态
@@ -42,6 +48,28 @@ class HomePage extends GetView<HomeController> {
             letterSpacing: 0.5,
           ),
         ),
+      ),
+      // 右下角悬浮目录按钮 — 点击弹出卷帘式分类目录
+      //
+      // 设计参考 ui-ux-pro-max FAB UX 建议：
+      // - 不破坏现有首页结构（Tab 栏 + 内容区不变）
+      // - 按钮固定在右下角，滚动时仍可见
+      // - 不与底部导航栏冲突（FAB 默认位置在底部导航上方）
+      // - 主题色切换时 Obx 自动重建（外层 build 已在 Obx 外）
+      floatingActionButton: Obx(
+        () => controller.categories.isEmpty
+            ? const SizedBox.shrink()
+            : FloatingActionButton(
+                heroTag: 'home_catalog_fab',
+                onPressed: () => _showCatalogSheet(
+                  context,
+                  AppTheme.colorsOf(context),
+                ),
+                backgroundColor: colors.primary,
+                foregroundColor: colors.onPrimary,
+                elevation: 4,
+                child: const Icon(PhosphorIconsRegular.list),
+              ),
       ),
       body: Obx(() {
         if (controller.isLoading.value && controller.categories.isEmpty) {
@@ -85,6 +113,146 @@ class HomePage extends GetView<HomeController> {
           ),
         );
       }),
+    );
+  }
+
+  /// 卷帘式目录 BottomSheet
+  ///
+  /// 展示首页"目录"区块所有分类（含视频数量），
+  /// 点击分类项关闭 BottomSheet 并跳转到独立分类页。
+  ///
+  /// 设计：
+  /// - 圆角顶部 + drag handle（MD3 BottomSheet 风格）
+  /// - 标题栏：左侧"目录"标题 + 右侧"取消"按钮
+  /// - 列表项：左侧分类名 + 右侧视频数量（如 "4827"）
+  /// - 点击项关闭 BottomSheet 并 Get.toNamed('/category')
+  void _showCatalogSheet(BuildContext context, ThemeColors colors) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: false,
+      backgroundColor: colors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(DesignTokens.radiusLg),
+        ),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // drag handle
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: DesignTokens.spaceSm),
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: colors.border,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+              ),
+              // 标题栏
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  DesignTokens.spaceLg,
+                  DesignTokens.spaceMd,
+                  DesignTokens.spaceMd,
+                  DesignTokens.spaceSm,
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      PhosphorIconsRegular.squaresFour,
+                      size: 20,
+                      color: colors.primary,
+                    ),
+                    const SizedBox(width: DesignTokens.spaceSm),
+                    Text(
+                      '目录',
+                      style: TextStyle(
+                        fontSize: DesignTokens.textH2,
+                        fontWeight: FontWeight.w700,
+                        color: colors.onSurface,
+                      ),
+                    ),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: () => Navigator.of(sheetContext).pop(),
+                      behavior: HitTestBehavior.opaque,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: DesignTokens.spaceSm,
+                          vertical: DesignTokens.spaceXs,
+                        ),
+                        child: Icon(
+                          PhosphorIconsRegular.x,
+                          size: 20,
+                          color: colors.onSurfaceMuted,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Divider(
+                height: 1,
+                thickness: 1,
+                color: colors.border,
+              ),
+              // 分类列表（含 count 视频数量）
+              Flexible(
+                child: Obx(() {
+                  final cats = controller.categories;
+                  if (cats.isEmpty) {
+                    return Padding(
+                      padding: const EdgeInsets.all(DesignTokens.spaceXl),
+                      child: Center(
+                        child: Text(
+                          '暂无分类',
+                          style: TextStyle(
+                            color: colors.onSurfaceMuted,
+                            fontSize: DesignTokens.textBody,
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+                  return ListView.separated(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: DesignTokens.spaceSm,
+                    ),
+                    itemCount: cats.length,
+                    separatorBuilder: (_, __) => Divider(
+                      height: 1,
+                      indent: DesignTokens.spaceLg,
+                      endIndent: DesignTokens.spaceLg,
+                      color: colors.border.withOpacity(0.5),
+                    ),
+                    itemBuilder: (_, i) {
+                      final c = cats[i];
+                      return _CatalogListItem(
+                        category: c,
+                        colors: colors,
+                        onTap: () {
+                          Navigator.of(sheetContext).pop();
+                          // 跳转到独立分类页（保留完整分页能力）
+                          Get.toNamed('/category', arguments: c.id);
+                        },
+                      );
+                    },
+                  );
+                }),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -431,4 +599,92 @@ class _CategoryTab {
   final String name;
 
   const _CategoryTab({required this.id, required this.name});
+}
+
+/// 目录卷帘菜单列表项
+///
+/// 展示分类名 + 视频数量（来自站点 .stui-pannel__menu 的 count）
+/// 设计：
+/// - 左侧分类名（onSurface 主色，textBody 字号）
+/// - 右侧视频数量 chip（surfaceVariant 背景，onSurfaceMuted 文字）
+/// - 点击态：InkWell ripple effect
+/// - 高度 56（MD3 ListItem 标准）
+class _CatalogListItem extends StatelessWidget {
+  final Category category;
+  final ThemeColors colors;
+  final VoidCallback onTap;
+
+  const _CatalogListItem({
+    required this.category,
+    required this.colors,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: DesignTokens.spaceLg,
+          vertical: DesignTokens.spaceMd,
+        ),
+        child: Row(
+          children: [
+            // 左侧分类名
+            Expanded(
+              child: Text(
+                category.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: DesignTokens.textBody,
+                  fontWeight: FontWeight.w500,
+                  color: colors.onSurface,
+                ),
+              ),
+            ),
+            // 右侧视频数量 chip
+            if (category.count > 0) ...[
+              const SizedBox(width: DesignTokens.spaceSm),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: DesignTokens.spaceSm,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: colors.surfaceVariant,
+                  borderRadius: BorderRadius.circular(DesignTokens.radiusPill),
+                ),
+                child: Text(
+                  _formatCount(category.count),
+                  style: TextStyle(
+                    fontSize: DesignTokens.textCaption,
+                    fontWeight: FontWeight.w500,
+                    color: colors.onSurfaceMuted,
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(width: DesignTokens.spaceXs),
+            Icon(
+              PhosphorIconsRegular.caretRight,
+              size: 16,
+              color: colors.onSurfaceMuted,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 格式化视频数量
+  ///
+  /// - < 10000: 原样显示（如 4827）
+  /// - >= 10000: 显示为 7.7w（节省横向空间）
+  static String _formatCount(int count) {
+    if (count < 10000) return count.toString();
+    final w = count / 10000;
+    return '${w.toStringAsFixed(1)}w';
+  }
 }
