@@ -14,7 +14,7 @@ class HistoryRepository {
 
   /// 获取全部历史（默认 500 条）
   Future<List<PlayHistory>> getAllHistory({int limit = 500}) async {
-    return _db.historyDao.findAll(limit: limit);
+    return _db.historyDao.findAll(limit);
   }
 
   /// 分页获取历史
@@ -22,7 +22,7 @@ class HistoryRepository {
     int limit = 20,
     int offset = 0,
   }) async {
-    return _db.historyDao.findPage(limit: limit, offset: offset);
+    return _db.historyDao.findPage(limit, offset);
   }
 
   /// 获取单条历史

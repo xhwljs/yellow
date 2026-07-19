@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:floor/floor.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:sqflite/sqflite.dart' as sqflite;
 import 'package:videohub/core/constants/app_constants.dart';
 import 'package:videohub/data/database/dao/category_dao.dart';
 import 'package:videohub/data/database/dao/favorite_dao.dart';
