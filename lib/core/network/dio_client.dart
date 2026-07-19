@@ -71,7 +71,9 @@ class DioClient {
       UserAgentInterceptor(),
       cookieInterceptor,
       LoggingInterceptor(),
-      RetryInterceptor(dioProvider: () => dio),
+      // dioProvider 回调到 _instance 而非闭包变量 dio，
+      // 这样 baseUrl 切换重建后，重试会自动用最新 Dio 而非已关闭的旧 Dio。
+      RetryInterceptor(dioProvider: () => _instance ?? dio),
       ErrorInterceptor(),
     ]);
 
@@ -131,7 +133,7 @@ class DioClient {
       UserAgentInterceptor(),
       cookieInterceptor,
       LoggingInterceptor(),
-      RetryInterceptor(dioProvider: () => dio),
+      RetryInterceptor(dioProvider: () => _instance ?? dio),
       ErrorInterceptor(),
     ]);
 

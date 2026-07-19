@@ -7,10 +7,19 @@ import 'package:videohub/core/network/dio_client.dart';
 /// API 服务 — 提供所有 HTTP 接口调用
 ///
 /// 业务层调用 Repository，Repository 调用 ApiService。
+///
+/// 重要：不缓存 Dio 引用！每次请求动态从 [DioClient.instance] 取最新实例，
+/// 这样切换 baseUrl 后（[DioClient.rebuildWithBaseUrl]）能立即生效，
+/// 不会因持有已关闭的旧 Dio 而抛
+/// "Dio can't establish a new connection after it was closed"。
 class ApiService {
-  final Dio _dio;
+  /// 仅用于测试注入 mock Dio；生产环境保持 null，每次动态读取最新 Dio。
+  final Dio? _dioOverride;
 
-  ApiService([Dio? dio]) : _dio = dio ?? DioClient.instance;
+  ApiService([Dio? dio]) : _dioOverride = dio;
+
+  /// 动态读取当前 DioClient 中的 Dio 实例（baseUrl 切换后会自动跟随）
+  Dio get _dio => _dioOverride ?? DioClient.instance;
 
   /// 获取首页 HTML（用于解析导航菜单获取所有分类）
   Future<String> fetchHomeHtml() async {
