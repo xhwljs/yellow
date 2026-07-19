@@ -167,10 +167,7 @@ class VideoDetailController extends GetxController {
       );
 
       // 同步更新 detail（若 url_decryptor 重新拉取过详情）
-      if (d == null ||
-          d.token == null ||
-          d.token!.isEmpty ||
-          d.aid == null) {
+      if (d == null || d.token == null || d.token!.isEmpty || d.aid == null) {
         detail.value = result.detail;
       }
 
@@ -182,9 +179,9 @@ class VideoDetailController extends GetxController {
         ),
       );
       await videoController.initialize().timeout(
-        const Duration(seconds: 30),
-        onTimeout: () => throw const TimeoutException('视频初始化超时'),
-      );
+            const Duration(seconds: 30),
+            onTimeout: () => throw const TimeoutException('视频初始化超时'),
+          );
 
       // 获取当前主题色（chewie 控件需在 build 时拿到主题色才能跟随切换）
       // 这里取默认 primary，实际颜色通过 Obx 在 UI 层重建 Chewie 时注入
