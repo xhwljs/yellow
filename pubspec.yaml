@@ -35,7 +35,7 @@ dependencies:
   chewie: ^1.8.1
   wakelock_plus: ^1.2.4
   screen_brightness: ^1.0.1
-  volume_controller: ^3.4.4
+  volume_controller: ^3.4.0
 
   # UI / 设计系统
   google_fonts: ^6.2.1
@@ -62,9 +62,11 @@ dev_dependencies:
 # package_info_plus 9.x 要求 Flutter 3.27+ 的新 plugin DSL，
 # 当前 Flutter 3.24.0 仍用旧 `flutter` 扩展机制 → 强制降到 8.x 兼容版本
 # wakelock_plus 1.4+ 要求 AGP 8.12+ / Gradle 8.13+，与 Flutter 3.24 默认 AGP 7.3 不兼容 → 降到 1.2.x
+# volume_controller 3.4.2+ 引入 FlutterSceneLifeCycleDelegate，需 Flutter 3.27+ → 降到 3.4.0
 dependency_overrides:
   package_info_plus: ^8.1.1
   wakelock_plus: '>=1.2.0 <1.4.0'
+  volume_controller: '>=3.4.0 <3.4.2'
 
 flutter:
   uses-material-design: true
