@@ -150,8 +150,18 @@ class _LoadingView extends StatelessWidget {
 
 /// 播放中视图（Chewie 集成）
 ///
-/// Chewie 的 MaterialControls 提供完整控件（进度条 / 播放暂停 / 全屏 / 倍速），
-/// 我们通过 [ChewieController] 注入主题色，并在外层叠加手势层处理亮度/音量调节。
+/// Chewie 的 MaterialControls 自带完整功能（无需自定义）：
+/// - 播放/暂停按钮（中央 + 底栏）
+/// - 进度条拖拽 + 缓冲进度展示
+/// - 横向滑动快进快退
+/// - 双击播放/暂停切换
+/// - 全屏切换按钮（进入/退出全屏）
+/// - 倍速切换（0.5x - 2.0x）
+/// - 控件自动隐藏（3 秒无操作）+ 点击视频区域显示控件
+///
+/// 我们通过 [ChewieController] 注入主题色，外层叠加 [_BrightnessVolumeGesture]
+/// 处理**亮度/音量**纵向拖动（chewie 默认不支持亮度/音量手势）。
+/// 横向拖动、双击、点击等手势交给 chewie 处理，避免冲突。
 class _PlayingView extends StatelessWidget {
   final PlayerPageController controller;
   final bool showBufferingIndicator;
@@ -206,53 +216,48 @@ class _PlayingView extends StatelessWidget {
 
     return Stack(
       children: [
-        // 视频本体
+        // 视频本体（chewie 自带：播放/暂停/进度/全屏/倍速/横向滑动/双击/自动隐藏）
         Center(
           child: AspectRatio(
             aspectRatio: videoController.value.aspectRatio,
             child: Chewie(controller: chewieController),
           ),
         ),
-        // 自定义手势层（亮度 / 音量 / 进度调节）
-        // 仅在不显示 Chewie 控件时拦截手势，避免冲突。
+        // 亮度 / 音量手势层（仅纵向拖动，不拦截横向拖动/双击/点击）
+        // 让 chewie 自带的手势（横向滑动快进 / 双击暂停 / 点击显示控件）正常工作。
         Positioned.fill(
-          child: _GestureOverlay(controller: controller),
+          child: _BrightnessVolumeGesture(controller: controller),
         ),
       ],
     );
   }
 }
 
-/// 手势叠加层（亮度 / 音量 / 进度调节）
+/// 亮度 / 音量手势层（仅纵向拖动）
 ///
 /// 设计：
-/// - 横向拖动：进度调节
-/// - 左半屏纵向拖动：亮度
-/// - 右半屏纵向拖动：音量
-/// - 双击：播放/暂停切换
+/// - 左半屏纵向拖动：亮度调节
+/// - 右半屏纵向拖动：音量调节
 ///
-/// 使用 HitTestBehavior.translucent 让 Chewie 的控件仍能接收点击事件。
-class _GestureOverlay extends StatelessWidget {
+/// **不处理**横向拖动、双击、点击 — 这些交给 chewie 自带控件处理：
+/// - 横向拖动：chewie 快进快退
+/// - 双击：chewie 播放/暂停
+/// - 单击：chewie 显示/隐藏控件
+///
+/// 使用 HitTestBehavior.translucent + 仅注册 onVerticalDragUpdate，
+/// 让其他手势类型穿透到下层 chewie。
+class _BrightnessVolumeGesture extends StatelessWidget {
   final PlayerPageController controller;
-  const _GestureOverlay({required this.controller});
+  const _BrightnessVolumeGesture({required this.controller});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
-      onDoubleTap: controller.togglePlayPause,
-      onHorizontalDragUpdate: (details) {
-        final dx = details.delta.dx;
-        final positionMs = controller.positionMs.value;
-        final durationMs = controller.durationMs.value;
-        if (durationMs == 0) return;
-        final deltaMs = (dx * durationMs / 300).toInt();
-        final target = (positionMs + deltaMs).clamp(0, durationMs);
-        controller.seekTo(Duration(milliseconds: target));
-      },
+      // 仅注册纵向拖动 — 横向拖动/双击/点击会被 chewie 处理
       onVerticalDragUpdate: (details) {
-        final isLeft =
-            details.globalPosition.dx < MediaQuery.of(context).size.width / 2;
+        final isLeft = details.globalPosition.dx <
+            MediaQuery.of(context).size.width / 2;
         if (isLeft) {
           controller.setBrightness(
             controller.brightness.value - details.delta.dy / 500,

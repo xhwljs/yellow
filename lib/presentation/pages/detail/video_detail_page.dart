@@ -15,7 +15,6 @@ import 'package:videohub/presentation/widgets/video_card.dart';
 /// 严格遵循 design-system/videohub/MASTER.md：
 /// - CustomScrollView + SliverAppBar（顶部内联播放器）
 /// - 标题、简介、相关推荐
-/// - 浮动 "全屏播放" FAB，颜色用 colors.primary
 /// - 收藏 IconButton：已收藏 solid / 未收藏 outline
 ///
 /// 顶部 SliverAppBar 区域集成了 video_player + chewie 内联播放器：
@@ -24,7 +23,8 @@ import 'package:videohub/presentation/widgets/video_card.dart';
 /// - 播放态：chewie 播放器（自带播放/暂停/进度/全屏/倍速按钮）
 /// - 错误态：封面 + 错误图标 + 重试按钮
 ///
-/// 现有功能保持不变：FAB 全屏跳转 / 收藏 / 相关推荐 / 标题简介。
+/// 全屏播放使用 chewie 内联播放器自带的全屏按钮（点击切换横屏全屏），
+/// 不再需要 FAB 跳转到独立的播放页。
 class VideoDetailPage extends GetView<VideoDetailController> {
   const VideoDetailPage({super.key});
 
@@ -49,25 +49,6 @@ class VideoDetailPage extends GetView<VideoDetailController> {
           return const LoadingView(message: '加载中...');
         }
         return _buildContent(context, colors, detail);
-      }),
-      floatingActionButton: Obx(() {
-        if (controller.detail.value == null) {
-          return const SizedBox.shrink();
-        }
-        return FloatingActionButton.extended(
-          onPressed: controller.goToPlayer,
-          backgroundColor: colors.primary,
-          foregroundColor: colors.onPrimary,
-          elevation: 4,
-          icon: const Icon(PhosphorIconsFill.play),
-          label: const Text(
-            '全屏播放',
-            style: TextStyle(
-              fontSize: DesignTokens.textBody,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        );
       }),
     );
   }

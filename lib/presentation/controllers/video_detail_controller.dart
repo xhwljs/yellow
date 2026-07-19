@@ -15,11 +15,13 @@ import 'package:videohub/data/repositories/video_repository.dart';
 
 /// 视频详情控制器
 ///
-/// 包含两个独立播放入口：
-/// 1. **顶部内联播放器**（[inlineVideoController]/[inlineChewieController]）：
-///    在详情页 SliverAppBar 区域直接播放，使用 chewie 自带控件。
-/// 2. **FAB 全屏跳转**（[goToPlayer]）：跳转到独立的 VideoPlayerPage 沉浸式播放，
-///    支持手势 / 倍速 / 进度续播。两个入口互不影响。
+/// 包含播放入口：
+/// **顶部内联播放器**（[inlineVideoController]/[inlineChewieController]）：
+/// 在详情页 SliverAppBar 区域直接播放，使用 chewie 自带控件
+/// （播放/暂停/进度/全屏/倍速/横向滑动快进/双击暂停/控件自动隐藏）。
+///
+/// 全屏播放使用 chewie 内联播放器自带的全屏按钮（点击切换横屏全屏），
+/// 不再需要 FAB 跳转到独立的播放页。[goToPlayer] 保留作为备用入口。
 class VideoDetailController extends GetxController {
   final VideoRepository _videoRepo;
   final FavoriteRepository _favoriteRepo;
