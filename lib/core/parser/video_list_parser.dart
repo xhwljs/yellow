@@ -63,14 +63,13 @@ class VideoListParser {
 
     // 标题：优先 .stui-vodlist__detail h4 a，降级到 a 的 title 属性 / 文本
     final detailEl = element.querySelector('.stui-vodlist__detail');
-    final title =
-        detailEl?.querySelector('h4 a')?.text.trim() ??
-            link.attributes['title']?.trim() ??
-            link.text.trim();
+    final title = detailEl?.querySelector('h4 a')?.text.trim() ??
+        link.attributes['title']?.trim() ??
+        link.text.trim();
 
     // 时长在 a 内的 .pic-text
-    final picText = link.querySelector('.pic-text') ??
-        element.querySelector('.pic-text');
+    final picText =
+        link.querySelector('.pic-text') ?? element.querySelector('.pic-text');
     final duration = picText?.text.trim() ?? '';
 
     // 解析播放数 / 喜欢数 / 更新时间（在 .stui-vodlist__detail .sub 内）
@@ -96,8 +95,7 @@ class VideoListParser {
   int parseTotalPages(String html) {
     try {
       final doc = html_parser.parse(html);
-      final pagination =
-          doc.querySelector('.stui-page, .pagination, .page');
+      final pagination = doc.querySelector('.stui-page, .pagination, .page');
       if (pagination == null) return 1;
 
       final links = pagination.querySelectorAll('a');

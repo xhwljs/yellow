@@ -27,9 +27,8 @@ class UserAgentInterceptor extends Interceptor {
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    final isPlayUrlDecrypt =
-        options.method.toUpperCase() == 'POST' &&
-            options.path.contains(_playUrlDecryptPath);
+    final isPlayUrlDecrypt = options.method.toUpperCase() == 'POST' &&
+        options.path.contains(_playUrlDecryptPath);
 
     options.headers['User-Agent'] = UserAgentUtils.random();
     options.headers['Accept'] = isPlayUrlDecrypt

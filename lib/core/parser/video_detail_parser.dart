@@ -43,9 +43,14 @@ class VideoDetailParser {
       final token = _extractToken(doc);
 
       // AID/ASID/ANID 从 script 中提取
-      final aid = _extractScriptVar(doc, 'AID') ?? _parseAidFromVideoId(videoId);
-      final sid = _extractScriptVar(doc, 'ASID') ?? _parseSidFromVideoId(videoId) ?? '1';
-      final nid = _extractScriptVar(doc, 'ANID') ?? _parseNidFromVideoId(videoId) ?? '1';
+      final aid =
+          _extractScriptVar(doc, 'AID') ?? _parseAidFromVideoId(videoId);
+      final sid = _extractScriptVar(doc, 'ASID') ??
+          _parseSidFromVideoId(videoId) ??
+          '1';
+      final nid = _extractScriptVar(doc, 'ANID') ??
+          _parseNidFromVideoId(videoId) ??
+          '1';
 
       // 相关推荐（过滤广告）
       final relatedVideos = _parseRelatedVideos(doc);
@@ -88,7 +93,8 @@ class VideoDetailParser {
   /// 3. `<title>` 标签内容（去掉站点后缀）
   static String? _extractTitle(dom.Document doc) {
     // 优先 .stui-pannel__head h3.title
-    final heads = doc.querySelectorAll('.stui-pannel__head h3.title, .stui-pannel__head .title');
+    final heads = doc.querySelectorAll(
+        '.stui-pannel__head h3.title, .stui-pannel__head .title');
     for (final h in heads) {
       final text = h.text.trim();
       if (text.isNotEmpty && text.length > 5 && text != '目录') {
@@ -135,8 +141,8 @@ class VideoDetailParser {
   static String _extractCoverUrl(dom.Document doc) {
     // 详情页有时有 .stui-content__thumb img
     final thumbImg = doc.querySelector('.stui-content__thumb img');
-    final cover = thumbImg?.attributes['data-original'] ??
-        thumbImg?.attributes['src'];
+    final cover =
+        thumbImg?.attributes['data-original'] ?? thumbImg?.attributes['src'];
     if (cover != null && cover.isNotEmpty) return cover;
 
     // 降级：相关推荐第一张 a[data-original]
