@@ -122,7 +122,7 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Generate native platform scaffolding (android)
+      - name: Generate native platform scaffolding (android only)
         run: flutter create --platforms=android --project-name=videohub --org com.videohub .
 
       - name: Run Floor codegen
@@ -142,65 +142,10 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
 
-  # ===== 3. 构建 iOS (无签名构建，仅编译验证) =====
-  build-ios:
-    name: Build iOS (no-code-sign)
-    needs: analyze-and-test
-    runs-on: macos-14
-    timeout-minutes: 45
-    continue-on-error: true
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          cache: true
-          channel: stable
-
-      - name: Cache pub packages
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.pub-cache
-            .dart_tool/
-          key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.lock', 'pubspec.yaml') }}
-          restore-keys: ${{ runner.os }}-pub-
-
-      - name: Cache Pods
-        uses: actions/cache@v4
-        with:
-          path: ios/Pods
-          key: ${{ runner.os }}-pods-${{ hashFiles('ios/Podfile.lock') }}
-          restore-keys: ${{ runner.os }}-pods-
-
-      - name: Install dependencies
-        run: flutter pub get
-
-      - name: Generate native platform scaffolding (ios)
-        run: flutter create --platforms=ios --project-name=videohub --org com.videohub .
-
-      - name: Run Floor codegen
-        run: dart run build_runner build --delete-conflicting-outputs
-
-      - name: Build iOS (simulator, no code sign)
-        run: flutter build ios --simulator --no-codesign --debug
-
-      - name: Upload iOS build
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios-build
-          path: build/ios/iphonesimulator/Runner.app
-          retention-days: 7
-          if-no-files-found: warn
-
-  # ===== 4. Release 构建（打 tag 时自动发布）=====
+  # ===== 3. Release 构建（打 tag 时自动发布）=====
   release:
     name: Release
-    needs: [analyze-and-test, build-android, build-ios]
+    needs: [analyze-and-test, build-android]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     if: startsWith(github.ref, 'refs/tags/v')
@@ -238,7 +183,6 @@ jobs:
             ### ✅ CI 状态
             - 静态检查: ${{ needs.analyze-and-test.result }}
             - Android 构建: ${{ needs.build-android.result }}
-            - iOS 构建: ${{ needs.build-ios.result }}
 
             ### 📝 说明
             由 GitHub Actions 自动构建发布。

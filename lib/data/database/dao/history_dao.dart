@@ -4,12 +4,12 @@ import 'package:videohub/data/models/play_history.dart';
 @dao
 abstract class HistoryDao {
   @Query('SELECT * FROM PlayHistory ORDER BY updatedAt DESC LIMIT :limit')
-  Future<List<PlayHistory>> findAll([int limit = 500]);
+  Future<List<PlayHistory>> findAll(int limit);
 
   @Query(
     'SELECT * FROM PlayHistory ORDER BY updatedAt DESC LIMIT :limit OFFSET :offset',
   )
-  Future<List<PlayHistory>> findPage([int limit = 20, int offset = 0]);
+  Future<List<PlayHistory>> findPage(int limit, int offset);
 
   @Query('SELECT * FROM PlayHistory WHERE videoId = :videoId')
   Future<PlayHistory?> findByVideoId(String videoId);
