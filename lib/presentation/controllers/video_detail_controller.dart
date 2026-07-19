@@ -12,6 +12,7 @@ import 'package:videohub/data/models/video_detail.dart';
 import 'package:videohub/data/repositories/favorite_repository.dart';
 import 'package:videohub/data/repositories/history_repository.dart';
 import 'package:videohub/data/repositories/video_repository.dart';
+import 'package:videohub/presentation/controllers/history_controller.dart';
 
 /// 视频详情控制器
 ///
@@ -66,12 +67,13 @@ class VideoDetailController extends GetxController {
   final RxString inlineErrorMessage = ''.obs;
   bool _inlineStarted = false;
 
-  // 历史记录节流保存
+  // 历史记录实时保存
   //
-  // 监听 video_player 的 position 变化，每 5 秒保存一次播放进度到数据库。
-  // 退出详情页（onClose）时也会保存最后一次进度，确保续播位置准确。
+  // 每秒读取 video_player 当前 position/duration 写入数据库，
+  // 并同步刷新 HistoryController 的 RxList，让 History Tab 实时更新。
+  // 退出详情页（onClose）时也会保存最后一次进度。
   Timer? _historySaveTimer;
-  static const Duration _historySaveInterval = Duration(seconds: 5);
+  static const Duration _historySaveInterval = Duration(seconds: 1);
 
   /// 当前生效的封面 URL
   ///
@@ -325,6 +327,10 @@ class VideoDetailController extends GetxController {
   ///
   /// 静默失败：若 videoController 未就绪或异常，直接返回（不影响播放）。
   /// duration 为 0 时跳过保存（避免误写 progress=1.0）。
+  ///
+  /// **实时同步 History Tab**：写入完成后调用 [_refreshHistoryController]，
+  /// 让 HistoryController 的 RxList 立即更新，用户切到 History Tab 时
+  /// 能看到最新播放记录和进度（无需等切换 Tab 触发 loadHistory）。
   void _saveHistoryFromPlayer() {
     final videoController = inlineVideoController.value;
     if (videoController == null || !videoController.value.isInitialized) {
@@ -345,9 +351,23 @@ class VideoDetailController extends GetxController {
       positionMs: positionMs,
       durationMs: durationMs,
     )
+        .then((_) => _refreshHistoryController())
         .catchError((e) {
       appLogger.w('保存播放历史失败: $e');
       return null;
     });
+  }
+
+  /// 同步刷新 HistoryController 的列表
+  ///
+  /// 使用 [Get.isRegistered] 防御性检查：
+  /// - 测试环境或启动早期 HistoryController 未注册时不报错
+  /// - 详情页可能在 History Tab 切换前就被打开
+  ///
+  /// 调用 [HistoryController.loadHistory] 会触发 RxList 重建，
+  /// History Tab 的 Obx 自动重建 UI，实现"实时添加到播放历史列表"。
+  void _refreshHistoryController() {
+    if (!Get.isRegistered<HistoryController>()) return;
+    Get.find<HistoryController>().loadHistory();
   }
 }
