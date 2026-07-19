@@ -54,15 +54,25 @@ class UrlDecryptor {
     await _runCountdown(onCountdown: onCountdown);
 
     // 3. 构造 POST 参数
+    //
+    // id 字段用 detail.aid（从详情页 script 中提取的 AID 值，如 "230754"），
+    // 不是 videoId（复合 ID "230754-1-1"）。
     final params = _buildParams(
-      videoId: videoId,
+      id: detail.aid ??
+          (videoId.contains('-') ? videoId.split('-').first : videoId),
       token: detail.token!,
       sid: detail.sid ?? '1',
       nid: detail.nid ?? '1',
     );
 
     // 4. 发送 POST 请求
-    final response = await _apiService.postDecryptPlayUrl(params);
+    //
+    // 传递 videoId 用于构造详情页 Referer（POST 接口要求 Referer 指向
+    // 具体详情页，不能是首页）。
+    final response = await _apiService.postDecryptPlayUrl(
+      params,
+      refererVideoId: videoId,
+    );
 
     // 5. 解析响应
     final ok = response['ok'];
@@ -105,14 +115,17 @@ class UrlDecryptor {
   /// 构造 POST 请求参数
   ///
   /// id, sid, nid, tk, g, x, y, dt, sw, sh, tz, t
+  ///
+  /// 注意：[id] 是从详情页 script 提取的 AID（如 "230754"），
+  /// 不是列表页 href 中的复合 `aid-sid-nid`。
   Map<String, dynamic> _buildParams({
-    required String videoId,
+    required String id,
     required String token,
     required String sid,
     required String nid,
   }) {
     return {
-      'id': videoId,
+      'id': id,
       'sid': sid,
       'nid': nid,
       'tk': token,

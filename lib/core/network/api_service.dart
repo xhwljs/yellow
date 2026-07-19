@@ -46,20 +46,33 @@ class ApiService {
   /// 参数: id, sid, nid, tk, g, x, y, dt, sw, sh, tz, t
   /// 返回: JSON {ok: boolean, u: string}
   ///
-  /// 注意：不要在此处设置 `X-Requested-With: XMLHttpRequest`，
-  /// 否则会覆盖拦截器注入的 `com.mmbox.xbrowser` 反爬识别头，
-  /// 导致源站 connection reset。Referer 也由拦截器统一注入。
+  /// Header 规则（实测）：
+  /// - GET 页面：`X-Requested-With: com.mmbox.xbrowser`（反爬识别）
+  /// - POST /static/count.php：`X-Requested-With: XMLHttpRequest`
+  ///   否则返回 `{"ok":false,"err":"xhr"}`
+  /// - POST Referer 必须指向详情页 `/v5/{aid}-{sid}-{nid}.html`，
+  ///   否则可能被识别为非法来源。
+  ///
+  /// 由 [UserAgentInterceptor] 拦截器统一注入 `X-Requested-With: XMLHttpRequest`，
+  /// 此处仅补充 Content-Type 和 Referer（基于 params 中的 id/sid/nid 构造）。
   Future<Map<String, dynamic>> postDecryptPlayUrl(
-    Map<String, dynamic> params,
-  ) async {
+    Map<String, dynamic> params, {
+    String? refererVideoId,
+  }) async {
+    final headers = <String, String>{
+      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+    };
+    // 构造详情页 Referer
+    if (refererVideoId != null && refererVideoId.isNotEmpty) {
+      headers['Referer'] = ApiEndpoints.videoDetail(refererVideoId);
+    }
+
     final response = await _dio.post<dynamic>(
       ApiEndpoints.playUrlDecrypt,
       data: params,
       options: Options(
         responseType: ResponseType.json,
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
+        headers: headers,
       ),
     );
     final data = response.data;

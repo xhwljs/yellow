@@ -20,8 +20,18 @@ class ApiEndpoints {
   }
 
   /// 视频详情
-  /// /voddetail/{videoId}.html
+  ///
+  /// 站点当前结构（2026）：/v5/{aid}-{sid}-{nid}.html
+  /// 其中 [videoId] 应为复合 ID，格式 `aid-sid-nid`（如 `230754-1-1`），
+  /// 由列表页 `/v5/...` href 直接解析得到。
+  ///
+  /// 兼容旧路径 /voddetail/{id}.html（保留以防站点回退）。
   static String videoDetail(String videoId) {
+    if (videoId.contains('-')) {
+      // 复合 ID：aid-sid-nid
+      return '$base/v5/$videoId.html';
+    }
+    // 单 ID（旧路径，兼容）
     return '$base/voddetail/$videoId.html';
   }
 
