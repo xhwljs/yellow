@@ -15,7 +15,7 @@ class VideoListParser {
     if (html.isEmpty) return const [];
 
     try {
-      final doc = parser.parse(html);
+      final doc = parse(html);
       final items = doc.querySelectorAll('.stui-vodlist__box');
 
       return items
@@ -57,7 +57,7 @@ class VideoListParser {
   /// 提取总页数（用于分页加载）
   int parseTotalPages(String html) {
     try {
-      final doc = parser.parse(html);
+      final doc = parse(html);
       // 通用模板站点的分页结构
       final pagination = doc.querySelector('.stui-page, .pagination, .page');
       if (pagination == null) return 1;

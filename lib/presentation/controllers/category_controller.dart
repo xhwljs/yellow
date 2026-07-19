@@ -63,5 +63,6 @@ class CategoryController extends GetxController {
     }
   }
 
+  @override
   Future<void> refresh() => loadFirstPage(forceRefresh: true);
 }

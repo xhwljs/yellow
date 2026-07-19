@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 import 'package:videohub/presentation/bindings/app_binding.dart';
 import 'package:videohub/presentation/pages/main_shell.dart';
 

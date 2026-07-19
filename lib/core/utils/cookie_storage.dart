@@ -1,6 +1,4 @@
-import 'dart:convert';
 import 'package:cookie_jar/cookie_jar.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Cookie 持久化存储
@@ -34,7 +32,7 @@ class CookieStorage implements Storage {
   }
 
   @override
-  Future<void> clear() async {
+  Future<void> deleteAll() async {
     final keys = _prefs.getKeys().where((k) => k.startsWith(_keyPrefix));
     for (final key in keys) {
       await _prefs.remove(key);

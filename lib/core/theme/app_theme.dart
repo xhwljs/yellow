@@ -215,15 +215,14 @@ class AppTheme {
         iconColor: colors.onSurfaceMuted,
       ),
       // 涟漪效果颜色
-      splashColor: colors.primary.withValues(alpha: 0.08),
-      highlightColor: colors.primary.withValues(alpha: 0.04),
+      splashColor: colors.primary.withOpacity(0.08),
+      highlightColor: colors.primary.withOpacity(0.04),
     );
   }
 
   static TextTheme _buildTextTheme(ThemeColors colors) {
-    final poppins = GoogleFonts.poppins;
-    final righteous = GoogleFonts.righteous;
-    final mono = GoogleFonts.jetBrainsMono;
+    const poppins = GoogleFonts.poppins;
+    const righteous = GoogleFonts.righteous;
 
     return TextTheme(
       displayLarge: righteous(

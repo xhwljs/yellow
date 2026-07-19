@@ -21,7 +21,7 @@ class LoggingInterceptor extends Interceptor {
     final length = response.data?.toString().length ?? 0;
     appLogger.i(
       '← ${response.statusCode} ${response.requestOptions.uri} '
-      '(${length} bytes)',
+      '($length bytes)',
     );
     handler.next(response);
   }

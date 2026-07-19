@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import 'package:videohub/data/models/play_history.dart';
 import 'package:videohub/data/models/video_detail.dart';
 import 'package:videohub/data/repositories/favorite_repository.dart';
 import 'package:videohub/data/repositories/history_repository.dart';
@@ -44,7 +45,7 @@ class VideoDetailController extends GetxController {
 
       detail.value = results[0] as VideoDetail;
       isFavorited.value = results[1] as bool;
-      final history = results[2];
+      final history = results[2] as PlayHistory?;
       if (history != null && !history.isCompleted) {
         initialPositionMs.value = history.positionMs;
       }

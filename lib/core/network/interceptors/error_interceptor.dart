@@ -25,6 +25,7 @@ class ErrorInterceptor extends Interceptor {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.sendTimeout:
       case DioExceptionType.receiveTimeout:
+      case DioExceptionType.transformTimeout:
         return const TimeoutException('网络连接超时，请检查网络后重试');
       case DioExceptionType.connectionError:
         return const NetworkException('网络连接失败，请检查网络设置');
@@ -35,12 +36,12 @@ class ErrorInterceptor extends Interceptor {
         }
         if (code >= 500) {
           return NetworkException(
-            '服务器繁忙 (${code})',
+            '服务器繁忙 ($code)',
             statusCode: code,
           );
         }
         return NetworkException(
-          '请求失败 (${code})',
+          '请求失败 ($code)',
           statusCode: code,
           cause: err,
         );

@@ -28,12 +28,12 @@ class UserAgentUtils {
 
   /// 模拟随机屏幕坐标 x（点击坐标）
   static String randomX() {
-    return _random.nextInt(200) + 100.toString(); // 100-300
+    return (_random.nextInt(200) + 100).toString(); // 100-300
   }
 
   /// 模拟随机屏幕坐标 y（点击坐标）
   static String randomY() {
-    return _random.nextInt(400) + 100.toString(); // 100-500
+    return (_random.nextInt(400) + 100).toString(); // 100-500
   }
 
   /// 模拟随机屏幕宽度

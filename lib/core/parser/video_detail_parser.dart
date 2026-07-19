@@ -16,7 +16,7 @@ class VideoDetailParser {
     }
 
     try {
-      final doc = parser.parse(html);
+      final doc = parse(html);
 
       // 标题
       final title = doc

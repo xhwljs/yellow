@@ -85,9 +85,9 @@ class ThemeColors {
   Color get onAccent => const Color(0xFFFFFFFF);
 
   // primary 的低透明度变体（背景/选中态使用）
-  Color get primaryContainer => preset.primaryColor.withValues(alpha: 0.12);
-  Color get secondaryContainer => preset.secondaryColor.withValues(alpha: 0.12);
-  Color get ring => preset.primaryColor.withValues(alpha: 0.4);
+  Color get primaryContainer => preset.primaryColor.withOpacity(0.12);
+  Color get secondaryContainer => preset.secondaryColor.withOpacity(0.12);
+  Color get ring => preset.primaryColor.withOpacity(0.4);
 
   // 不变令牌（与 DesignTokens 保持一致）
   Color get background => const Color(0xFFF5F5F7);

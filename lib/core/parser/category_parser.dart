@@ -16,7 +16,7 @@ class CategoryParser {
     if (html.isEmpty) return const [];
 
     try {
-      final doc = parser.parse(html);
+      final doc = parse(html);
 
       // 优先尝试 .stui-header__menu (macCMS 标准)
       var items = doc.querySelectorAll('.stui-header__menu li a');

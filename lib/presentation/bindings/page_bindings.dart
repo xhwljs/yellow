@@ -11,7 +11,7 @@ import 'package:videohub/presentation/controllers/video_player_controller.dart';
 class CategoryBinding extends Bindings {
   @override
   void dependencies() {
-    final categoryId = int.tryParse(Get.arguments.toString() ?? '') ?? 0;
+    final categoryId = int.tryParse(Get.arguments.toString()) ?? 0;
     Get.lazyPut<CategoryController>(
       () => CategoryController(
         Get.find<VideoRepository>(),

@@ -42,7 +42,7 @@ class HomePage extends GetView<HomeController> {
         if (controller.isLoading.value && controller.categories.isEmpty) {
           return _buildSkeletonGrid();
         }
-        final errMsg = controller.error?.value ?? '';
+        final errMsg = controller.error.value;
         if (errMsg.isNotEmpty && controller.categories.isEmpty) {
           return ErrorView(message: errMsg, onRetry: controller.refresh);
         }

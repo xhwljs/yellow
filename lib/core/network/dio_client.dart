@@ -35,9 +35,9 @@ class DioClient {
 
     final dio = Dio(
       BaseOptions(
-        connectTimeout: Duration(milliseconds: AppConstants.connectTimeoutMs),
-        receiveTimeout: Duration(milliseconds: AppConstants.receiveTimeoutMs),
-        sendTimeout: Duration(milliseconds: AppConstants.sendTimeoutMs),
+        connectTimeout: const Duration(milliseconds: AppConstants.connectTimeoutMs),
+        receiveTimeout: const Duration(milliseconds: AppConstants.receiveTimeoutMs),
+        sendTimeout: const Duration(milliseconds: AppConstants.sendTimeoutMs),
         responseType: ResponseType.plain, // 返回原始字符串用于 HTML 解析
         followRedirects: true,
         maxRedirects: 5,
@@ -67,7 +67,7 @@ class DioClient {
 
   static Future<CookieJar> cookieInterceptorJar() async {
     final interceptor = (await CookieInterceptor.create());
-    return interceptor.jar;
+    return interceptor.cookieJar;
   }
 
   /// 仅用于测试或重置

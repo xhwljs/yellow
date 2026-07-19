@@ -28,13 +28,15 @@ class FavoriteRepository {
     required int categoryId,
   }) async {
     final now = DateTime.now().millisecondsSinceEpoch;
-    await _db.favoriteDao.insert(Favorite(
-      videoId: videoId,
-      title: title,
-      coverUrl: coverUrl,
-      categoryId: categoryId,
-      createdAt: now,
-    ));
+    await _db.favoriteDao.insert(
+      Favorite(
+        videoId: videoId,
+        title: title,
+        coverUrl: coverUrl,
+        categoryId: categoryId,
+        createdAt: now,
+      ),
+    );
     appLogger.i('已收藏: $videoId');
   }
 

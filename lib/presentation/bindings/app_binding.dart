@@ -59,7 +59,7 @@ Future<void> initializeApp() async {
 
   // 6. 全局控制器
   final themeController = ThemeController();
-  await themeController.onInit();
+  themeController.onInit();
   Get.put<ThemeController>(themeController, permanent: true);
   Get.put<MainShellController>(MainShellController(), permanent: true);
 

@@ -42,20 +42,23 @@ class HistoryRepository {
     required int durationMs,
   }) async {
     final now = DateTime.now().millisecondsSinceEpoch;
-    await _db.historyDao.upsert(PlayHistory(
-      videoId: videoId,
-      title: title,
-      coverUrl: coverUrl,
-      categoryId: categoryId,
-      positionMs: positionMs,
-      durationMs: durationMs,
-      updatedAt: now,
-    ));
+    await _db.historyDao.upsert(
+      PlayHistory(
+        videoId: videoId,
+        title: title,
+        coverUrl: coverUrl,
+        categoryId: categoryId,
+        positionMs: positionMs,
+        durationMs: durationMs,
+        updatedAt: now,
+      ),
+    );
 
     // 自动裁剪
     await _db.historyDao.trimOld(AppConstants.historyMaxRecords);
     appLogger.d(
-        '更新播放历史: $videoId progress=${positionMs / (durationMs > 0 ? durationMs : 1)}');
+      '更新播放历史: $videoId progress=${positionMs / (durationMs > 0 ? durationMs : 1)}',
+    );
   }
 
   /// 删除单条历史

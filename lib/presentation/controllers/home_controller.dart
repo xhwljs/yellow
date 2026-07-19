@@ -14,7 +14,7 @@ class HomeController extends GetxController {
   final RxList<Category> categories = <Category>[].obs;
   final RxMap<int, List<Video>> categoryVideos = <int, List<Video>>{}.obs;
   final RxBool isLoading = false.obs;
-  final RxString? error = RxString('').obs;
+  final RxString error = RxString('');
 
   @override
   void onInit() {
@@ -24,7 +24,7 @@ class HomeController extends GetxController {
 
   Future<void> loadData({bool forceRefresh = false}) async {
     isLoading.value = true;
-    error?.value = '';
+    error.value = '';
     try {
       // 1. 分类
       final cats =
@@ -41,7 +41,7 @@ class HomeController extends GetxController {
       });
       await Future.wait(futures);
     } catch (e) {
-      error?.value = e.toString();
+      error.value = e.toString();
     } finally {
       isLoading.value = false;
     }
@@ -55,6 +55,7 @@ class HomeController extends GetxController {
     } catch (_) {}
   }
 
+  @override
   Future<void> refresh() async {
     await loadData(forceRefresh: true);
   }

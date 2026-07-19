@@ -7,7 +7,8 @@ abstract class HistoryDao {
   Future<List<PlayHistory>> findAll({int limit = 500});
 
   @Query(
-      'SELECT * FROM PlayHistory ORDER BY updatedAt DESC LIMIT :limit OFFSET :offset')
+    'SELECT * FROM PlayHistory ORDER BY updatedAt DESC LIMIT :limit OFFSET :offset',
+  )
   Future<List<PlayHistory>> findPage({int limit = 20, int offset = 0});
 
   @Query('SELECT * FROM PlayHistory WHERE videoId = :videoId')
@@ -19,8 +20,10 @@ abstract class HistoryDao {
   @Query('DELETE FROM PlayHistory WHERE videoId = :videoId')
   Future<void> deleteByVideoId(String videoId);
 
-  @Query('DELETE FROM PlayHistory WHERE videoId NOT IN ('
-      'SELECT videoId FROM PlayHistory ORDER BY updatedAt DESC LIMIT :keepCount)')
+  @Query(
+    'DELETE FROM PlayHistory WHERE videoId NOT IN ('
+    'SELECT videoId FROM PlayHistory ORDER BY updatedAt DESC LIMIT :keepCount)',
+  )
   Future<void> trimOld(int keepCount);
 
   @Query('DELETE FROM PlayHistory')

@@ -13,47 +13,44 @@ sealed class AppException implements Exception {
 class NetworkException extends AppException {
   final int? statusCode;
   const NetworkException(
-    String message, {
+    super.message, {
     this.statusCode,
-    Object? cause,
-  }) : super(message, code: 'NETWORK', cause: cause);
+    super.cause,
+  }) : super(code: 'NETWORK');
 }
 
 class TimeoutException extends AppException {
-  const TimeoutException([String message = '请求超时'])
-      : super(message, code: 'TIMEOUT');
+  const TimeoutException([super.message = '请求超时']) : super(code: 'TIMEOUT');
 }
 
 class ParseException extends AppException {
   final String selector;
   const ParseException(
-    String message, {
+    super.message, {
     this.selector = '',
-    Object? cause,
-  }) : super(message, code: 'PARSE', cause: cause);
+    super.cause,
+  }) : super(code: 'PARSE');
 }
 
 class DecryptException extends AppException {
-  const DecryptException([String message = '播放地址解密失败'])
-      : super(message, code: 'DECRYPT');
+  const DecryptException([super.message = '播放地址解密失败'])
+      : super(code: 'DECRYPT');
 }
 
 class UrlExpiredException extends AppException {
-  const UrlExpiredException([String message = '播放地址已过期'])
-      : super(message, code: 'URL_EXPIRED');
+  const UrlExpiredException([super.message = '播放地址已过期'])
+      : super(code: 'URL_EXPIRED');
 }
 
 class NotFoundException extends AppException {
-  const NotFoundException([String message = '资源不存在'])
-      : super(message, code: 'NOT_FOUND');
+  const NotFoundException([super.message = '资源不存在'])
+      : super(code: 'NOT_FOUND');
 }
 
 class DatabaseException extends AppException {
-  const DatabaseException(String message, {Object? cause})
-      : super(message, code: 'DB', cause: cause);
+  const DatabaseException(super.message, {super.cause}) : super(code: 'DB');
 }
 
 class BusinessException extends AppException {
-  const BusinessException(String message, {String code = 'BUSINESS'})
-      : super(message, code: code);
+  const BusinessException(super.message, {super.code = 'BUSINESS'});
 }
