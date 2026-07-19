@@ -185,14 +185,14 @@ jobs:
       - name: Run Floor codegen
         run: dart run build_runner build --delete-conflicting-outputs
 
-      - name: Build iOS (no code sign)
-        run: flutter build ios --no-codesign --release
+      - name: Build iOS (simulator, no code sign)
+        run: flutter build ios --simulator --no-codesign --debug
 
       - name: Upload iOS build
         uses: actions/upload-artifact@v4
         with:
           name: ios-build
-          path: build/ios/iphoneos/Runner.app
+          path: build/ios/iphonesimulator/Runner.app
           retention-days: 7
           if-no-files-found: warn
 
