@@ -38,19 +38,20 @@ class HistoryPage extends GetView<HistoryController> {
           ),
         ),
         actions: [
-          Obx(() => controller.histories.isNotEmpty
-              ? TextButton(
-                  onPressed: _confirmClearAll,
-                  child: Text(
-                    '清空',
-                    style: TextStyle(
-                      color: colors.destructive,
-                      fontSize: DesignTokens.textBody,
-                      fontWeight: FontWeight.w600,
+          Obx(
+            () => controller.histories.isNotEmpty
+                ? TextButton(
+                    onPressed: _confirmClearAll,
+                    child: Text(
+                      '清空',
+                      style: TextStyle(
+                        color: colors.destructive,
+                        fontSize: DesignTokens.textBody,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                )
-              : const SizedBox.shrink(),
+                  )
+                : const SizedBox.shrink(),
           ),
         ],
       ),

@@ -29,14 +29,15 @@ class FavoritesPage extends GetView<FavoritesController> {
         backgroundColor: colors.background,
         elevation: 0,
         scrolledUnderElevation: 0,
-        title: Obx(() => Text(
-              '我的收藏 (${controller.favorites.length})',
-              style: TextStyle(
-                color: colors.onBackground,
-                fontSize: DesignTokens.textH1,
-                fontWeight: FontWeight.w700,
-              ),
+        title: Obx(
+          () => Text(
+            '我的收藏 (${controller.favorites.length})',
+            style: TextStyle(
+              color: colors.onBackground,
+              fontSize: DesignTokens.textH1,
+              fontWeight: FontWeight.w700,
             ),
+          ),
         ),
       ),
       body: Obx(() {
