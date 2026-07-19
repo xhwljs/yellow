@@ -214,6 +214,14 @@ class VideoDetailController extends GetxController {
       inlineChewieController.value = chewie;
       inlineLoading.value = false;
 
+      // 立即写入一次历史记录（position = 续播位置或 0）
+      //
+      // 用户需求：开始播放就出现在历史列表，不必等节流定时器首次触发。
+      // 此时 videoController 已就绪但 duration 可能还在更新中，
+      // _saveHistoryFromPlayer 内部会判断 duration > 0 才保存，
+      // 因此这里直接调用即可（duration 0 时静默跳过，下一次定时器触发会写入）。
+      _saveHistoryFromPlayer();
+
       // 启动历史记录节流保存定时器
       _startHistorySaveTimer();
     } on UrlExpiredException {

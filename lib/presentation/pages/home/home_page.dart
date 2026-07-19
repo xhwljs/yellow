@@ -155,7 +155,7 @@ class HomePage extends GetView<HomeController> {
         final selectedId = controller.selectedCategoryId.value;
         // Tab 列表：推荐 + 各分类
         final tabs = <_CategoryTab>[
-          _CategoryTab(id: null, name: '推荐'),
+          const _CategoryTab(id: null, name: '推荐'),
           ...controller.categories.map(
             (c) => _CategoryTab(id: c.id, name: c.name),
           ),
