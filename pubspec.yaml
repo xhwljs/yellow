@@ -58,6 +58,11 @@ dev_dependencies:
   floor_generator: ^1.4.2
   build_runner: ^2.4.9
 
+# package_info_plus 9.x 要求 Flutter 3.27+ 的新 plugin DSL，
+# 当前 Flutter 3.24.0 仍用旧 `flutter` 扩展机制 → 强制降到 8.x 兼容版本
+dependency_overrides:
+  package_info_plus: ^8.1.1
+
 flutter:
   uses-material-design: true
   assets:
