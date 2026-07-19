@@ -17,7 +17,7 @@ class FavoriteRepository {
 
   /// 检查是否已收藏
   Future<bool> isFavorited(String videoId) async {
-    return _db.favoriteDao.exists(videoId);
+    return (await _db.favoriteDao.exists(videoId)) ?? false;
   }
 
   /// 添加收藏

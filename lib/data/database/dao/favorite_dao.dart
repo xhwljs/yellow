@@ -10,7 +10,7 @@ abstract class FavoriteDao {
   Future<Favorite?> findByVideoId(String videoId);
 
   @Query('SELECT EXISTS(SELECT 1 FROM Favorite WHERE videoId = :videoId)')
-  Future<bool> exists(String videoId);
+  Future<bool?> exists(String videoId);
 
   @Insert(onConflict: OnConflictStrategy.replace)
   Future<void> insert(Favorite favorite);
