@@ -47,7 +47,9 @@ class ApiServerSwitcher {
     // 自动迁移死链
     if (_deadMirrors.contains(saved)) {
       await prefs.setString(
-          AppConstants.keyApiBaseUrl, AppConstants.defaultBaseUrl);
+        AppConstants.keyApiBaseUrl,
+        AppConstants.defaultBaseUrl,
+      );
       AppConstants.baseUrl = AppConstants.defaultBaseUrl;
       return;
     }
