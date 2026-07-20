@@ -56,6 +56,20 @@ class AppConstants {
   static const String keyApiBaseUrl = 'api_base_url';
   static const String keySearchHistory = 'search_history';
 
+  /// 上次成功下载并安装的 GitHub Release tag（强制更新模式）
+  ///
+  /// 用于 [GitHubReleaseService.checkForUpdate] 判断是否需要更新：
+  /// - 启动时读取 latest release tag，与本字段比较
+  /// - 相同 → 已是最新版本，跳过更新
+  /// - 不同（或本字段为空）→ 触发强制更新
+  /// - 在 [AppUpdateService.downloadAndInstall] 下载成功后写入此字段
+  ///
+  /// 之所以不直接用 [AppConstants.appVersion]：
+  /// AppConstants.appVersion 是硬编码常量（如 '1.0.0'），CI 不注入 tag，
+  /// 更新后本地版本号仍是 1.0.0，会重复触发"发现新版本"。
+  /// 用 SP 记录实际安装的 tag 可避免此问题。
+  static const String keyLastInstalledReleaseTag = 'last_installed_release_tag';
+
   /// 首页"目录"区块分类 id 集合（来自 `.stui-pannel__menu`）
   ///
   /// 用于 [CategoryRepository] 启动时给从数据库读取的 Category 标记

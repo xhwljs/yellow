@@ -138,3 +138,73 @@ jobs:
 
             ### 📝 说明
             由 GitHub Actions 自动构建发布。
+
+  # ===== 3. Auto Release（push 到 main 自动打 tag + 发 Release）=====
+  #
+  # 触发条件：仅 push 到 main 分支时执行。
+  # 流程：
+  #   1. 等待 build-android 完成（复用其上传的 APK artifact）
+  #   2. 计算下一个递增 tag：v{YYYY.MMDD.N}
+  #      - 当天首次构建 → v2026.0720.0
+  #      - 当天后续构建 → v2026.0720.1, v2026.0720.2 ...
+  #   3. 通过 `gh release create` 一次性创建 tag + Release + 上传 APK
+  #
+  # 关键点：
+  #   - 通过 GitHub API 创建的 tag 不会触发 push 事件，避免循环触发 build-android。
+  #   - 因此每次 git push 到 main 都会强制生成新版本，App 启动时检测到
+  #     tag > 本地版本即弹强制更新对话框（无"稍后"按钮）。
+  #   - 与 release job（处理手动 push v* tag）独立，两者互不影响。
+  auto-release:
+    name: Auto Tag + Release
+    needs: [build-android]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout (full history for tag listing)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: android-apk
+          path: artifacts/
+
+      - name: Compute next tag (v{YYYY.MMDD.N})
+        id: tag
+        run: |
+          DATE=$(date -u +'%Y.%m%d')
+          BASE="v${DATE}"
+          # 列出当天已有的所有 tag（如 v2026.0720.0, v2026.0720.1, ...），取最大编号 +1
+          EXISTING=$(git tag -l "${BASE}.*" | sort -V | tail -n 1)
+          if [ -z "$EXISTING" ]; then
+            NEXT="${BASE}.0"
+          else
+            N=$(echo "$EXISTING" | awk -F. '{print $NF}')
+            NEXT="${BASE}.$((N+1))"
+          fi
+          echo "next_tag=$NEXT" >> "$GITHUB_OUTPUT"
+          echo "Computed next tag: $NEXT"
+
+      - name: Create tag + GitHub Release (with APK)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEXT_TAG: ${{ steps.tag.outputs.next_tag }}
+        run: |
+          gh release create "$NEXT_TAG" artifacts/*.apk \
+            --title "Release $NEXT_TAG" \
+            --notes "Yellow Depot $NEXT_TAG 自动构建发布（由 push 到 main 触发，强制更新）" \
+            --latest
+
+      - name: Verify release
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEXT_TAG: ${{ steps.tag.outputs.next_tag }}
+        run: |
+          echo "Release $NEXT_TAG:"
+          gh release view "$NEXT_TAG" --json url,name,tagName,createdAt -q '.' || true

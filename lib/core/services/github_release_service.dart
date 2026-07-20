@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yellow_depot/core/constants/app_constants.dart';
 import 'package:yellow_depot/core/utils/logger.dart';
 
@@ -173,12 +174,21 @@ class GitHubReleaseService {
     }
   }
 
-  /// 检查是否有新版本可用
+  /// 检查是否有新版本可用（强制更新模式）
   ///
   /// 流程：
   /// 1. 调用 GitHub API 拿最新 release
-  /// 2. 解析 tag_name 与当前 AppConstants.appVersion 比较
-  /// 3. 检查 assets 中是否有 APK 下载链接
+  /// 2. 跳过预发布版本
+  /// 3. 比较 release.tagName 与 SharedPreferences 中的 lastInstalledReleaseTag
+  ///    - 相同 → 已是最新版本，返回 null
+  ///    - 不同（或无记录）→ 返回 release，触发强制更新
+  ///
+  /// 强制更新模式说明：
+  /// 不再使用 [AppConstants.appVersion]（硬编码常量，CI 不注入 tag）。
+  /// 改用 [AppConstants.keyLastInstalledReleaseTag] 记录实际安装的 release tag，
+  /// 由 [AppUpdateService.downloadAndInstall] 下载成功后写入。
+  /// 这样每次 git push 触发新 release 时，tag 不同就会强制更新；
+  /// 用户已更新到该 tag 后，下次启动会跳过更新（相同 tag）。
   ///
   /// 返回 GitHubRelease 表示有新版本（含 APK 下载链接），否则返回 null。
   /// 不抛异常（内部捕获，失败时返回 null 让调用方静默跳过更新流程）。
@@ -193,14 +203,20 @@ class GitHubReleaseService {
         return null;
       }
 
-      // 版本比较
-      final hasNewVersion = release.isNewerThan(AppConstants.appVersion);
-      if (!hasNewVersion) {
-        appLogger.i('当前已是最新版本 (${AppConstants.appVersion} ≥ ${release.tagName})');
+      // 读取上次已安装的 release tag
+      final prefs = await SharedPreferences.getInstance();
+      final installedTag =
+          prefs.getString(AppConstants.keyLastInstalledReleaseTag) ?? '';
+
+      if (installedTag == release.tagName) {
+        appLogger.i('已安装最新版本 ${installedTag}，无需更新');
         return null;
       }
 
-      appLogger.i('发现新版本：${release.tagName}（当前 ${AppConstants.appVersion}）');
+      appLogger.i(
+        '发现新版本：${release.tagName}'
+        '${installedTag.isEmpty ? '（首次安装）' : '（当前已安装: $installedTag）'}',
+      );
       return release;
     } catch (e) {
       appLogger.w('检查更新失败: $e');

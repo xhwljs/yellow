@@ -22,7 +22,7 @@ const Color _kOnBackgroundMutedColor = Color(0xFF8E8E93);
 
 /// 启动页（Splash Screen）
 ///
-/// 启动流程：
+/// 启动流程（强制更新模式）：
 /// 1. WidgetsFlutterBinding.ensureInitialized（在 main.dart 完成）
 /// 2. runApp(SplashPage()) — 立即显示启动页，避免黑屏
 /// 3. 启动页内部启动后台初始化任务：
@@ -30,11 +30,9 @@ const Color _kOnBackgroundMutedColor = Color(0xFF8E8E93);
 ///    b. GitHubReleaseService.checkForUpdate()（并行检查更新）
 ///    c. 等待 (a) 完成 + 显示至少 2 秒（避免加载太快闪屏）
 /// 4. (a)(b)(c) 全部完成：
-///    - 有新版本 → 弹出 UpdateDialog，用户决定是否更新
+///    - 有新版本 → 弹出 UpdateDialog（强制更新，无"稍后"按钮）
 ///    - 无新版本或检查失败 → 直接切换到 MainShell
-/// 5. 用户在 UpdateDialog 选"稍后" → 切换到 MainShell
-/// 6. 用户在 UpdateDialog 选"立即更新" → 下载并唤起系统 APK 安装器
-///    （安装器打开后用户回到桌面手动安装，splash 页保持显示）
+/// 5. 用户必须完成更新或退出 App；不会进入旧版本
 ///
 /// 设计要点：
 /// - **背景色**：与 App 主题背景一致 (#F5F5F7)，避免从 native 黑屏到 App 浅色背景的突兀跳变
@@ -95,16 +93,14 @@ class _SplashPageState extends State<SplashPage> {
     if (!mounted) return;
 
     if (update != null) {
-      // 有新版本 → 显示更新对话框
+      // 有新版本 → 显示强制更新对话框（无"稍后"按钮）
       setState(() => _loadingText = '发现新版本');
       await UpdateDialog.show(
         context,
         release: update,
-        onLater: _enterApp,
       );
-      // 注意：用户点"立即更新"会唤起系统 APK 安装器，
-      // 安装器返回后用户回到 App 仍然停留在 splash 页。
-      // 此处不主动 _enterApp，让用户在安装完成后从桌面再次启动。
+      // 强制更新模式下，对话框关闭意味着用户已退出 App 或正在安装新版本。
+      // 不调用 _enterApp，避免用户进入旧版本 App。
     } else {
       // 无新版本或检查失败 → 直接进入 App
       _enterApp();
