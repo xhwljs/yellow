@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:videohub/core/theme/app_theme.dart';
 import 'package:videohub/core/theme/design_tokens.dart';
+import 'package:videohub/core/theme/theme_presets.dart';
 import 'package:videohub/data/models/play_history.dart';
 import 'package:videohub/presentation/controllers/history_controller.dart';
 import 'package:videohub/presentation/widgets/video_card.dart';
@@ -266,6 +267,12 @@ class _HistoryItem extends StatelessWidget {
                           ),
                       ],
                     ),
+                    // 详情元信息行：时长 · 播放次数 · 收藏次数 · 更新时间
+                    // 字段为空时自动跳过，全部为空时不渲染
+                    if (_hasMetaInfo(history)) ...[
+                      const SizedBox(height: DesignTokens.spaceXs),
+                      _buildMetaRow(history, colors),
+                    ],
                     const SizedBox(height: DesignTokens.spaceXs),
                     ClipRRect(
                       borderRadius: BorderRadius.circular(
@@ -301,5 +308,103 @@ class _HistoryItem extends StatelessWidget {
     if (diff.inDays < 7) return '${diff.inDays} 天前';
     return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-'
         '${dt.day.toString().padLeft(2, '0')}';
+  }
+
+  /// 是否有任何详情元信息可展示
+  bool _hasMetaInfo(PlayHistory h) {
+    return h.durationText.isNotEmpty ||
+        h.playCount > 0 ||
+        h.likeCount > 0 ||
+        h.updateTime.isNotEmpty;
+  }
+
+  /// 详情元信息行：时长 · 播放次数 · 收藏次数 · 更新时间
+  ///
+  /// 设计：
+  /// - 各项以分隔点 "·" 连接，缺失项自动跳过
+  /// - 图标 + 文本紧凑展示，使用 onSurfaceMuted 颜色
+  /// - 字段从 VideoDao 补全（@ignore），未命中时为空 → 自动跳过
+  Widget _buildMetaRow(PlayHistory h, ThemeColors colors) {
+    final items = <Widget>[];
+
+    if (h.durationText.isNotEmpty) {
+      items.add(_metaItem(
+        PhosphorIconsRegular.play,
+        h.durationText,
+        colors,
+      ));
+    }
+    if (h.playCount > 0) {
+      items.add(_metaItem(
+        PhosphorIconsRegular.eye,
+        _formatCount(h.playCount),
+        colors,
+      ));
+    }
+    if (h.likeCount > 0) {
+      items.add(_metaItem(
+        PhosphorIconsFill.heart,
+        _formatCount(h.likeCount),
+        colors,
+      ));
+    }
+    if (h.updateTime.isNotEmpty) {
+      items.add(_metaItem(
+        PhosphorIconsRegular.calendar,
+        h.updateTime,
+        colors,
+      ));
+    }
+
+    return Wrap(
+      spacing: DesignTokens.spaceSm,
+      runSpacing: 2,
+      children: [
+        for (var i = 0; i < items.length; i++) ...[
+          items[i],
+          if (i < items.length - 1)
+            Text(
+              '·',
+              style: TextStyle(
+                fontSize: DesignTokens.textCaption,
+                color: colors.onSurfaceMuted,
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+
+  Widget _metaItem(IconData icon, String text, ThemeColors colors) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Icon(
+          icon,
+          size: 11,
+          color: colors.onSurfaceMuted,
+        ),
+        const SizedBox(width: 2),
+        Text(
+          text,
+          style: TextStyle(
+            fontSize: DesignTokens.textCaption,
+            color: colors.onSurfaceMuted,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 数字格式化：超过 1万 显示 "1.2万"，超过 1亿 显示 "1.2亿"
+  String _formatCount(int n) {
+    if (n >= 100000000) {
+      return '${(n / 100000000).toStringAsFixed(1)}亿';
+    }
+    if (n >= 10000) {
+      return '${(n / 10000).toStringAsFixed(1)}万';
+    }
+    return n.toString();
   }
 }

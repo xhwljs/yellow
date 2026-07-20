@@ -4,9 +4,20 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:videohub/core/theme/app_theme.dart';
 import 'package:videohub/core/theme/design_tokens.dart';
+import 'package:videohub/core/theme/theme_presets.dart';
 import 'package:videohub/data/models/video.dart';
 
 /// 视频卡片（Bento Grid 风格）
+///
+/// 展示内容（自上而下）：
+/// - 封面（16:9）+ 时长 badge + 收藏角标 + 进度条
+/// - 标题（最多 2 行）
+/// - 元信息行（播放次数 · 收藏次数 · 更新时间）
+///
+/// 元信息行规则：
+/// - 三项都有 → eye count · heart count · clock time
+/// - 部分缺失 → 自动跳过空项，以分隔点连接
+/// - 全部缺失 → 不渲染该行，节省高度
 class VideoCard extends StatelessWidget {
   final Video video;
   final VoidCallback? onTap;
@@ -108,11 +119,17 @@ class VideoCard extends StatelessWidget {
                 ],
               ),
             ),
-            // 标题
+            // 标题 + 元信息
             Padding(
-              padding: const EdgeInsets.all(DesignTokens.spaceMd),
+              padding: const EdgeInsets.fromLTRB(
+                DesignTokens.spaceSm,
+                DesignTokens.spaceSm,
+                DesignTokens.spaceSm,
+                DesignTokens.spaceSm,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     video.title,
@@ -125,22 +142,108 @@ class VideoCard extends StatelessWidget {
                       height: 1.3,
                     ),
                   ),
-                  if (video.updateTime.isNotEmpty) ...[
-                    const SizedBox(height: DesignTokens.spaceXs),
-                    Text(
-                      video.updateTime,
-                      style: TextStyle(
-                        fontSize: DesignTokens.textCaption,
-                        color: colors.onSurfaceMuted,
-                      ),
-                    ),
-                  ],
+                  _buildMetaRow(colors),
                 ],
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  /// 元信息行：播放次数 · 收藏次数 · 更新时间
+  ///
+  /// 设计：
+  /// - 三项以分隔点 "·" 连接，缺失项自动跳过
+  /// - 图标 + 数字紧凑展示，使用 onSurfaceMuted 颜色
+  /// - 全部缺失时不渲染（返回 SizedBox.shrink）
+  Widget _buildMetaRow(ThemeColors colors) {
+    final items = <_MetaItem>[];
+
+    if (video.playCount > 0) {
+      items.add(_MetaItem(
+        icon: PhosphorIconsRegular.eye,
+        text: _formatCount(video.playCount),
+      ));
+    }
+    if (video.likeCount > 0) {
+      items.add(_MetaItem(
+        icon: PhosphorIconsFill.heart,
+        text: _formatCount(video.likeCount),
+      ));
+    }
+    if (video.updateTime.isNotEmpty) {
+      items.add(_MetaItem(
+        icon: PhosphorIconsRegular.calendar,
+        text: video.updateTime,
+      ));
+    }
+
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: DesignTokens.spaceXs),
+      child: Wrap(
+        spacing: DesignTokens.spaceSm,
+        runSpacing: 2,
+        children: [
+          for (var i = 0; i < items.length; i++) ...[
+            items[i],
+            if (i < items.length - 1)
+              Text(
+                '·',
+                style: TextStyle(
+                  fontSize: DesignTokens.textCaption,
+                  color: colors.onSurfaceMuted,
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// 数字格式化：超过 1万 显示 "1.2万"，超过 1亿 显示 "1.2亿"
+  String _formatCount(int n) {
+    if (n >= 100000000) {
+      return '${(n / 100000000).toStringAsFixed(1)}亿';
+    }
+    if (n >= 10000) {
+      return '${(n / 10000).toStringAsFixed(1)}万';
+    }
+    return n.toString();
+  }
+}
+
+/// 元信息单项（图标 + 文本）
+class _MetaItem extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _MetaItem({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppTheme.colorsOf(context);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Icon(
+          icon,
+          size: 11,
+          color: colors.onSurfaceMuted,
+        ),
+        const SizedBox(width: 2),
+        Text(
+          text,
+          style: TextStyle(
+            fontSize: DesignTokens.textCaption,
+            color: colors.onSurfaceMuted,
+          ),
+        ),
+      ],
     );
   }
 }

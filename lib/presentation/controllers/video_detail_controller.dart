@@ -133,6 +133,17 @@ class VideoDetailController extends GetxController {
       if (history != null && !history.isCompleted) {
         initialPositionMs.value = history.positionMs;
       }
+
+      // 同步缓存当前 video 到 VideoDao，让收藏/历史列表加载时
+      // 能从 VideoDao 查到详情字段（duration/playCount/likeCount/updateTime）
+      // 并补全到 Favorite/PlayHistory 的 @ignore 字段。
+      //
+      // 失败不阻断详情页加载，下次进入详情页会再次同步。
+      try {
+        await _videoRepo.cacheVideo(detail.value!.video);
+      } catch (e) {
+        appLogger.w('同步缓存 video 到 VideoDao 失败: $e');
+      }
     } catch (e) {
       errorMessage.value = e.toString();
     } finally {

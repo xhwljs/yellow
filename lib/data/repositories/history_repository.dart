@@ -12,9 +12,33 @@ class HistoryRepository {
 
   HistoryRepository(this._db);
 
-  /// 获取全部历史（默认 500 条）
+  /// 获取全部历史（默认 500 条，已补全 @ignore 详情字段）
+  ///
+  /// 详情字段（durationText/playCount/likeCount/updateTime）从 [VideoDao]
+  /// 缓存按 videoId 批量补全，避免触发 schema migration：
+  /// - VideoDao 命中 → 显示完整详情
+  /// - VideoDao 未命中 → 字段为空，UI 自动隐藏对应行
   Future<List<PlayHistory>> getAllHistory({int limit = 500}) async {
-    return _db.historyDao.findAll(limit);
+    final list = await _db.historyDao.findAll(limit);
+    if (list.isEmpty) return const [];
+
+    final enriched = <PlayHistory>[];
+    for (final h in list) {
+      final video = await _db.videoDao.findById(h.videoId);
+      if (video != null) {
+        enriched.add(
+          h.withDetail(
+            durationText: video.duration,
+            playCount: video.playCount,
+            likeCount: video.likeCount,
+            updateTime: video.updateTime,
+          ),
+        );
+      } else {
+        enriched.add(h);
+      }
+    }
+    return enriched;
   }
 
   /// 分页获取历史

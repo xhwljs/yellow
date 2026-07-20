@@ -57,6 +57,18 @@ class VideoRepository {
     return _db.videoDao.findById(id);
   }
 
+  /// 缓存单条视频到 Video 表（用于详情页补全详情字段）
+  ///
+  /// 收藏/播放历史列表加载时，会从 VideoDao 按 videoId 查询详情字段
+  /// （duration/playCount/likeCount/updateTime）补全到 Favorite/PlayHistory
+  /// 的 @ignore 字段。详情页加载后调用此方法同步缓存当前视频，
+  /// 保证用户收藏或播放后，下次打开收藏/历史列表能立即看到完整详情。
+  ///
+  /// 注意：用 OnConflictStrategy.replace，已存在则覆盖（保持最新数据）。
+  Future<void> cacheVideo(Video video) async {
+    await _db.videoDao.insert(video);
+  }
+
   /// 通过 ids 批量查询
   Future<List<Video>> getVideosByIds(List<String> ids) async {
     final result = <Video>[];

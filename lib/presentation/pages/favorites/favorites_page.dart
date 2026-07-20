@@ -57,7 +57,7 @@ class FavoritesPage extends GetView<FavoritesController> {
             crossAxisCount: DesignTokens.videoGridCrossAxisCount,
             mainAxisSpacing: DesignTokens.videoGridMainAxisSpacing,
             crossAxisSpacing: DesignTokens.videoGridSpacing,
-            childAspectRatio: 0.65,
+            childAspectRatio: 1.0,
           ),
           itemCount: controller.favorites.length,
           itemBuilder: (_, i) {
@@ -85,14 +85,16 @@ class FavoritesPage extends GetView<FavoritesController> {
   }
 
   Video _favoriteToVideo(Favorite fav) {
+    // 把 Favorite 的 @ignore 详情字段（已从 VideoDao 补全）传递给 VideoCard，
+    // VideoCard 会根据字段是否为空自动展示 eye/heart/calendar 元信息行。
     return Video(
       id: fav.videoId,
       title: fav.title,
       coverUrl: fav.coverUrl,
-      duration: '',
-      updateTime: '',
-      playCount: 0,
-      likeCount: 0,
+      duration: fav.duration,
+      updateTime: fav.updateTime,
+      playCount: fav.playCount,
+      likeCount: fav.likeCount,
       categoryId: fav.categoryId,
     );
   }

@@ -453,7 +453,9 @@ class HomePage extends GetView<HomeController> {
             crossAxisCount: DesignTokens.videoGridCrossAxisCount,
             mainAxisSpacing: DesignTokens.videoGridMainAxisSpacing,
             crossAxisSpacing: DesignTokens.videoGridSpacing,
-            childAspectRatio: 0.65,
+            // 16:9 封面 + 2 行标题 + 元信息行 = 卡片高 ≈ 卡片宽
+            // 旧值 0.65 会让文字区下方留白约 100px，列表底部空一大块
+            childAspectRatio: 1.0,
           ),
           itemCount: controller.selectedCategoryVideos.length +
               (controller.selectedLoadingMore.value ? 1 : 0),
@@ -488,7 +490,7 @@ class HomePage extends GetView<HomeController> {
         crossAxisCount: DesignTokens.videoGridCrossAxisCount,
         mainAxisSpacing: DesignTokens.videoGridMainAxisSpacing,
         crossAxisSpacing: DesignTokens.videoGridSpacing,
-        childAspectRatio: 0.65,
+        childAspectRatio: 1.0,
       ),
       itemCount: 6,
       itemBuilder: (_, __) => const VideoCardSkeleton(),
