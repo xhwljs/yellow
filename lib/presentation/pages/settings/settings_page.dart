@@ -1837,17 +1837,17 @@ class _CustomColorSectionState extends State<_CustomColorSection> {
 
   /// Color 转 #RRGGBB 字符串
   static String _colorToHex(Color color) {
-    final r = (color.r * 255).round().toRadixString(16).padLeft(2, '0');
-    final g = (color.g * 255).round().toRadixString(16).padLeft(2, '0');
-    final b = (color.b * 255).round().toRadixString(16).padLeft(2, '0');
+    final r = color.red.toRadixString(16).padLeft(2, '0');
+    final g = color.green.toRadixString(16).padLeft(2, '0');
+    final b = color.blue.toRadixString(16).padLeft(2, '0');
     return '#$r$g$b'.toUpperCase();
   }
 
   /// 判断颜色是否为浅色（用于决定按钮文字颜色）
   static bool _isLight(Color color) {
-    // 标准亮度公式：0.299R + 0.587G + 0.114B
+    // 标准亮度公式：0.299R + 0.587G + 0.114B（归一化到 0-1）
     final luminance =
-        0.299 * color.r + 0.587 * color.g + 0.114 * color.b;
+        (0.299 * color.red + 0.587 * color.green + 0.114 * color.blue) / 255;
     return luminance > 0.6;
   }
 }
