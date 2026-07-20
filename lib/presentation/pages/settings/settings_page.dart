@@ -10,22 +10,24 @@ import 'package:yellow_depot/core/theme/design_tokens.dart';
 import 'package:yellow_depot/core/theme/theme_controller.dart';
 import 'package:yellow_depot/core/theme/theme_presets.dart';
 
-/// 设置页（重构版）
+/// 设置页（列表 + 卷帘菜单版）
 ///
-/// 设计原则（应用 ui-ux-pro-max App UI 指引）：
-/// - **Section Card 模式**：每个分组都是 elevation1 圆角卡片，统一节奏
-/// - **SectionHeader 复用组件**：彩色 icon chip + 标题 + 副标题
-/// - **SettingsRow 复用组件**：iOS 风格 label-value 行，统一 Divider 分隔
-/// - **状态徽章**：语义色 pill badge（success / destructive）
-/// - **操作层级**：主操作 FilledButton（高亮），次操作 OutlinedButton，
-///   三级操作 TextButton（去强调），让用户视觉焦点集中在最重要的操作
-/// - **App Hero Header**：顶部 logo + 名称 + 版本作为视觉锚点
-/// - **触控目标 ≥48dp**（所有按钮 minimumSize: Size(48, 48)）
+/// **设计原则**：
+/// 与首页"分类目录"卷帘菜单（_showCatalogSheet）保持完全一致的交互模式，
+/// 让用户在 app 内任何"选择类"操作都用同一种 bottom sheet 交互。
 ///
-/// 功能与旧版完全一致，仅改进视觉层次和交互清晰度：
-/// - 主题色选择（5 个预设 + 当前预设徽章）
-/// - API 服务器切换（当前 URL + 镜像 chips + 测试连通性 + 自定义 URL + 重置）
-/// - 关于（应用名/版本/技术栈/设计系统）
+/// - **主列表**：每行 SettingsListTile（icon + 标题 + 当前值 + 右箭头）
+///   - 主题色行 → 点击弹出 _showThemeSheet（5 个色块选择）
+///   - API 服务器行 → 点击弹出 _showApiServerSheet（镜像列表 + 自定义 URL）
+///   - 关于行 → 点击弹出 _showAboutSheet（应用信息详情）
+///   - 清除缓存行 → 点击直接执行（不需要选择）
+/// - **卷帘菜单**：showModalBottomSheet + drag handle + 标题栏 + 列表
+///   风格统一与 home_page._showCatalogSheet 一致
+///
+/// **保留功能**：
+/// - 主题色：5 个预设色块选择 + 当前预设展示
+/// - API 服务器：当前 URL + 镜像 chips + 测试连通性 + 自定义 URL + 重置
+/// - 关于：应用名/版本/技术栈/设计系统
 /// - 清除缓存
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -35,10 +37,19 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  String _currentBaseUrl = ApiServerSwitcher.current;
-  bool _testingUrl = false;
-  String? _testResult;
-  bool _hasTested = false;
+  late String _currentBaseUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentBaseUrl = ApiServerSwitcher.current;
+  }
+
+  void _refreshBaseUrl() {
+    setState(() {
+      _currentBaseUrl = ApiServerSwitcher.current;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -66,28 +77,115 @@ class _SettingsPageState extends State<SettingsPage> {
           DesignTokens.space2xl,
         ),
         children: [
+          // App Hero Header
           _buildAppHero(colors),
           const SizedBox(height: DesignTokens.spaceXl),
-          _buildThemeSection(colors),
+
+          // Group 1: 个性化
+          _GroupLabel(text: '个性化', colors: colors),
+          const SizedBox(height: DesignTokens.spaceSm),
+          _SectionCard(
+            colors: colors,
+            child: Column(
+              children: [
+                // 主题色 → 卷帘菜单
+                Obx(() {
+                  final themeController = Get.find<ThemeController>();
+                  final current = themeController.presetRx.value;
+                  return _SettingsListTile(
+                    icon: PhosphorIconsRegular.palette,
+                    iconTone: _IconTone.primary,
+                    title: '主题色',
+                    subtitle: '${current.name} · ${current.description}',
+                    colors: colors,
+                    onTap: () => _showThemeSheet(context, colors),
+                  );
+                }),
+                _ListDivider(colors: colors),
+                // API 服务器 → 卷帘菜单
+                _SettingsListTile(
+                  icon: PhosphorIconsRegular.globe,
+                  iconTone: _IconTone.primary,
+                  title: 'API 服务器',
+                  subtitle: _currentBaseUrl,
+                  subtitleMaxLines: 1,
+                  colors: colors,
+                  onTap: () async {
+                    await _showApiServerSheet(context, colors);
+                    _refreshBaseUrl();
+                  },
+                ),
+              ],
+            ),
+          ),
+
           const SizedBox(height: DesignTokens.spaceXl),
-          _buildApiServerSection(colors),
+
+          // Group 2: 关于
+          _GroupLabel(text: '关于', colors: colors),
+          const SizedBox(height: DesignTokens.spaceSm),
+          _SectionCard(
+            colors: colors,
+            child: Column(
+              children: [
+                _SettingsListTile(
+                  icon: PhosphorIconsRegular.info,
+                  iconTone: _IconTone.neutral,
+                  title: '应用信息',
+                  subtitle: 'v${AppConstants.appVersion}',
+                  colors: colors,
+                  onTap: () => _showAboutSheet(context, colors),
+                ),
+                _ListDivider(colors: colors),
+                _SettingsListTile(
+                  icon: PhosphorIconsRegular.code,
+                  iconTone: _IconTone.neutral,
+                  title: '技术栈',
+                  subtitle: 'Flutter + GetX + Floor',
+                  colors: colors,
+                  onTap: () => _showAboutSheet(context, colors),
+                ),
+              ],
+            ),
+          ),
+
           const SizedBox(height: DesignTokens.spaceXl),
-          _buildAboutSection(colors),
-          const SizedBox(height: DesignTokens.spaceXl),
-          _buildCacheSection(colors),
+
+          // Group 3: 数据
+          _GroupLabel(text: '数据', colors: colors),
+          const SizedBox(height: DesignTokens.spaceSm),
+          _SectionCard(
+            colors: colors,
+            child: _SettingsListTile(
+              icon: PhosphorIconsRegular.trash,
+              iconTone: _IconTone.destructive,
+              title: '清除缓存',
+              subtitle: '清理 Cookie / Session 缓存数据',
+              colors: colors,
+              showTrailingArrow: false,
+              onTap: _clearCache,
+            ),
+          ),
+
+          const SizedBox(height: DesignTokens.space2xl),
+          // 底部版权
+          Center(
+            child: Text(
+              '${AppConstants.appName} · v${AppConstants.appVersion}',
+              style: TextStyle(
+                fontSize: DesignTokens.textCaption,
+                color: colors.onSurfaceMuted.withOpacity(0.7),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
   // ============================================================
-  // App Hero Header — 顶部视觉锚点
+  // App Hero Header
   // ============================================================
-  //
-  // 设计：
-  // - 主题色渐变背景的圆角卡片，96x96 logo
-  // - logo（FilmSlate 图标）+ App 名（Poppins display 字体）+ 版本号
-  // - 整体作为视觉锚点，让用户进入设置页时立即看到 app 标识
   Widget _buildAppHero(ThemeColors colors) {
     return Container(
       width: double.infinity,
@@ -156,241 +254,171 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   // ============================================================
-  // Section 1: 主题色
+  // 卷帘菜单 1: 主题色选择
   // ============================================================
-  Widget _buildThemeSection(ThemeColors colors) {
+  //
+  // 风格与 home_page._showCatalogSheet 完全一致：
+  // - 圆角顶部 + drag handle
+  // - 标题栏：左侧 icon + 标题 + 右侧关闭按钮
+  // - 列表项：左侧色块圆点 + 中间 name/description + 右侧 check
+  Future<void> _showThemeSheet(BuildContext context, ThemeColors colors) async {
     final themeController = Get.find<ThemeController>();
-    return _SectionCard(
-      colors: colors,
-      header: _SectionHeader(
-        icon: PhosphorIconsRegular.palette,
-        title: '主题色',
-        subtitle: '切换主题色，背景保持浅色不变',
-        colors: colors,
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: false,
+      backgroundColor: colors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(DesignTokens.radiusLg),
+        ),
       ),
-      children: [
-        Obx(() {
-          final current = themeController.presetRx.value;
-          return Wrap(
-            spacing: DesignTokens.spaceLg,
-            runSpacing: DesignTokens.spaceLg,
-            children: ThemePreset.values.map((preset) {
-              final selected = preset == current;
-              return _ThemeColorBlock(
-                preset: preset,
-                selected: selected,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // drag handle
+              _SheetDragHandle(colors: colors),
+              // 标题栏
+              _SheetHeader(
+                icon: PhosphorIconsRegular.palette,
+                title: '主题色',
                 colors: colors,
-                onTap: () => themeController.switchPreset(preset),
-              );
-            }).toList(),
-          );
-        }),
-        const SizedBox(height: DesignTokens.spaceLg),
-        Obx(() {
-          final current = themeController.presetRx.value;
-          return _StatusBadge(
-            text: '当前：${current.name} · ${current.description}',
-            icon: PhosphorIconsRegular.info,
-            tone: _StatusTone.neutral,
-            colors: colors,
-          );
-        }),
-      ],
+                onClose: () => Navigator.of(sheetContext).pop(),
+              ),
+              Divider(height: 1, thickness: 1, color: colors.border),
+              // 色块列表
+              Flexible(
+                child: Obx(() {
+                  final current = themeController.presetRx.value;
+                  return ListView.separated(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: DesignTokens.spaceSm,
+                    ),
+                    itemCount: ThemePreset.values.length,
+                    separatorBuilder: (_, __) => Divider(
+                      height: 1,
+                      indent: DesignTokens.spaceLg,
+                      endIndent: DesignTokens.spaceLg,
+                      color: colors.border.withOpacity(0.5),
+                    ),
+                    itemBuilder: (_, i) {
+                      final preset = ThemePreset.values[i];
+                      final selected = preset == current;
+                      return _ThemeSheetItem(
+                        preset: preset,
+                        selected: selected,
+                        colors: colors,
+                        onTap: () {
+                          themeController.switchPreset(preset);
+                          Navigator.of(sheetContext).pop();
+                        },
+                      );
+                    },
+                  );
+                }),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
   // ============================================================
-  // Section 2: API 服务器
+  // 卷帘菜单 2: API 服务器
   // ============================================================
-  Widget _buildApiServerSection(ThemeColors colors) {
-    return _SectionCard(
-      colors: colors,
-      header: _SectionHeader(
-        icon: PhosphorIconsRegular.globe,
-        title: 'API 服务器',
-        subtitle: '源站域名会因反爬频繁更换，如遇加载失败可切换镜像',
-        colors: colors,
+  Future<void> _showApiServerSheet(
+    BuildContext context,
+    ThemeColors colors,
+  ) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: colors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(DesignTokens.radiusLg),
+        ),
       ),
-      children: [
-        // 当前 baseUrl + 连通状态徽章
-        Row(
-          children: [
-            Icon(
-              PhosphorIconsRegular.link,
-              size: 14,
-              color: colors.onSurfaceMuted,
-            ),
-            const SizedBox(width: DesignTokens.spaceXs),
-            Expanded(
-              child: Text(
-                _currentBaseUrl,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: DesignTokens.textCaption,
-                  color: colors.onSurface,
-                  fontWeight: FontWeight.w500,
+      builder: (sheetContext) {
+        return _ApiServerSheet(
+          colors: colors,
+          currentBaseUrl: _currentBaseUrl,
+          onClose: () => Navigator.of(sheetContext).pop(),
+          onSwitched: _refreshBaseUrl,
+          onCustomUrl: () async {
+            Navigator.of(sheetContext).pop();
+            await _showCustomUrlDialog();
+          },
+        );
+      },
+    );
+  }
+
+  // ============================================================
+  // 卷帘菜单 3: 关于
+  // ============================================================
+  Future<void> _showAboutSheet(BuildContext context, ThemeColors colors) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: false,
+      backgroundColor: colors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(DesignTokens.radiusLg),
+        ),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _SheetDragHandle(colors: colors),
+              _SheetHeader(
+                icon: PhosphorIconsRegular.info,
+                title: '关于',
+                colors: colors,
+                onClose: () => Navigator.of(sheetContext).pop(),
+              ),
+              Divider(height: 1, thickness: 1, color: colors.border),
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  vertical: DesignTokens.spaceSm,
+                ),
+                child: Column(
+                  children: [
+                    _SheetInfoRow(
+                      label: '应用名称',
+                      value: AppConstants.appName,
+                      colors: colors,
+                    ),
+                    _SheetInfoRow(
+                      label: '当前版本',
+                      value: 'v${AppConstants.appVersion}',
+                      colors: colors,
+                    ),
+                    _SheetInfoRow(
+                      label: '技术栈',
+                      value: 'Flutter + GetX + Floor',
+                      colors: colors,
+                    ),
+                    _SheetInfoRow(
+                      label: '设计系统',
+                      value: 'Yellow Depot MASTER v1.0',
+                      colors: colors,
+                    ),
+                  ],
                 ),
               ),
-            ),
-            if (_testingUrl)
-              const SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            else if (_testResult != null)
-              _StatusBadge(
-                text: '失败',
-                icon: PhosphorIconsFill.warningCircle,
-                tone: _StatusTone.destructive,
-                colors: colors,
-                compact: true,
-              )
-            else if (_hasTested)
-              _StatusBadge(
-                text: '已连通',
-                icon: PhosphorIconsFill.checkCircle,
-                tone: _StatusTone.success,
-                colors: colors,
-                compact: true,
-              ),
-          ],
-        ),
-        if (_testResult != null) ...[
-          const SizedBox(height: DesignTokens.spaceXs),
-          Text(
-            '连接失败：$_testResult',
-            style: TextStyle(
-              fontSize: DesignTokens.textCaption,
-              color: colors.destructive,
-            ),
+            ],
           ),
-        ],
-        const SizedBox(height: DesignTokens.spaceLg),
-
-        // 镜像列表 section label
-        _SubLabel(text: '镜像列表', colors: colors),
-        const SizedBox(height: DesignTokens.spaceSm),
-        Wrap(
-          spacing: DesignTokens.spaceSm,
-          runSpacing: DesignTokens.spaceSm,
-          children: ApiServerSwitcher.presetMirrors.map((url) {
-            final selected = url == _currentBaseUrl;
-            return _MirrorChip(
-              url: url,
-              selected: selected,
-              colors: colors,
-              onTap: () => _switchBaseUrl(url),
-            );
-          }).toList(),
-        ),
-        const SizedBox(height: DesignTokens.spaceLg),
-
-        // 操作按钮 — 按重要性分层
-        // 主操作：测试连通性（FilledButton，主色调高亮）
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton.icon(
-            onPressed: _testingUrl ? null : _testConnectivity,
-            icon: const Icon(PhosphorIconsRegular.plugsConnected),
-            label: const Text('测试连通性'),
-            style: FilledButton.styleFrom(
-              backgroundColor: colors.primary,
-              foregroundColor: colors.onPrimary,
-              minimumSize: const Size(48, 48),
-              padding: const EdgeInsets.symmetric(
-                horizontal: DesignTokens.spaceLg,
-                vertical: DesignTokens.spaceMd,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(DesignTokens.radiusMd),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: DesignTokens.spaceSm),
-
-        // 次操作：自定义 URL（OutlinedButton，去强调但可见）
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: _showCustomUrlDialog,
-            icon: const Icon(PhosphorIconsRegular.pencilSimpleLine),
-            label: const Text('自定义 URL'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: colors.onSurface,
-              side: BorderSide(color: colors.border),
-              minimumSize: const Size(48, 48),
-              padding: const EdgeInsets.symmetric(
-                horizontal: DesignTokens.spaceLg,
-                vertical: DesignTokens.spaceMd,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(DesignTokens.radiusMd),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: DesignTokens.spaceXs),
-
-        // 三级操作：重置为默认（TextButton，最弱强调）
-        SizedBox(
-          width: double.infinity,
-          child: TextButton.icon(
-            onPressed: () => _switchBaseUrl(AppConstants.defaultBaseUrl),
-            icon: const Icon(PhosphorIconsRegular.arrowCounterClockwise),
-            label: const Text('重置为默认'),
-            style: TextButton.styleFrom(
-              foregroundColor: colors.onSurfaceMuted,
-              minimumSize: const Size(48, 48),
-            ),
-          ),
-        ),
-      ],
+        );
+      },
     );
-  }
-
-  Future<void> _switchBaseUrl(String newUrl) async {
-    final colors = AppTheme.colorsOf(Get.context!);
-    try {
-      await ApiServerSwitcher.switchTo(newUrl);
-      setState(() {
-        _currentBaseUrl = newUrl;
-        _testResult = null;
-        _hasTested = false;
-      });
-      Get.snackbar(
-        '已切换',
-        '当前 API 服务器：$newUrl',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: colors.surface,
-        colorText: colors.onSurface,
-        duration: const Duration(seconds: 2),
-      );
-    } catch (e) {
-      Get.snackbar(
-        '切换失败',
-        e.toString(),
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: colors.destructive,
-        colorText: colors.surface,
-      );
-    }
-  }
-
-  Future<void> _testConnectivity() async {
-    setState(() {
-      _testingUrl = true;
-      _testResult = null;
-    });
-    final result = await ApiServerSwitcher.testConnectivity(_currentBaseUrl);
-    if (!mounted) return;
-    setState(() {
-      _testingUrl = false;
-      _testResult = result;
-      _hasTested = true;
-    });
   }
 
   Future<void> _showCustomUrlDialog() async {
@@ -439,81 +467,28 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
-  // ============================================================
-  // Section 3: 关于
-  // ============================================================
-  Widget _buildAboutSection(ThemeColors colors) {
-    return _SectionCard(
-      colors: colors,
-      header: _SectionHeader(
-        icon: PhosphorIconsRegular.info,
-        title: '关于',
-        subtitle: null,
-        colors: colors,
-      ),
-      children: [
-        _SettingsRow(
-          label: '应用名称',
-          value: AppConstants.appName,
-          colors: colors,
-        ),
-        _Divider(colors: colors),
-        _SettingsRow(
-          label: '当前版本',
-          value: 'v${AppConstants.appVersion}',
-          colors: colors,
-        ),
-        _Divider(colors: colors),
-        _SettingsRow(
-          label: '技术栈',
-          value: 'Flutter + GetX + Floor',
-          colors: colors,
-        ),
-        _Divider(colors: colors),
-        _SettingsRow(
-          label: '设计系统',
-          value: 'Yellow Depot MASTER v1.0',
-          colors: colors,
-        ),
-      ],
-    );
-  }
-
-  // ============================================================
-  // Section 4: 缓存
-  // ============================================================
-  Widget _buildCacheSection(ThemeColors colors) {
-    return _SectionCard(
-      colors: colors,
-      header: _SectionHeader(
-        icon: PhosphorIconsRegular.trash,
-        title: '缓存',
-        subtitle: '清理 Cookie / Session 缓存数据',
-        colors: colors,
-      ),
-      children: [
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton.icon(
-            onPressed: _clearCache,
-            icon: const Icon(PhosphorIconsRegular.broom),
-            label: const Text('清除缓存'),
-            style: FilledButton.styleFrom(
-              backgroundColor: colors.destructive,
-              foregroundColor: colors.surface,
-              minimumSize: const Size(48, 48),
-              padding: const EdgeInsets.symmetric(
-                horizontal: DesignTokens.spaceLg,
-                vertical: DesignTokens.spaceMd,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(DesignTokens.radiusMd),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
+  Future<void> _switchBaseUrl(String newUrl) async {
+    final colors = AppTheme.colorsOf(Get.context!);
+    try {
+      await ApiServerSwitcher.switchTo(newUrl);
+      _refreshBaseUrl();
+      Get.snackbar(
+        '已切换',
+        '当前 API 服务器：$newUrl',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: colors.surface,
+        colorText: colors.onSurface,
+        duration: const Duration(seconds: 2),
+      );
+    } catch (e) {
+      Get.snackbar(
+        '切换失败',
+        e.toString(),
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: colors.destructive,
+        colorText: colors.surface,
+      );
+    }
   }
 
   Future<void> _clearCache() async {
@@ -545,151 +520,276 @@ class _SettingsPageState extends State<SettingsPage> {
 // Reusable Components
 // ============================================================
 
-/// 状态徽章色调
-enum _StatusTone { success, destructive, neutral }
+/// 分组标题
+class _GroupLabel extends StatelessWidget {
+  final String text;
+  final ThemeColors colors;
+
+  const _GroupLabel({required this.text, required this.colors});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: DesignTokens.spaceXs),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: DesignTokens.textLabel,
+          fontWeight: FontWeight.w600,
+          color: colors.onSurfaceMuted,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+}
 
 /// 通用 Section Card
-///
-/// - elevation1 圆角卡片
-/// - 顶部 header（icon chip + 标题 + 副标题）
-/// - 内容区按需填充 children
 class _SectionCard extends StatelessWidget {
   final ThemeColors colors;
-  final _SectionHeader header;
-  final List<Widget> children;
+  final Widget child;
 
-  const _SectionCard({
-    required this.colors,
-    required this.header,
-    required this.children,
-  });
+  const _SectionCard({required this.colors, required this.child});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(DesignTokens.spaceLg),
       decoration: BoxDecoration(
         color: colors.surface,
         borderRadius: BorderRadius.circular(DesignTokens.radiusLg),
         boxShadow: DesignTokens.elevation1,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      clipBehavior: Clip.antiAlias,
+      child: child,
+    );
+  }
+}
+
+/// icon 色调（用于区分 destructive 等特殊语义）
+enum _IconTone { primary, neutral, destructive }
+
+/// SettingsListTile — 主列表项
+///
+/// - 左侧 36x36 icon chip（按 tone 着色）
+/// - 中间 title + subtitle
+/// - 右侧 chevron right（可关闭，用于"清除缓存"等无选择项）
+/// - 行内 padding spaceLg × spaceMd，触控目标 ≥56px
+class _SettingsListTile extends StatelessWidget {
+  final IconData icon;
+  final _IconTone iconTone;
+  final String title;
+  final String? subtitle;
+  final int subtitleMaxLines;
+  final ThemeColors colors;
+  final bool showTrailingArrow;
+  final VoidCallback onTap;
+
+  const _SettingsListTile({
+    required this.icon,
+    required this.iconTone,
+    required this.title,
+    required this.colors,
+    required this.onTap,
+    this.subtitle,
+    this.subtitleMaxLines = 2,
+    this.showTrailingArrow = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final (iconBg, iconFg) = switch (iconTone) {
+      _IconTone.primary =>
+        (colors.primary.withOpacity(0.12), colors.primary),
+      _IconTone.neutral =>
+        (colors.onSurfaceMuted.withOpacity(0.12), colors.onSurfaceMuted),
+      _IconTone.destructive =>
+        (colors.destructive.withOpacity(0.12), colors.destructive),
+    };
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: DesignTokens.spaceLg,
+            vertical: DesignTokens.spaceMd,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: iconBg,
+                  borderRadius: BorderRadius.circular(DesignTokens.radiusMd),
+                ),
+                child: Center(
+                  child: Icon(
+                    icon,
+                    size: 18,
+                    color: iconFg,
+                  ),
+                ),
+              ),
+              const SizedBox(width: DesignTokens.spaceMd),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: DesignTokens.textBody,
+                        fontWeight: FontWeight.w500,
+                        color: colors.onSurface,
+                      ),
+                    ),
+                    if (subtitle != null && subtitle!.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle!,
+                        maxLines: subtitleMaxLines,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: DesignTokens.textCaption,
+                          color: colors.onSurfaceMuted,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (showTrailingArrow) ...[
+                const SizedBox(width: DesignTokens.spaceSm),
+                Icon(
+                  PhosphorIconsRegular.caretRight,
+                  size: 16,
+                  color: colors.onSurfaceMuted,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 行内分割线（带 indent）
+class _ListDivider extends StatelessWidget {
+  final ThemeColors colors;
+  const _ListDivider({required this.colors});
+
+  @override
+  Widget build(BuildContext context) {
+    return Divider(
+      height: 1,
+      thickness: 1,
+      indent: DesignTokens.spaceLg + 36 + DesignTokens.spaceMd,
+      endIndent: DesignTokens.spaceLg,
+      color: colors.border.withOpacity(0.6),
+    );
+  }
+}
+
+// ============================================================
+// Bottom Sheet 共用组件
+// ============================================================
+
+/// 卷帘菜单 drag handle
+class _SheetDragHandle extends StatelessWidget {
+  final ThemeColors colors;
+  const _SheetDragHandle({required this.colors});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.only(top: DesignTokens.spaceSm),
+        child: Container(
+          width: 36,
+          height: 4,
+          decoration: BoxDecoration(
+            color: colors.border,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 卷帘菜单标题栏
+class _SheetHeader extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final ThemeColors colors;
+  final VoidCallback onClose;
+
+  const _SheetHeader({
+    required this.icon,
+    required this.title,
+    required this.colors,
+    required this.onClose,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        DesignTokens.spaceLg,
+        DesignTokens.spaceMd,
+        DesignTokens.spaceMd,
+        DesignTokens.spaceSm,
+      ),
+      child: Row(
         children: [
-          header,
-          if (children.isNotEmpty) ...[
-            const SizedBox(height: DesignTokens.spaceLg),
-            ...children,
-          ],
+          Icon(
+            icon,
+            size: 20,
+            color: colors.primary,
+          ),
+          const SizedBox(width: DesignTokens.spaceSm),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: DesignTokens.textH2,
+              fontWeight: FontWeight.w700,
+              color: colors.onSurface,
+            ),
+          ),
+          const Spacer(),
+          GestureDetector(
+            onTap: onClose,
+            behavior: HitTestBehavior.opaque,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: DesignTokens.spaceSm,
+                vertical: DesignTokens.spaceXs,
+              ),
+              child: Icon(
+                PhosphorIconsRegular.x,
+                size: 20,
+                color: colors.onSurfaceMuted,
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-/// Section Header
-///
-/// 设计：
-/// - 左侧 36x36 彩色 icon chip（primary.withOpacity(0.12) 背景 + primary 图标）
-/// - 右侧 标题（H2 600）+ 副标题（caption muted，可选）
-class _SectionHeader extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String? subtitle;
-  final ThemeColors colors;
-
-  const _SectionHeader({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.colors,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: colors.primary.withOpacity(0.12),
-            borderRadius: BorderRadius.circular(DesignTokens.radiusMd),
-          ),
-          child: Center(
-            child: Icon(
-              icon,
-              size: 18,
-              color: colors.primary,
-            ),
-          ),
-        ),
-        const SizedBox(width: DesignTokens.spaceMd),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: DesignTokens.textH2,
-                  fontWeight: FontWeight.w600,
-                  color: colors.onSurface,
-                ),
-              ),
-              if (subtitle != null) ...[
-                const SizedBox(height: 2),
-                Text(
-                  subtitle!,
-                  style: TextStyle(
-                    fontSize: DesignTokens.textCaption,
-                    color: colors.onSurfaceMuted,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// 子区块标签（如 "镜像列表"）
-class _SubLabel extends StatelessWidget {
-  final String text;
-  final ThemeColors colors;
-
-  const _SubLabel({required this.text, required this.colors});
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: TextStyle(
-        fontSize: DesignTokens.textLabel,
-        fontWeight: FontWeight.w600,
-        color: colors.onSurfaceMuted,
-        letterSpacing: 0.5,
-      ),
-    );
-  }
-}
-
-/// Settings Row — iOS 风格的 label-value 行
-///
-/// - 左侧 label（onSurfaceMuted）
-/// - 右侧 value（onSurface，可 ellipsis）
-/// - 适合"关于"等纯信息展示场景
-class _SettingsRow extends StatelessWidget {
+/// 卷帘菜单信息行（label : value）
+class _SheetInfoRow extends StatelessWidget {
   final String label;
   final String value;
   final ThemeColors colors;
 
-  const _SettingsRow({
+  const _SheetInfoRow({
     required this.label,
     required this.value,
     required this.colors,
@@ -698,9 +798,11 @@ class _SettingsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: DesignTokens.spaceSm),
+      padding: const EdgeInsets.symmetric(
+        horizontal: DesignTokens.spaceLg,
+        vertical: DesignTokens.spaceMd,
+      ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Text(
             label,
@@ -729,28 +831,365 @@ class _SettingsRow extends StatelessWidget {
   }
 }
 
-/// 分割线
-class _Divider extends StatelessWidget {
+/// 主题色卷帘菜单项
+class _ThemeSheetItem extends StatelessWidget {
+  final ThemePreset preset;
+  final bool selected;
   final ThemeColors colors;
-  const _Divider({required this.colors});
+  final VoidCallback onTap;
+
+  const _ThemeSheetItem({
+    required this.preset,
+    required this.selected,
+    required this.colors,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Divider(
-      height: 1,
-      thickness: 1,
-      color: colors.border.withOpacity(0.6),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: DesignTokens.spaceLg,
+            vertical: DesignTokens.spaceMd,
+          ),
+          child: Row(
+            children: [
+              // 色块圆点
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: preset.primaryColor,
+                  shape: BoxShape.circle,
+                  boxShadow: DesignTokens.elevation1,
+                ),
+                child: selected
+                    ? Center(
+                        child: Icon(
+                          PhosphorIconsFill.check,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                      )
+                    : null,
+              ),
+              const SizedBox(width: DesignTokens.spaceMd),
+              // name + description
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      preset.name,
+                      style: TextStyle(
+                        fontSize: DesignTokens.textBody,
+                        fontWeight: FontWeight.w600,
+                        color: colors.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      preset.description,
+                      style: TextStyle(
+                        fontSize: DesignTokens.textCaption,
+                        color: colors.onSurfaceMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
 
-/// 状态徽章（pill badge）
+// ============================================================
+// API 服务器卷帘菜单
+// ============================================================
+
+/// API 服务器卷帘菜单
 ///
-/// 设计：
-/// - pill 形状（radiusPill）
-/// - 三种色调：success（绿）/ destructive（红）/ neutral（灰）
-/// - icon + 文本紧凑布局
-/// - compact=true 时缩小尺寸用于行内嵌入
+/// 与首页 catalog sheet 同款风格：
+/// - drag handle + 标题栏
+/// - 当前 URL + 状态徽章
+/// - 镜像列表（chip 风格，复用 _MirrorChip）
+/// - 自定义 URL / 测试连通性 / 重置按钮
+class _ApiServerSheet extends StatefulWidget {
+  final ThemeColors colors;
+  final String currentBaseUrl;
+  final VoidCallback onClose;
+  final VoidCallback onSwitched;
+  final Future<void> Function() onCustomUrl;
+
+  const _ApiServerSheet({
+    required this.colors,
+    required this.currentBaseUrl,
+    required this.onClose,
+    required this.onSwitched,
+    required this.onCustomUrl,
+  });
+
+  @override
+  State<_ApiServerSheet> createState() => _ApiServerSheetState();
+}
+
+class _ApiServerSheetState extends State<_ApiServerSheet> {
+  late String _currentBaseUrl;
+  bool _testingUrl = false;
+  String? _testResult;
+  bool _hasTested = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentBaseUrl = widget.currentBaseUrl;
+  }
+
+  ThemeColors get colors => widget.colors;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _SheetDragHandle(colors: colors),
+            _SheetHeader(
+              icon: PhosphorIconsRegular.globe,
+              title: 'API 服务器',
+              colors: colors,
+              onClose: widget.onClose,
+            ),
+            Divider(height: 1, thickness: 1, color: colors.border),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                padding: const EdgeInsets.all(DesignTokens.spaceLg),
+                children: [
+                  // 当前 URL + 状态徽章
+                  _buildCurrentRow(),
+                  if (_testResult != null) ...[
+                    const SizedBox(height: DesignTokens.spaceXs),
+                    Text(
+                      '连接失败：$_testResult',
+                      style: TextStyle(
+                        fontSize: DesignTokens.textCaption,
+                        color: colors.destructive,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: DesignTokens.spaceLg),
+
+                  // 镜像列表
+                  _buildSubLabel('镜像列表'),
+                  const SizedBox(height: DesignTokens.spaceSm),
+                  Wrap(
+                    spacing: DesignTokens.spaceSm,
+                    runSpacing: DesignTokens.spaceSm,
+                    children: ApiServerSwitcher.presetMirrors.map((url) {
+                      final selected = url == _currentBaseUrl;
+                      return _MirrorChip(
+                        url: url,
+                        selected: selected,
+                        colors: colors,
+                        onTap: () => _switchBaseUrl(url),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: DesignTokens.spaceLg),
+
+                  // 操作按钮 — 按重要性分层
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: _testingUrl ? null : _testConnectivity,
+                      icon: const Icon(PhosphorIconsRegular.plugsConnected),
+                      label: const Text('测试连通性'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: colors.primary,
+                        foregroundColor: colors.onPrimary,
+                        minimumSize: const Size(48, 48),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: DesignTokens.spaceLg,
+                          vertical: DesignTokens.spaceMd,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius:
+                              BorderRadius.circular(DesignTokens.radiusMd),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: DesignTokens.spaceSm),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        widget.onClose();
+                        await widget.onCustomUrl();
+                      },
+                      icon: const Icon(PhosphorIconsRegular.pencilSimpleLine),
+                      label: const Text('自定义 URL'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: colors.onSurface,
+                        side: BorderSide(color: colors.border),
+                        minimumSize: const Size(48, 48),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: DesignTokens.spaceLg,
+                          vertical: DesignTokens.spaceMd,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius:
+                              BorderRadius.circular(DesignTokens.radiusMd),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: DesignTokens.spaceXs),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton.icon(
+                      onPressed: () => _switchBaseUrl(AppConstants.defaultBaseUrl),
+                      icon: const Icon(PhosphorIconsRegular.arrowCounterClockwise),
+                      label: const Text('重置为默认'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: colors.onSurfaceMuted,
+                        minimumSize: const Size(48, 48),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCurrentRow() {
+    return Row(
+      children: [
+        Icon(
+          PhosphorIconsRegular.link,
+          size: 14,
+          color: colors.onSurfaceMuted,
+        ),
+        const SizedBox(width: DesignTokens.spaceXs),
+        Expanded(
+          child: Text(
+            _currentBaseUrl,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: DesignTokens.textCaption,
+              color: colors.onSurface,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        if (_testingUrl)
+          const SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        else if (_testResult != null)
+          _StatusBadge(
+            text: '失败',
+            icon: PhosphorIconsFill.warningCircle,
+            tone: _StatusTone.destructive,
+            colors: colors,
+            compact: true,
+          )
+        else if (_hasTested)
+          _StatusBadge(
+            text: '已连通',
+            icon: PhosphorIconsFill.checkCircle,
+            tone: _StatusTone.success,
+            colors: colors,
+            compact: true,
+          ),
+      ],
+    );
+  }
+
+  Widget _buildSubLabel(String text) {
+    return Text(
+      text,
+      style: TextStyle(
+        fontSize: DesignTokens.textLabel,
+        fontWeight: FontWeight.w600,
+        color: colors.onSurfaceMuted,
+        letterSpacing: 0.5,
+      ),
+    );
+  }
+
+  Future<void> _switchBaseUrl(String newUrl) async {
+    try {
+      await ApiServerSwitcher.switchTo(newUrl);
+      setState(() {
+        _currentBaseUrl = newUrl;
+        _testResult = null;
+        _hasTested = false;
+      });
+      widget.onSwitched();
+      Get.snackbar(
+        '已切换',
+        '当前 API 服务器：$newUrl',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: colors.surface,
+        colorText: colors.onSurface,
+        duration: const Duration(seconds: 2),
+      );
+    } catch (e) {
+      Get.snackbar(
+        '切换失败',
+        e.toString(),
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: colors.destructive,
+        colorText: colors.surface,
+      );
+    }
+  }
+
+  Future<void> _testConnectivity() async {
+    setState(() {
+      _testingUrl = true;
+      _testResult = null;
+    });
+    final result = await ApiServerSwitcher.testConnectivity(_currentBaseUrl);
+    if (!mounted) return;
+    setState(() {
+      _testingUrl = false;
+      _testResult = result;
+      _hasTested = true;
+    });
+  }
+}
+
+// ============================================================
+// 共用小组件
+// ============================================================
+
+/// 状态徽章色调
+enum _StatusTone { success, destructive, neutral }
+
+/// 状态徽章
 class _StatusBadge extends StatelessWidget {
   final String text;
   final IconData icon;
@@ -772,8 +1211,7 @@ class _StatusBadge extends StatelessWidget {
       _StatusTone.success => (colors.success, colors.success.withOpacity(0.12)),
       _StatusTone.destructive =>
         (colors.destructive, colors.destructive.withOpacity(0.12)),
-      _StatusTone.neutral =>
-        (colors.onSurfaceMuted, colors.surfaceVariant),
+      _StatusTone.neutral => (colors.onSurfaceMuted, colors.surfaceVariant),
     };
 
     return Container(
@@ -789,11 +1227,7 @@ class _StatusBadge extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Icon(
-            icon,
-            size: compact ? 11 : 13,
-            color: fg,
-          ),
+          Icon(icon, size: compact ? 11 : 13, color: fg),
           const SizedBox(width: 4),
           Flexible(
             child: Text(
@@ -801,7 +1235,9 @@ class _StatusBadge extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: compact ? DesignTokens.textLabel : DesignTokens.textCaption,
+                fontSize: compact
+                    ? DesignTokens.textLabel
+                    : DesignTokens.textCaption,
                 fontWeight: FontWeight.w500,
                 color: fg,
               ),
@@ -869,71 +1305,6 @@ class _MirrorChip extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// 主题色色块
-class _ThemeColorBlock extends StatelessWidget {
-  final ThemePreset preset;
-  final bool selected;
-  final ThemeColors colors;
-  final VoidCallback onTap;
-
-  const _ThemeColorBlock({
-    required this.preset,
-    required this.selected,
-    required this.colors,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: selected ? colors.onBackground : Colors.transparent,
-                width: 2.5,
-              ),
-            ),
-            child: Container(
-              decoration: BoxDecoration(
-                color: preset.primaryColor,
-                shape: BoxShape.circle,
-                boxShadow: DesignTokens.elevation1,
-              ),
-              child: selected
-                  ? Center(
-                      child: Icon(
-                        PhosphorIconsFill.check,
-                        color: colors.surface,
-                        size: 24,
-                      ),
-                    )
-                  : null,
-            ),
-          ),
-          const SizedBox(height: DesignTokens.spaceXs),
-          Text(
-            preset.name,
-            style: TextStyle(
-              fontSize: DesignTokens.textLabel,
-              fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-              color: selected ? colors.onBackground : colors.onSurfaceMuted,
-            ),
-          ),
-        ],
       ),
     );
   }

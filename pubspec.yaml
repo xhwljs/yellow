@@ -50,6 +50,10 @@ dependencies:
   intl: ^0.19.0
   logger: ^2.3.0
 
+  # 自动更新（GitHub Releases APK 下载 + 安装）
+  open_file: ^3.5.4
+  permission_handler: ^11.3.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

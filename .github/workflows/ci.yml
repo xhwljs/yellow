@@ -59,12 +59,17 @@ jobs:
         # 老用户可以平滑升级（不变更包名 = 不丢数据）。
         # Dart 包名已改为 yellow_depot（见 pubspec.yaml），与 Android 包名独立。
         #
-        # 但 launcher 显示名需要 sed 改为 "Yellow Depot"，
-        # 否则 Android 桌面图标下方仍显示 "videohub"。
+        # 1. launcher 显示名 sed 改为 "Yellow Depot"
+        # 2. 注入 REQUEST_INSTALL_PACKAGES 权限（自动更新功能需要）
+        # 3. 注入 FileProvider 用于分享 APK 给系统安装器（open_file 包需要）
         run: |
           flutter create --platforms=android --project-name=videohub --org com.videohub .
           sed -i 's|android:label="videohub"|android:label="Yellow Depot"|' android/app/src/main/AndroidManifest.xml
-          grep -E 'android:label=' android/app/src/main/AndroidManifest.xml
+
+          # 在 </manifest> 前注入权限
+          sed -i 's|</manifest>|    <!-- 自动更新：安装未知来源 APK 权限（Android 8+ 必需） -->\n    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />\n</manifest>|' android/app/src/main/AndroidManifest.xml
+
+          grep -E 'android:label=|REQUEST_INSTALL_PACKAGES' android/app/src/main/AndroidManifest.xml
 
       - name: Bump Kotlin to 1.9.22 for plugin compatibility
         run: |
