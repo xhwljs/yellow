@@ -251,15 +251,33 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NEXT_TAG: ${{ needs.build-android.outputs.next_tag }}
         run: |
-          # release body 包含 "[强制更新]" 标记，
-          # App 启动时 GitHubReleaseService 会解析此标记并设置 forceUpdate=true，
-          # UpdateDialog 仅显示"立即更新"按钮（无"稍后"）。
+          # release body 包含：
+          # 1. 本次具体修改内容（让用户知道更新了什么）
+          # 2. "[强制更新]" 标记（App 启动时 GitHubReleaseService 解析此标记
+          #    设置 forceUpdate=true，UpdateDialog 仅显示"立即更新"按钮）
           # 如需改为非强制更新，删除 body 中的 [强制更新] 行即可。
-          {
-            echo "Yellow Depot $NEXT_TAG 自动构建发布（由 push 到 main 触发）"
-            echo ""
-            echo "[强制更新]"
-          } > /tmp/release_notes.md
+          cat > /tmp/release_notes.md <<'NOTES_EOF'
+          ## 本次更新内容
+
+          ### 新增
+          - 设置页顶部 Yellow Depot Hero 卡片重新设计：多层渐变背景 + 几何纹理装饰 + 玻璃拟态 Logo + 主题色徽章
+          - 主题色选择新增 HSV 选色盘：可在饱和度×明度面板和色相滑块上拖动选择任意颜色，实时预览 + Hex 值显示
+          - 新增「自定义」主题预设，用户保存的颜色持久化到 SharedPreferences，重启后保留
+          - 自定义颜色的 secondary 由 primary 自动派生（HSL 降低 8% 亮度）
+
+          ### 改进
+          - ThemeColors 支持 customPrimary 参数，自定义色不再被错误识别为预设色
+          - AppTheme.colorsOf 优先从 ThemeController 读取（支持自定义色），splash 阶段回退到 Theme primary 推断
+          - 主题卷帘菜单列表项在 custom 预设下显示实际保存的颜色，而非占位色
+
+          ### 修复
+          - 对话框不显示：splash_page 用 Builder 捕获 MaterialApp 内部 context，避免 showDialog 找不到 Navigator
+          - 已安装最新版本仍提示更新：CI 用 sed 把 tag（去掉 v 前缀）注入 AppConstants.appVersion，启动时直接比较版本号
+
+          [强制更新]
+          NOTES_EOF
+          # 移除 heredoc 导致的每行前导空格（保持 markdown 结构）
+          sed -i 's/^          //' /tmp/release_notes.md
           gh release create "$NEXT_TAG" artifacts/*.apk \
             --title "Release $NEXT_TAG" \
             --notes-file /tmp/release_notes.md \

@@ -26,11 +26,13 @@ class MainShell extends GetView<MainShellController> {
   Widget build(BuildContext context) {
     final themeController = Get.find<ThemeController>();
     return Obx(() {
+      // 监听 presetRx 和 customColorRx — 任意一个变化都重建 ThemeData
       final preset = themeController.presetRx.value;
+      final customColor = themeController.customColorRx.value;
       return GetMaterialApp(
         title: AppConstants.appName,
         debugShowCheckedModeBanner: false,
-        theme: AppTheme.fromPreset(preset),
+        theme: AppTheme.fromPreset(preset, customPrimary: customColor),
         defaultTransition: Transition.fadeIn,
         transitionDuration: DesignTokens.motionSlow,
         home: const _ShellBody(),

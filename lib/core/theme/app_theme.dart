@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:yellow_depot/core/theme/design_tokens.dart';
 import 'package:yellow_depot/core/theme/theme_presets.dart';
+import 'package:yellow_depot/core/theme/theme_controller.dart';
 
 /// AppTheme — 基于 ThemePreset 生成 ThemeData
 ///
@@ -9,11 +11,21 @@ import 'package:yellow_depot/core/theme/theme_presets.dart';
 /// - 仅浅色模式（brightness: Brightness.light）
 /// - 不生成 darkTheme
 /// - 字体：Righteous (display) + Poppins (body) + JetBrains Mono (mono)
+///
+/// **自定义色支持**：
+/// 当用户选择 [ThemePreset.custom] 时，[fromPreset] 接受 [customPrimary] 参数，
+/// 由 [ThemeController] 传入用户持久化的颜色。
+/// 同时 [_presetOf] 改为依赖 ThemeController 而非从 primary 反推，
+/// 这样自定义色不会被错误识别为某个预设。
 class AppTheme {
   AppTheme._();
 
-  static ThemeData fromPreset(ThemePreset preset) {
-    final colors = ThemeColors(preset);
+  /// 根据 [ThemePreset] 生成 ThemeData
+  ///
+  /// [customPrimary] 仅当 preset == [ThemePreset.custom] 时生效，
+  /// 用于自定义主题色。其他预设下此参数被忽略。
+  static ThemeData fromPreset(ThemePreset preset, {Color? customPrimary}) {
+    final colors = ThemeColors(preset, customPrimary: customPrimary);
     final scheme = ColorScheme.light(
       primary: colors.primary,
       onPrimary: colors.onPrimary,
@@ -276,21 +288,25 @@ class AppTheme {
   }
 
   /// 获取当前 ThemeColors（用于自定义 widget 读取语义令牌）
+  ///
+  /// 优先从 GetX 的 [ThemeController] 读取（支持自定义色），
+  /// 如果 ThemeController 未就绪（如 splash 阶段），回退到从 Theme primary 推断。
   static ThemeColors colorsOf(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     assert(brightness == Brightness.light, 'Yellow Depot 仅支持浅色模式');
-    return ThemeColors(_presetOf(context));
-  }
 
-  static ThemePreset _presetOf(BuildContext context) {
-    // 通过 InheritedWidget 或 GetX tag 注入
-    // 这里直接读 Theme primary 推断 preset（兜底）
+    // 优先使用 ThemeController（支持自定义色 + 当前 preset）
+    if (Get.isRegistered<ThemeController>()) {
+      return Get.find<ThemeController>().colors;
+    }
+
+    // 回退：从 Theme primary 反推预设（兼容 splash 等未初始化 GetX 的场景）
     final primary = Theme.of(context).colorScheme.primary;
     for (final preset in ThemePreset.values) {
-      if (preset.primaryColor.value == primary.value) {
-        return preset;
+      if (!preset.isCustom && preset.primaryColor.value == primary.value) {
+        return ThemeColors(preset);
       }
     }
-    return ThemePreset.pink;
+    return ThemeColors(ThemePreset.pink);
   }
 }

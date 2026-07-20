@@ -69,6 +69,12 @@ class AppConstants {
   static const String keyApiBaseUrl = 'api_base_url';
   static const String keySearchHistory = 'search_history';
 
+  /// 自定义主题色（仅当 keyThemePreset = 'custom' 时生效）
+  ///
+  /// 值为 Color.value（ARGB int），由 ThemeController.applyCustomColor 写入。
+  /// 加载时由 ThemeController._loadPreset 读取并设置到 customColorRx。
+  static const String keyCustomPrimaryColor = 'custom_primary_color';
+
   /// 首页"目录"区块分类 id 集合（来自 `.stui-pannel__menu`）
   ///
   /// 用于 [CategoryRepository] 启动时给从数据库读取的 Category 标记

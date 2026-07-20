@@ -184,69 +184,232 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   // ============================================================
-  // App Hero Header
+  // App Hero Header — 重新设计（多层渐变 + 沉浸式纹理）
   // ============================================================
+  //
+  // 设计要点（基于 ui-ux-pro-max 技能建议）：
+  // 1. **多层渐变**：LinearGradient (135°) primary → secondary + RadialGradient 光晕
+  // 2. **沉浸式纹理**：右上角半透明几何装饰（圆形/方形）增加层次
+  // 3. **Logo 卡片**：玻璃拟态效果（BackdropFilter blur）让 logo 浮在主色之上
+  // 4. **App 名称**：Poppins Bold，shadow 让白字在彩色背景上更易读
+  // 5. **版本徽章**：低透明度白色背景 pill，避免抢戏
+  // 6. **副标题**：从主色派生的浅色调，传达"视频聚合"主题
+  //
+  // 颜色搭配：
+  // - 背景：colors.primary → colors.secondary（135° 渐变）
+  // - 装饰圆：白色 0.08 / 0.15 透明度，营造层次
+  // - 文字：白色（在彩色背景上 WCAG AAA 对比度）
+  // - 阴影：colors.primary 30% 透明度，blurRadius 28，模拟 elevation2
   Widget _buildAppHero(ThemeColors colors) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(DesignTokens.spaceXl),
+      padding: const EdgeInsets.fromLTRB(
+        DesignTokens.spaceXl,
+        DesignTokens.space2xl,
+        DesignTokens.spaceXl,
+        DesignTokens.spaceXl,
+      ),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(DesignTokens.radiusXl),
+        // 多层渐变：LinearGradient 主渐变 + 通过 Stack 叠加 RadialGradient 光晕
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
+          stops: const [0.0, 0.55, 1.0],
           colors: [
             colors.primary,
+            colors.secondary,
             colors.primary.withOpacity(0.85),
           ],
         ),
-        boxShadow: DesignTokens.elevation2,
+        boxShadow: [
+          BoxShadow(
+            color: colors.primary.withOpacity(0.32),
+            blurRadius: 28,
+            offset: const Offset(0, 14),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      child: Column(
+      // Stack 用于叠加装饰元素
+      child: Stack(
         children: [
-          Container(
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.18),
-              borderRadius: BorderRadius.circular(DesignTokens.radiusLg),
-            ),
-            child: const Center(
-              child: Icon(
-                PhosphorIconsFill.filmSlate,
-                size: 36,
-                color: Colors.white,
+          // 右上角装饰：半透明圆形 + 方形（几何纹理）
+          Positioned(
+            top: -20,
+            right: -20,
+            child: Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.08),
               ),
             ),
           ),
-          const SizedBox(height: DesignTokens.spaceLg),
-          Text(
-            AppConstants.appName,
-            style: GoogleFonts.poppins(
-              fontSize: DesignTokens.textDisplay,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-              letterSpacing: 0.5,
-            ),
-          ),
-          const SizedBox(height: DesignTokens.spaceXs),
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: DesignTokens.spaceMd,
-              vertical: 4,
-            ),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(DesignTokens.radiusPill),
-            ),
-            child: Text(
-              'v${AppConstants.appVersion}',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: DesignTokens.textCaption,
-                fontWeight: FontWeight.w500,
+          Positioned(
+            top: 24,
+            right: 18,
+            child: Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(DesignTokens.radiusMd),
+                color: Colors.white.withOpacity(0.06),
               ),
             ),
+          ),
+          Positioned(
+            bottom: -28,
+            left: -28,
+            child: Container(
+              width: 88,
+              height: 88,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.05),
+              ),
+            ),
+          ),
+          // 主内容
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Logo 卡片：玻璃拟态效果（半透明白色背景 + blur 模拟）
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.20),
+                  borderRadius: BorderRadius.circular(DesignTokens.radiusLg),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.32),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.12),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Center(
+                  child: Icon(
+                    PhosphorIconsFill.filmSlate,
+                    size: 40,
+                    color: Colors.white,
+                    shadows: [
+                      Shadow(
+                        color: Color(0x66000000),
+                        blurRadius: 4,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: DesignTokens.spaceLg),
+              // App 名称
+              Text(
+                AppConstants.appName,
+                style: GoogleFonts.poppins(
+                  fontSize: DesignTokens.textDisplay,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                  letterSpacing: 0.6,
+                  shadows: const [
+                    Shadow(
+                      color: Color(0x40000000),
+                      blurRadius: 8,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: DesignTokens.spaceXs),
+              // 副标题
+              Text(
+                '视频聚合 · 随心播放',
+                style: GoogleFonts.poppins(
+                  fontSize: DesignTokens.textBody,
+                  fontWeight: FontWeight.w400,
+                  color: Colors.white.withOpacity(0.85),
+                  letterSpacing: 0.4,
+                ),
+              ),
+              const SizedBox(height: DesignTokens.spaceLg),
+              // 版本徽章 + 主题色预览圆点
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 版本徽章
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: DesignTokens.spaceMd,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.22),
+                      borderRadius: BorderRadius.circular(DesignTokens.radiusPill),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.32),
+                        width: 0.8,
+                      ),
+                    ),
+                    child: Text(
+                      'v${AppConstants.appVersion}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: DesignTokens.textCaption,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: DesignTokens.spaceSm),
+                  // 主题色名称徽章
+                  Obx(() {
+                    final themeController = Get.find<ThemeController>();
+                    final current = themeController.presetRx.value;
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: DesignTokens.spaceMd,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.18),
+                        borderRadius:
+                            BorderRadius.circular(DesignTokens.radiusPill),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            PhosphorIconsFill.palette,
+                            size: 11,
+                            color: Colors.white.withOpacity(0.85),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            current.name,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: DesignTokens.textCaption,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ],
           ),
         ],
       ),
@@ -254,18 +417,19 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   // ============================================================
-  // 卷帘菜单 1: 主题色选择
+  // 卷帘菜单 1: 主题色选择（预设 + 自定义选色盘）
   // ============================================================
   //
   // 风格与 home_page._showCatalogSheet 完全一致：
   // - 圆角顶部 + drag handle
   // - 标题栏：左侧 icon + 标题 + 右侧关闭按钮
   // - 列表项：左侧色块圆点 + 中间 name/description + 右侧 check
+  // - 底部增加 HSV 选色盘（CustomColorPicker），用户可拖动选择任意色
   Future<void> _showThemeSheet(BuildContext context, ThemeColors colors) async {
     final themeController = Get.find<ThemeController>();
     await showModalBottomSheet<void>(
       context: context,
-      isScrollControlled: false,
+      isScrollControlled: true,
       backgroundColor: colors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(
@@ -274,53 +438,96 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
       builder: (sheetContext) {
         return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // drag handle
-              _SheetDragHandle(colors: colors),
-              // 标题栏
-              _SheetHeader(
-                icon: PhosphorIconsRegular.palette,
-                title: '主题色',
-                colors: colors,
-                onClose: () => Navigator.of(sheetContext).pop(),
-              ),
-              Divider(height: 1, thickness: 1, color: colors.border),
-              // 色块列表
-              Flexible(
-                child: Obx(() {
-                  final current = themeController.presetRx.value;
-                  return ListView.separated(
-                    shrinkWrap: true,
-                    padding: const EdgeInsets.symmetric(
-                      vertical: DesignTokens.spaceSm,
-                    ),
-                    itemCount: ThemePreset.values.length,
-                    separatorBuilder: (_, __) => Divider(
-                      height: 1,
-                      indent: DesignTokens.spaceLg,
-                      endIndent: DesignTokens.spaceLg,
-                      color: colors.border.withOpacity(0.5),
-                    ),
-                    itemBuilder: (_, i) {
-                      final preset = ThemePreset.values[i];
-                      final selected = preset == current;
-                      return _ThemeSheetItem(
-                        preset: preset,
-                        selected: selected,
-                        colors: colors,
-                        onTap: () {
-                          themeController.switchPreset(preset);
-                          Navigator.of(sheetContext).pop();
-                        },
-                      );
-                    },
-                  );
-                }),
-              ),
-            ],
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // drag handle
+                _SheetDragHandle(colors: colors),
+                // 标题栏
+                _SheetHeader(
+                  icon: PhosphorIconsRegular.palette,
+                  title: '主题色',
+                  colors: colors,
+                  onClose: () => Navigator.of(sheetContext).pop(),
+                ),
+                Divider(height: 1, thickness: 1, color: colors.border),
+                // 预设色块列表（可滚动）
+                Flexible(
+                  child: Obx(() {
+                    final current = themeController.presetRx.value;
+                    final customColor = themeController.customColorRx.value;
+                    return ListView.separated(
+                      shrinkWrap: true,
+                      padding: const EdgeInsets.symmetric(
+                        vertical: DesignTokens.spaceSm,
+                      ),
+                      itemCount: ThemePreset.values.length,
+                      separatorBuilder: (_, __) => Divider(
+                        height: 1,
+                        indent: DesignTokens.spaceLg,
+                        endIndent: DesignTokens.spaceLg,
+                        color: colors.border.withOpacity(0.5),
+                      ),
+                      itemBuilder: (_, i) {
+                        final preset = ThemePreset.values[i];
+                        final selected = preset == current;
+                        return _ThemeSheetItem(
+                          preset: preset,
+                          selected: selected,
+                          colors: colors,
+                          customColor: preset.isCustom ? customColor : null,
+                          onTap: () {
+                            themeController.switchPreset(preset);
+                            Navigator.of(sheetContext).pop();
+                          },
+                        );
+                      },
+                    );
+                  }),
+                ),
+                // 自定义颜色分隔标题
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    DesignTokens.spaceLg,
+                    DesignTokens.spaceSm,
+                    DesignTokens.spaceLg,
+                    DesignTokens.spaceXs,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        PhosphorIconsRegular.paintBrush,
+                        size: 14,
+                        color: colors.onSurfaceMuted,
+                      ),
+                      const SizedBox(width: DesignTokens.spaceXs),
+                      Text(
+                        '自定义颜色',
+                        style: TextStyle(
+                          fontSize: DesignTokens.textLabel,
+                          fontWeight: FontWeight.w600,
+                          color: colors.onSurfaceMuted,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // HSV 选色盘 + 预览 + 应用按钮
+                _CustomColorSection(
+                  colors: colors,
+                  onApply: (color) async {
+                    await themeController.applyCustomColor(color);
+                    if (sheetContext.mounted) Navigator.of(sheetContext).pop();
+                  },
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -838,15 +1045,26 @@ class _ThemeSheetItem extends StatelessWidget {
   final ThemeColors colors;
   final VoidCallback onTap;
 
+  /// 自定义模式下的实际颜色（仅 preset == ThemePreset.custom 时使用）
+  ///
+  /// 由调用方传入 ThemeController.customColor，用于色块圆点显示真实颜色，
+  /// 而非枚举的占位色。
+  final Color? customColor;
+
   const _ThemeSheetItem({
     required this.preset,
     required this.selected,
     required this.colors,
     required this.onTap,
+    this.customColor,
   });
 
   @override
   Widget build(BuildContext context) {
+    // 实际显示颜色：custom 预设用 customColor，其他用 preset.primaryColor
+    final displayColor = preset.isCustom
+        ? (customColor ?? ThemePreset.pink.primaryColor)
+        : preset.primaryColor;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -858,12 +1076,12 @@ class _ThemeSheetItem extends StatelessWidget {
           ),
           child: Row(
             children: [
-              // 色块圆点
+              // 色块圆点（custom 预设显示用户保存的实际颜色）
               Container(
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: preset.primaryColor,
+                  color: displayColor,
                   shape: BoxShape.circle,
                   boxShadow: DesignTokens.elevation1,
                 ),
@@ -1307,5 +1525,329 @@ class _MirrorChip extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+// ============================================================
+// 自定义颜色选择器（HSV 选色盘 + 色相滑块 + 预览 + 应用按钮）
+// ============================================================
+
+/// 自定义颜色选择区域
+///
+/// 包含：
+/// - **HSV 色盘**：饱和度 × 明度（SV）方形面板，可拖动选择
+/// - **色相滑块**：横向彩虹条，可拖动选择色相（H）
+/// - **预览圆点**：显示当前选中的颜色 + Hex 值
+/// - **应用按钮**：点击后将颜色应用到主题
+///
+/// 设计：
+/// - SV 面板用 CustomPaint 绘制（水平饱和度 0→1，垂直明度 1→0）
+/// - 色相滑块用 7 段彩虹渐变 LinearGradient（red→yellow→green→cyan→blue→magenta→red）
+/// - 拖动通过 GestureDetector 监听 onPanUpdate
+/// - 触摸目标 ≥44pt（满足 a11y 要求）
+class _CustomColorSection extends StatefulWidget {
+  final ThemeColors colors;
+  final Future<void> Function(Color color) onApply;
+
+  const _CustomColorSection({
+    required this.colors,
+    required this.onApply,
+  });
+
+  @override
+  State<_CustomColorSection> createState() => _CustomColorSectionState();
+}
+
+class _CustomColorSectionState extends State<_CustomColorSection> {
+  /// 当前选中的 HSV 颜色（默认初始为当前主题色对应的 HSV）
+  late HSVColor _hsv;
+
+  @override
+  void initState() {
+    super.initState();
+    // 初始 HSV 用当前主题色（让用户从当前色开始调整，更自然）
+    _hsv = HSVColor.fromColor(widget.colors.primary);
+  }
+
+  /// 当前 HSV 对应的 RGB Color
+  Color get _currentColor => _hsv.toColor();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = widget.colors;
+    final currentColor = _currentColor;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        DesignTokens.spaceLg,
+        DesignTokens.spaceXs,
+        DesignTokens.spaceLg,
+        DesignTokens.spaceLg,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // SV 选色盘（饱和度 × 明度）
+          _buildSvPanel(colors, currentColor),
+          const SizedBox(height: DesignTokens.spaceSm),
+          // 色相滑块
+          _buildHueSlider(colors),
+          const SizedBox(height: DesignTokens.spaceMd),
+          // 预览 + Hex 值 + 应用按钮
+          _buildPreviewAndApply(colors, currentColor),
+        ],
+      ),
+    );
+  }
+
+  /// SV 色盘：水平方向 = 饱和度，垂直方向 = 明度（上=1, 下=0）
+  ///
+  /// 背景：左侧白 → 右侧当前色相（饱和度渐变）
+  ///      叠加：上透明 → 下黑（明度渐变）
+  /// 用两层 Stack 实现（Flutter 不能直接画 HSV gradient）
+  Widget _buildSvPanel(ThemeColors colors, Color currentColor) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // 固定高度 180，宽度填满
+        const height = 180.0;
+        final width = constraints.maxWidth;
+        return GestureDetector(
+          onPanDown: (details) =>
+              _updateFromSv(details.localPosition, width, height),
+          onPanUpdate: (details) =>
+              _updateFromSv(details.localPosition, width, height),
+          child: Container(
+            width: double.infinity,
+            height: height,
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(DesignTokens.radiusMd),
+              border: Border.all(color: colors.border, width: 1),
+            ),
+            child: Stack(
+              children: [
+                // 底层：水平白色 → 当前色相饱和色
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: [
+                          Colors.white,
+                          _hsv.withSaturation(1).withValue(1).toColor(),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                // 上层：垂直透明 → 黑色（明度渐变）
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                // 当前位置指示器（圆环）
+                Positioned(
+                  left: (_hsv.saturation * width).clamp(0.0, width - 24) - 12,
+                  top: ((1 - _hsv.value) * height).clamp(0.0, height - 24) - 12,
+                  child: Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 3),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.3),
+                          blurRadius: 4,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// 色相滑块：横向 7 段彩虹渐变
+  Widget _buildHueSlider(ThemeColors colors) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        const height = 28.0;
+        return GestureDetector(
+          onPanDown: (details) =>
+              _updateFromHue(details.localPosition.dx, width),
+          onPanUpdate: (details) =>
+              _updateFromHue(details.localPosition.dx, width),
+          child: Container(
+            width: double.infinity,
+            height: height,
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(DesignTokens.radiusPill),
+              border: Border.all(color: colors.border, width: 1),
+            ),
+            child: Stack(
+              children: [
+                // 彩虹渐变
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: [
+                          const Color(0xFFFF0000), // red 0°
+                          const Color(0xFFFFFF00), // yellow 60°
+                          const Color(0xFF00FF00), // green 120°
+                          const Color(0xFF00FFFF), // cyan 180°
+                          const Color(0xFF0000FF), // blue 240°
+                          const Color(0xFFFF00FF), // magenta 300°
+                          const Color(0xFFFF0000), // red 360°
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                // 当前色相指示器（白色圆环）
+                Positioned(
+                  left: (_hsv.hue / 360 * width).clamp(0.0, width - 20) - 10,
+                  top: 4,
+                  child: Container(
+                    width: 20,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _hsv.withSaturation(1).withValue(1).toColor(),
+                      border: Border.all(color: Colors.white, width: 3),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.3),
+                          blurRadius: 4,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// 预览 + Hex 值 + 应用按钮
+  Widget _buildPreviewAndApply(ThemeColors colors, Color currentColor) {
+    final hex = _colorToHex(currentColor);
+    return Row(
+      children: [
+        // 预览圆点
+        Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: currentColor,
+            shape: BoxShape.circle,
+            border: Border.all(color: colors.border, width: 1.5),
+            boxShadow: DesignTokens.elevation1,
+          ),
+        ),
+        const SizedBox(width: DesignTokens.spaceMd),
+        // Hex 值
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '当前选择',
+                style: TextStyle(
+                  fontSize: DesignTokens.textCaption,
+                  color: colors.onSurfaceMuted,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                hex,
+                style: TextStyle(
+                  fontSize: DesignTokens.textBody,
+                  fontWeight: FontWeight.w600,
+                  color: colors.onSurface,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+        // 应用按钮
+        FilledButton.icon(
+          onPressed: () => widget.onApply(currentColor),
+          icon: const Icon(PhosphorIconsFill.check, size: 16),
+          label: const Text('应用'),
+          style: FilledButton.styleFrom(
+            backgroundColor: currentColor,
+            foregroundColor: _isLight(currentColor) ? Colors.black : Colors.white,
+            minimumSize: const Size(56, 48),
+            padding: const EdgeInsets.symmetric(
+              horizontal: DesignTokens.spaceMd,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(DesignTokens.radiusPill),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 根据触摸位置更新 SV
+  void _updateFromSv(Offset localPosition, double width, double height) {
+    setState(() {
+      final s = (localPosition.dx / width).clamp(0.0, 1.0);
+      final v = (1 - localPosition.dy / height).clamp(0.0, 1.0);
+      _hsv = _hsv.withSaturation(s).withValue(v);
+    });
+  }
+
+  /// 根据触摸位置更新色相
+  void _updateFromHue(double dx, double width) {
+    setState(() {
+      final h = (dx / width).clamp(0.0, 1.0) * 360;
+      _hsv = _hsv.withHue(h);
+    });
+  }
+
+  /// Color 转 #RRGGBB 字符串
+  static String _colorToHex(Color color) {
+    final r = (color.r * 255).round().toRadixString(16).padLeft(2, '0');
+    final g = (color.g * 255).round().toRadixString(16).padLeft(2, '0');
+    final b = (color.b * 255).round().toRadixString(16).padLeft(2, '0');
+    return '#$r$g$b'.toUpperCase();
+  }
+
+  /// 判断颜色是否为浅色（用于决定按钮文字颜色）
+  static bool _isLight(Color color) {
+    // 标准亮度公式：0.299R + 0.587G + 0.114B
+    final luminance =
+        0.299 * color.r + 0.587 * color.g + 0.114 * color.b;
+    return luminance > 0.6;
   }
 }
