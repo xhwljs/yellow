@@ -1,6 +1,6 @@
 import 'package:get/get.dart';
-import 'package:videohub/data/models/favorite.dart';
-import 'package:videohub/data/repositories/favorite_repository.dart';
+import 'package:yellow_depot/data/models/favorite.dart';
+import 'package:yellow_depot/data/repositories/favorite_repository.dart';
 
 /// 收藏控制器
 class FavoritesController extends GetxController {

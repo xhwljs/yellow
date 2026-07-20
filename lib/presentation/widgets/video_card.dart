@@ -2,10 +2,10 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:shimmer/shimmer.dart';
-import 'package:videohub/core/theme/app_theme.dart';
-import 'package:videohub/core/theme/design_tokens.dart';
-import 'package:videohub/core/theme/theme_presets.dart';
-import 'package:videohub/data/models/video.dart';
+import 'package:yellow_depot/core/theme/app_theme.dart';
+import 'package:yellow_depot/core/theme/design_tokens.dart';
+import 'package:yellow_depot/core/theme/theme_presets.dart';
+import 'package:yellow_depot/data/models/video.dart';
 
 /// 视频卡片（Bento Grid 风格）
 ///

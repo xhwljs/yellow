@@ -1,8 +1,8 @@
 import 'package:get/get.dart';
-import 'package:videohub/data/models/category.dart';
-import 'package:videohub/data/repositories/category_repository.dart';
-import 'package:videohub/data/repositories/video_repository.dart';
-import 'package:videohub/data/models/video.dart';
+import 'package:yellow_depot/data/models/category.dart';
+import 'package:yellow_depot/data/repositories/category_repository.dart';
+import 'package:yellow_depot/data/repositories/video_repository.dart';
+import 'package:yellow_depot/data/models/video.dart';
 
 /// 首页控制器
 ///

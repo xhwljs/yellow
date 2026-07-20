@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import 'package:videohub/core/utils/logger.dart';
+import 'package:yellow_depot/core/utils/logger.dart';
 
 /// 日志拦截器
 ///

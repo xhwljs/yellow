@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:videohub/core/theme/design_tokens.dart';
-import 'package:videohub/core/theme/theme_presets.dart';
-import 'package:videohub/data/models/category.dart';
-import 'package:videohub/data/models/video.dart';
+import 'package:yellow_depot/core/theme/design_tokens.dart';
+import 'package:yellow_depot/core/theme/theme_presets.dart';
+import 'package:yellow_depot/data/models/category.dart';
+import 'package:yellow_depot/data/models/video.dart';
 
 /// Smoke 测试 — 验证核心数据模型与设计 tokens 基础契约。
 ///

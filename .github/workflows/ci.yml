@@ -53,7 +53,18 @@ jobs:
         run: flutter pub get
 
       - name: Generate native platform scaffolding (android only)
-        run: flutter create --platforms=android --project-name=videohub --org com.videohub .
+        #
+        # 关键：保留 --project-name=videohub 与 --org com.videohub 不变
+        # 这样生成的 Android applicationId 仍是 com.videohub.videohub，
+        # 老用户可以平滑升级（不变更包名 = 不丢数据）。
+        # Dart 包名已改为 yellow_depot（见 pubspec.yaml），与 Android 包名独立。
+        #
+        # 但 launcher 显示名需要 sed 改为 "Yellow Depot"，
+        # 否则 Android 桌面图标下方仍显示 "videohub"。
+        run: |
+          flutter create --platforms=android --project-name=videohub --org com.videohub .
+          sed -i 's|android:label="videohub"|android:label="Yellow Depot"|' android/app/src/main/AndroidManifest.xml
+          grep -E 'android:label=' android/app/src/main/AndroidManifest.xml
 
       - name: Bump Kotlin to 1.9.22 for plugin compatibility
         run: |
@@ -112,7 +123,7 @@ jobs:
           files: |
             artifacts/android/*.apk
           body: |
-            ## VideoHub ${{ github.ref_name }}
+            ## Yellow Depot ${{ github.ref_name }}
 
             ### 📦 Downloads
             - **Android APK**: `app-arm64-v8a-debug.apk`（见下方附件）

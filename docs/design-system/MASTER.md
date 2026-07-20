@@ -1,4 +1,4 @@
-# VideoHub Design System — MASTER (Single Source of Truth)
+# Yellow Depot Design System — MASTER (Single Source of Truth)
 
 > 由 UI-UX-Pro-Max Skill 推理生成，针对 **视频聚合 / 内容浏览** 类型应用定制。
 > 严格遵守：**仅浅色模式（Light Mode Only）** + **支持主题色切换（Multi-Theme Color Switching）**。

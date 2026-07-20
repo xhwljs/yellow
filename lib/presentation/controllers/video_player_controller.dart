@@ -1,11 +1,11 @@
 import 'package:get/get.dart';
 import 'package:screen_brightness/screen_brightness.dart';
 import 'package:video_player/video_player.dart' as vp;
-import 'package:videohub/core/error/exceptions.dart';
-import 'package:videohub/core/player/url_decryptor.dart';
-import 'package:videohub/core/utils/logger.dart';
-import 'package:videohub/data/models/video_detail.dart';
-import 'package:videohub/data/repositories/history_repository.dart';
+import 'package:yellow_depot/core/error/exceptions.dart';
+import 'package:yellow_depot/core/player/url_decryptor.dart';
+import 'package:yellow_depot/core/utils/logger.dart';
+import 'package:yellow_depot/data/models/video_detail.dart';
+import 'package:yellow_depot/data/repositories/history_repository.dart';
 import 'package:volume_controller/volume_controller.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 

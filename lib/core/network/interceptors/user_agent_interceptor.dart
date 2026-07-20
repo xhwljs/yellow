@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
-import 'package:videohub/core/constants/api_endpoints.dart';
-import 'package:videohub/core/utils/user_agent_utils.dart';
+import 'package:yellow_depot/core/constants/api_endpoints.dart';
+import 'package:yellow_depot/core/utils/user_agent_utils.dart';
 
 /// 随机 User-Agent + 反爬识别 Header 拦截器
 ///

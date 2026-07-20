@@ -1,5 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:videohub/core/constants/app_constants.dart';
+import 'package:yellow_depot/core/constants/app_constants.dart';
 
 /// 搜索历史本地存储服务
 ///

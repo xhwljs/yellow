@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-import 'package:videohub/core/theme/app_theme.dart';
-import 'package:videohub/core/theme/design_tokens.dart';
-import 'package:videohub/presentation/controllers/video_player_controller.dart';
+import 'package:yellow_depot/core/theme/app_theme.dart';
+import 'package:yellow_depot/core/theme/design_tokens.dart';
+import 'package:yellow_depot/presentation/controllers/video_player_controller.dart';
 
 /// 视频播放器页面
 ///
@@ -32,7 +32,15 @@ class VideoPlayerPage extends GetView<PlayerPageController> {
 
   @override
   Widget build(BuildContext context) {
-    // 播放页全屏沉浸：状态栏透明 + 横屏锁定可切换
+    // 播放页全屏沉浸：状态栏透明，但不遮盖状态栏（用户要求）
+    //
+    // 关键变更：SafeArea.top 从 false 改为 true
+    // - 旧值 false：内容延伸到状态栏下方，状态栏图标与视频/加载内容重叠
+    // - 新值 true：内容从状态栏下方开始绘制，状态栏区域显示黑色背景
+    //   （Scaffold backgroundColor: Colors.black）
+    //
+    // AnnotatedRegion 仍设 statusBarColor: transparent 让状态栏背景透明，
+    // 图标用 light 色（白色）保证在黑底上可读。
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light.copyWith(
         statusBarColor: Colors.transparent,
@@ -41,7 +49,7 @@ class VideoPlayerPage extends GetView<PlayerPageController> {
       child: Scaffold(
         backgroundColor: Colors.black,
         body: SafeArea(
-          top: false,
+          top: true,
           bottom: false,
           child: Obx(() => _buildBody(context)),
         ),

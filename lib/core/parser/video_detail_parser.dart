@@ -1,8 +1,8 @@
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
-import 'package:videohub/core/error/exceptions.dart';
-import 'package:videohub/data/models/video.dart';
-import 'package:videohub/data/models/video_detail.dart';
+import 'package:yellow_depot/core/error/exceptions.dart';
+import 'package:yellow_depot/data/models/video.dart';
+import 'package:yellow_depot/data/models/video_detail.dart';
 
 /// 视频详情解析器
 ///

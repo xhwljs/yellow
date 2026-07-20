@@ -3,7 +3,7 @@ class AppConstants {
   AppConstants._();
 
   // App
-  static const String appName = 'VideoHub';
+  static const String appName = 'Yellow Depot';
   static const String appVersion = '1.0.0';
 
   // API base URL（默认源站点根路径）

@@ -4,15 +4,15 @@ import 'package:chewie/chewie.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:video_player/video_player.dart' as vp;
-import 'package:videohub/core/error/exceptions.dart';
-import 'package:videohub/core/player/url_decryptor.dart';
-import 'package:videohub/core/utils/logger.dart';
-import 'package:videohub/data/models/play_history.dart';
-import 'package:videohub/data/models/video_detail.dart';
-import 'package:videohub/data/repositories/favorite_repository.dart';
-import 'package:videohub/data/repositories/history_repository.dart';
-import 'package:videohub/data/repositories/video_repository.dart';
-import 'package:videohub/presentation/controllers/history_controller.dart';
+import 'package:yellow_depot/core/error/exceptions.dart';
+import 'package:yellow_depot/core/player/url_decryptor.dart';
+import 'package:yellow_depot/core/utils/logger.dart';
+import 'package:yellow_depot/data/models/play_history.dart';
+import 'package:yellow_depot/data/models/video_detail.dart';
+import 'package:yellow_depot/data/repositories/favorite_repository.dart';
+import 'package:yellow_depot/data/repositories/history_repository.dart';
+import 'package:yellow_depot/data/repositories/video_repository.dart';
+import 'package:yellow_depot/presentation/controllers/history_controller.dart';
 
 /// 视频详情控制器
 ///

@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import 'package:videohub/core/error/exceptions.dart';
+import 'package:yellow_depot/core/error/exceptions.dart';
 
 /// 错误封装拦截器
 ///

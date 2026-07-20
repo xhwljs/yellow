@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-import 'package:videohub/core/constants/app_constants.dart';
-import 'package:videohub/core/theme/design_tokens.dart';
+import 'package:yellow_depot/core/constants/app_constants.dart';
+import 'package:yellow_depot/core/theme/design_tokens.dart';
 
 // 默认主题色（pink）— 与 ThemePreset.pink 一致
 // 启动时 ThemeController 尚未就绪，硬编码默认主题色避免依赖 GetX

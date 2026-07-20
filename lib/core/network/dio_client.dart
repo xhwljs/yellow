@@ -3,12 +3,12 @@ import 'dart:io';
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
-import 'package:videohub/core/constants/app_constants.dart';
-import 'package:videohub/core/network/interceptors/cookie_interceptor.dart';
-import 'package:videohub/core/network/interceptors/error_interceptor.dart';
-import 'package:videohub/core/network/interceptors/logging_interceptor.dart';
-import 'package:videohub/core/network/interceptors/retry_interceptor.dart';
-import 'package:videohub/core/network/interceptors/user_agent_interceptor.dart';
+import 'package:yellow_depot/core/constants/app_constants.dart';
+import 'package:yellow_depot/core/network/interceptors/cookie_interceptor.dart';
+import 'package:yellow_depot/core/network/interceptors/error_interceptor.dart';
+import 'package:yellow_depot/core/network/interceptors/logging_interceptor.dart';
+import 'package:yellow_depot/core/network/interceptors/retry_interceptor.dart';
+import 'package:yellow_depot/core/network/interceptors/user_agent_interceptor.dart';
 
 /// Dio 客户端单例
 ///

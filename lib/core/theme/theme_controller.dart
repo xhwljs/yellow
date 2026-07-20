@@ -1,8 +1,8 @@
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:videohub/core/constants/app_constants.dart';
-import 'package:videohub/core/theme/app_theme.dart';
-import 'package:videohub/core/theme/theme_presets.dart';
+import 'package:yellow_depot/core/constants/app_constants.dart';
+import 'package:yellow_depot/core/theme/app_theme.dart';
+import 'package:yellow_depot/core/theme/theme_presets.dart';
 
 /// 主题控制器 — 全局主题色切换
 ///

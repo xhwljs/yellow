@@ -1,5 +1,5 @@
 import 'package:floor/floor.dart';
-import 'package:videohub/data/models/favorite.dart';
+import 'package:yellow_depot/data/models/favorite.dart';
 
 @dao
 abstract class FavoriteDao {

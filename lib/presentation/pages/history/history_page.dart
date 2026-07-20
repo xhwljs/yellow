@@ -2,12 +2,12 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-import 'package:videohub/core/theme/app_theme.dart';
-import 'package:videohub/core/theme/design_tokens.dart';
-import 'package:videohub/core/theme/theme_presets.dart';
-import 'package:videohub/data/models/play_history.dart';
-import 'package:videohub/presentation/controllers/history_controller.dart';
-import 'package:videohub/presentation/widgets/video_card.dart';
+import 'package:yellow_depot/core/theme/app_theme.dart';
+import 'package:yellow_depot/core/theme/design_tokens.dart';
+import 'package:yellow_depot/core/theme/theme_presets.dart';
+import 'package:yellow_depot/data/models/play_history.dart';
+import 'package:yellow_depot/presentation/controllers/history_controller.dart';
+import 'package:yellow_depot/presentation/widgets/video_card.dart';
 
 /// 播放历史页
 ///

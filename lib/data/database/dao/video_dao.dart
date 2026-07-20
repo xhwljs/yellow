@@ -1,5 +1,5 @@
 import 'package:floor/floor.dart';
-import 'package:videohub/data/models/video.dart';
+import 'package:yellow_depot/data/models/video.dart';
 
 @dao
 abstract class VideoDao {

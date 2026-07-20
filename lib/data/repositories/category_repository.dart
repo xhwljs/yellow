@@ -1,10 +1,10 @@
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:videohub/core/constants/app_constants.dart';
-import 'package:videohub/core/network/api_service.dart';
-import 'package:videohub/core/parser/category_parser.dart';
-import 'package:videohub/core/utils/logger.dart';
-import 'package:videohub/data/database/app_database.dart';
-import 'package:videohub/data/models/category.dart';
+import 'package:yellow_depot/core/constants/app_constants.dart';
+import 'package:yellow_depot/core/network/api_service.dart';
+import 'package:yellow_depot/core/parser/category_parser.dart';
+import 'package:yellow_depot/core/utils/logger.dart';
+import 'package:yellow_depot/data/database/app_database.dart';
+import 'package:yellow_depot/data/models/category.dart';
 
 /// 分类 Repository
 ///

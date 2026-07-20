@@ -1,4 +1,4 @@
-import 'package:videohub/core/constants/app_constants.dart';
+import 'package:yellow_depot/core/constants/app_constants.dart';
 
 /// API 端点定义
 class ApiEndpoints {

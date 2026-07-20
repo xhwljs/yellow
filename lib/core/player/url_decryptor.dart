@@ -1,14 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:videohub/core/constants/app_constants.dart';
-import 'package:videohub/core/error/exceptions.dart';
-import 'package:videohub/core/network/api_server_switcher.dart';
-import 'package:videohub/core/network/api_service.dart';
-import 'package:videohub/core/parser/video_detail_parser.dart';
-import 'package:videohub/core/utils/logger.dart';
-import 'package:videohub/core/utils/user_agent_utils.dart';
-import 'package:videohub/data/models/video_detail.dart';
+import 'package:yellow_depot/core/constants/app_constants.dart';
+import 'package:yellow_depot/core/error/exceptions.dart';
+import 'package:yellow_depot/core/network/api_server_switcher.dart';
+import 'package:yellow_depot/core/network/api_service.dart';
+import 'package:yellow_depot/core/parser/video_detail_parser.dart';
+import 'package:yellow_depot/core/utils/logger.dart';
+import 'package:yellow_depot/core/utils/user_agent_utils.dart';
+import 'package:yellow_depot/data/models/video_detail.dart';
 
 /// 播放地址解密模块
 ///

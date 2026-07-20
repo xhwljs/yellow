@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-import 'package:videohub/core/constants/app_constants.dart';
-import 'package:videohub/core/theme/app_theme.dart';
-import 'package:videohub/core/theme/design_tokens.dart';
-import 'package:videohub/core/theme/theme_controller.dart';
-import 'package:videohub/presentation/controllers/main_shell_controller.dart';
-import 'package:videohub/presentation/pages/favorites/favorites_page.dart';
-import 'package:videohub/presentation/pages/history/history_page.dart';
-import 'package:videohub/presentation/pages/home/home_page.dart';
-import 'package:videohub/presentation/pages/settings/settings_page.dart';
-import 'package:videohub/presentation/routes/app_pages.dart';
+import 'package:yellow_depot/core/constants/app_constants.dart';
+import 'package:yellow_depot/core/theme/app_theme.dart';
+import 'package:yellow_depot/core/theme/design_tokens.dart';
+import 'package:yellow_depot/core/theme/theme_controller.dart';
+import 'package:yellow_depot/presentation/controllers/main_shell_controller.dart';
+import 'package:yellow_depot/presentation/pages/favorites/favorites_page.dart';
+import 'package:yellow_depot/presentation/pages/history/history_page.dart';
+import 'package:yellow_depot/presentation/pages/home/home_page.dart';
+import 'package:yellow_depot/presentation/pages/settings/settings_page.dart';
+import 'package:yellow_depot/presentation/routes/app_pages.dart';
 
 /// 主 Shell — GetMaterialApp 入口 + 底部导航
 ///

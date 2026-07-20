@@ -4,15 +4,15 @@ import 'package:floor/floor.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart' as sqflite;
-import 'package:videohub/core/constants/app_constants.dart';
-import 'package:videohub/data/database/dao/category_dao.dart';
-import 'package:videohub/data/database/dao/favorite_dao.dart';
-import 'package:videohub/data/database/dao/history_dao.dart';
-import 'package:videohub/data/database/dao/video_dao.dart';
-import 'package:videohub/data/models/category.dart';
-import 'package:videohub/data/models/favorite.dart';
-import 'package:videohub/data/models/play_history.dart';
-import 'package:videohub/data/models/video.dart';
+import 'package:yellow_depot/core/constants/app_constants.dart';
+import 'package:yellow_depot/data/database/dao/category_dao.dart';
+import 'package:yellow_depot/data/database/dao/favorite_dao.dart';
+import 'package:yellow_depot/data/database/dao/history_dao.dart';
+import 'package:yellow_depot/data/database/dao/video_dao.dart';
+import 'package:yellow_depot/data/models/category.dart';
+import 'package:yellow_depot/data/models/favorite.dart';
+import 'package:yellow_depot/data/models/play_history.dart';
+import 'package:yellow_depot/data/models/video.dart';
 
 part 'app_database.g.dart';
 

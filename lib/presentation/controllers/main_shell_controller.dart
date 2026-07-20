@@ -1,6 +1,6 @@
 import 'package:get/get.dart';
-import 'package:videohub/presentation/controllers/favorites_controller.dart';
-import 'package:videohub/presentation/controllers/history_controller.dart';
+import 'package:yellow_depot/presentation/controllers/favorites_controller.dart';
+import 'package:yellow_depot/presentation/controllers/history_controller.dart';
 
 /// 主 Shell 控制器 — 管理底部导航 currentIndex + Tab 切换时刷新数据
 ///

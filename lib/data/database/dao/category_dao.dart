@@ -1,5 +1,5 @@
 import 'package:floor/floor.dart';
-import 'package:videohub/data/models/category.dart';
+import 'package:yellow_depot/data/models/category.dart';
 
 @dao
 abstract class CategoryDao {

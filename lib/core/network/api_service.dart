@@ -1,8 +1,8 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
-import 'package:videohub/core/constants/api_endpoints.dart';
-import 'package:videohub/core/network/dio_client.dart';
+import 'package:yellow_depot/core/constants/api_endpoints.dart';
+import 'package:yellow_depot/core/network/dio_client.dart';
 
 /// API 服务 — 提供所有 HTTP 接口调用
 ///

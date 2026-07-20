@@ -1,7 +1,7 @@
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
-import 'package:videohub/core/error/exceptions.dart';
-import 'package:videohub/data/models/category.dart';
+import 'package:yellow_depot/core/error/exceptions.dart';
+import 'package:yellow_depot/data/models/category.dart';
 
 /// 分类列表解析器
 ///

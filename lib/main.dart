@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:videohub/presentation/bindings/app_binding.dart';
-import 'package:videohub/presentation/pages/main_shell.dart';
-import 'package:videohub/presentation/pages/splash/splash_page.dart';
+import 'package:yellow_depot/presentation/bindings/app_binding.dart';
+import 'package:yellow_depot/presentation/pages/main_shell.dart';
+import 'package:yellow_depot/presentation/pages/splash/splash_page.dart';
 
 /// 应用入口
 ///

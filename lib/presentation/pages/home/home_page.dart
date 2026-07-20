@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-import 'package:videohub/core/constants/app_constants.dart';
-import 'package:videohub/core/theme/app_theme.dart';
-import 'package:videohub/core/theme/design_tokens.dart';
-import 'package:videohub/core/theme/theme_presets.dart';
-import 'package:videohub/data/models/category.dart';
-import 'package:videohub/data/models/video.dart';
-import 'package:videohub/presentation/controllers/home_controller.dart';
-import 'package:videohub/presentation/widgets/video_card.dart';
+import 'package:yellow_depot/core/constants/app_constants.dart';
+import 'package:yellow_depot/core/theme/app_theme.dart';
+import 'package:yellow_depot/core/theme/design_tokens.dart';
+import 'package:yellow_depot/core/theme/theme_presets.dart';
+import 'package:yellow_depot/data/models/category.dart';
+import 'package:yellow_depot/data/models/video.dart';
+import 'package:yellow_depot/presentation/controllers/home_controller.dart';
+import 'package:yellow_depot/presentation/widgets/video_card.dart';
 
 /// 首页
 ///
 /// 严格遵循 design-system/videohub/MASTER.md：
-/// - 顶部 AppBar 标题 "VideoHub" 使用主题色 primary
+/// - 顶部 AppBar 标题 "Yellow Depot" 使用主题色 primary
 /// - **分类菜单 Tab**（pill-shaped，参考 ui-ux-pro-max MD3 风格）：
 ///   - 横向滚动 Tab 栏：推荐 + 各分类（来自站点导航菜单）
 ///   - 选中态：primary 背景 + onPrimary 文字（pill 形状）

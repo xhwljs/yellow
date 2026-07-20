@@ -1,9 +1,9 @@
 import 'package:get/get.dart';
-import 'package:videohub/presentation/bindings/page_bindings.dart';
-import 'package:videohub/presentation/pages/category/category_page.dart';
-import 'package:videohub/presentation/pages/detail/video_detail_page.dart';
-import 'package:videohub/presentation/pages/player/video_player_page.dart';
-import 'package:videohub/presentation/pages/search/search_page.dart';
+import 'package:yellow_depot/presentation/bindings/page_bindings.dart';
+import 'package:yellow_depot/presentation/pages/category/category_page.dart';
+import 'package:yellow_depot/presentation/pages/detail/video_detail_page.dart';
+import 'package:yellow_depot/presentation/pages/player/video_player_page.dart';
+import 'package:yellow_depot/presentation/pages/search/search_page.dart';
 
 /// 路由配置
 class AppPages {

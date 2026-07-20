@@ -1,5 +1,5 @@
 import 'package:floor/floor.dart';
-import 'package:videohub/data/models/play_history.dart';
+import 'package:yellow_depot/data/models/play_history.dart';
 
 @dao
 abstract class HistoryDao {

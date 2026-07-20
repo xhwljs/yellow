@@ -1,7 +1,7 @@
-import 'package:videohub/core/constants/app_constants.dart';
-import 'package:videohub/core/utils/logger.dart';
-import 'package:videohub/data/database/app_database.dart';
-import 'package:videohub/data/models/play_history.dart';
+import 'package:yellow_depot/core/constants/app_constants.dart';
+import 'package:yellow_depot/core/utils/logger.dart';
+import 'package:yellow_depot/data/database/app_database.dart';
+import 'package:yellow_depot/data/models/play_history.dart';
 
 /// 播放历史 Repository
 ///

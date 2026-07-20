@@ -1,12 +1,12 @@
 import 'package:dio/dio.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:videohub/core/constants/app_constants.dart';
-import 'package:videohub/core/network/dio_client.dart';
-import 'package:videohub/data/database/app_database.dart';
-import 'package:videohub/presentation/controllers/favorites_controller.dart';
-import 'package:videohub/presentation/controllers/history_controller.dart';
-import 'package:videohub/presentation/controllers/home_controller.dart';
+import 'package:yellow_depot/core/constants/app_constants.dart';
+import 'package:yellow_depot/core/network/dio_client.dart';
+import 'package:yellow_depot/data/database/app_database.dart';
+import 'package:yellow_depot/presentation/controllers/favorites_controller.dart';
+import 'package:yellow_depot/presentation/controllers/history_controller.dart';
+import 'package:yellow_depot/presentation/controllers/home_controller.dart';
 
 /// API 服务器切换工具
 ///

@@ -1,5 +1,5 @@
 import 'package:dio_cookie_manager/dio_cookie_manager.dart';
-import 'package:videohub/core/utils/cookie_storage.dart';
+import 'package:yellow_depot/core/utils/cookie_storage.dart';
 
 /// Cookie 持久化拦截器
 ///

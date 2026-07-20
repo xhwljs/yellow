@@ -1,12 +1,12 @@
 import 'package:get/get.dart';
-import 'package:videohub/data/repositories/video_repository.dart';
-import 'package:videohub/data/repositories/favorite_repository.dart';
-import 'package:videohub/data/repositories/history_repository.dart';
-import 'package:videohub/core/player/url_decryptor.dart';
-import 'package:videohub/presentation/controllers/category_controller.dart';
-import 'package:videohub/presentation/controllers/search_controller.dart';
-import 'package:videohub/presentation/controllers/video_detail_controller.dart';
-import 'package:videohub/presentation/controllers/video_player_controller.dart';
+import 'package:yellow_depot/data/repositories/video_repository.dart';
+import 'package:yellow_depot/data/repositories/favorite_repository.dart';
+import 'package:yellow_depot/data/repositories/history_repository.dart';
+import 'package:yellow_depot/core/player/url_decryptor.dart';
+import 'package:yellow_depot/presentation/controllers/category_controller.dart';
+import 'package:yellow_depot/presentation/controllers/search_controller.dart';
+import 'package:yellow_depot/presentation/controllers/video_detail_controller.dart';
+import 'package:yellow_depot/presentation/controllers/video_player_controller.dart';
 
 /// 分类页 Binding
 class CategoryBinding extends Bindings {

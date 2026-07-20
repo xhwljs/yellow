@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:videohub/core/theme/design_tokens.dart';
-import 'package:videohub/core/theme/theme_presets.dart';
+import 'package:yellow_depot/core/theme/design_tokens.dart';
+import 'package:yellow_depot/core/theme/theme_presets.dart';
 
 /// AppTheme — 基于 ThemePreset 生成 ThemeData
 ///
@@ -278,7 +278,7 @@ class AppTheme {
   /// 获取当前 ThemeColors（用于自定义 widget 读取语义令牌）
   static ThemeColors colorsOf(BuildContext context) {
     final brightness = Theme.of(context).brightness;
-    assert(brightness == Brightness.light, 'VideoHub 仅支持浅色模式');
+    assert(brightness == Brightness.light, 'Yellow Depot 仅支持浅色模式');
     return ThemeColors(_presetOf(context));
   }
 

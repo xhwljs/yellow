@@ -1,6 +1,6 @@
 import 'package:get/get.dart';
-import 'package:videohub/data/models/video.dart';
-import 'package:videohub/data/repositories/video_repository.dart';
+import 'package:yellow_depot/data/models/video.dart';
+import 'package:yellow_depot/data/repositories/video_repository.dart';
 
 /// 分类页控制器
 class CategoryController extends GetxController {

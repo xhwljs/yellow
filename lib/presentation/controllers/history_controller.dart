@@ -1,6 +1,6 @@
 import 'package:get/get.dart';
-import 'package:videohub/data/models/play_history.dart';
-import 'package:videohub/data/repositories/history_repository.dart';
+import 'package:yellow_depot/data/models/play_history.dart';
+import 'package:yellow_depot/data/repositories/history_repository.dart';
 
 /// 历史记录控制器
 class HistoryController extends GetxController {

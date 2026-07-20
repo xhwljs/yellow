@@ -1,6 +1,6 @@
-import 'package:videohub/core/utils/logger.dart';
-import 'package:videohub/data/database/app_database.dart';
-import 'package:videohub/data/models/favorite.dart';
+import 'package:yellow_depot/core/utils/logger.dart';
+import 'package:yellow_depot/data/database/app_database.dart';
+import 'package:yellow_depot/data/models/favorite.dart';
 
 /// 收藏 Repository
 ///

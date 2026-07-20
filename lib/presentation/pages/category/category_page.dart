@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-import 'package:videohub/core/theme/app_theme.dart';
-import 'package:videohub/core/theme/design_tokens.dart';
-import 'package:videohub/presentation/controllers/category_controller.dart';
-import 'package:videohub/presentation/controllers/home_controller.dart';
-import 'package:videohub/presentation/widgets/video_card.dart';
+import 'package:yellow_depot/core/theme/app_theme.dart';
+import 'package:yellow_depot/core/theme/design_tokens.dart';
+import 'package:yellow_depot/presentation/controllers/category_controller.dart';
+import 'package:yellow_depot/presentation/controllers/home_controller.dart';
+import 'package:yellow_depot/presentation/widgets/video_card.dart';
 
 /// 分类页
 ///

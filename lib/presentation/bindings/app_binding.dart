@@ -1,18 +1,18 @@
 import 'package:get/get.dart';
-import 'package:videohub/core/network/api_server_switcher.dart';
-import 'package:videohub/core/network/api_service.dart';
-import 'package:videohub/core/network/dio_client.dart';
-import 'package:videohub/core/player/url_decryptor.dart';
-import 'package:videohub/core/theme/theme_controller.dart';
-import 'package:videohub/data/database/app_database.dart';
-import 'package:videohub/data/repositories/category_repository.dart';
-import 'package:videohub/data/repositories/favorite_repository.dart';
-import 'package:videohub/data/repositories/history_repository.dart';
-import 'package:videohub/data/repositories/video_repository.dart';
-import 'package:videohub/presentation/controllers/favorites_controller.dart';
-import 'package:videohub/presentation/controllers/history_controller.dart';
-import 'package:videohub/presentation/controllers/home_controller.dart';
-import 'package:videohub/presentation/controllers/main_shell_controller.dart';
+import 'package:yellow_depot/core/network/api_server_switcher.dart';
+import 'package:yellow_depot/core/network/api_service.dart';
+import 'package:yellow_depot/core/network/dio_client.dart';
+import 'package:yellow_depot/core/player/url_decryptor.dart';
+import 'package:yellow_depot/core/theme/theme_controller.dart';
+import 'package:yellow_depot/data/database/app_database.dart';
+import 'package:yellow_depot/data/repositories/category_repository.dart';
+import 'package:yellow_depot/data/repositories/favorite_repository.dart';
+import 'package:yellow_depot/data/repositories/history_repository.dart';
+import 'package:yellow_depot/data/repositories/video_repository.dart';
+import 'package:yellow_depot/presentation/controllers/favorites_controller.dart';
+import 'package:yellow_depot/presentation/controllers/history_controller.dart';
+import 'package:yellow_depot/presentation/controllers/home_controller.dart';
+import 'package:yellow_depot/presentation/controllers/main_shell_controller.dart';
 
 /// 应用初始化（在 runApp 之前调用）
 ///
