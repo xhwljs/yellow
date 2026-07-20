@@ -83,7 +83,7 @@ class _BackPressExitWrapperState extends State<BackPressExitWrapper> {
         '再按一次退出应用',
         style: TextStyle(
           color: colors.onSurface,
-          fontSize: DesignTokens.textMd,
+          fontSize: DesignTokens.textBody,
         ),
       ),
       snackPosition: SnackPosition.BOTTOM,
@@ -95,7 +95,7 @@ class _BackPressExitWrapperState extends State<BackPressExitWrapper> {
       ),
       backgroundColor: colors.surface,
       borderRadius: DesignTokens.radiusMd,
-      borderColor: colors.outline,
+      borderColor: colors.border,
       borderWidth: 1,
       isDismissible: false,
       dismissDirection: DismissDirection.none,
