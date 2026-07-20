@@ -255,45 +255,38 @@ jobs:
           # 1. 本次具体修改内容（让用户知道更新了什么）
           # 2. "[强制更新]" 标记（App 启动时 GitHubReleaseService 解析此标记
           #    设置 forceUpdate=true，UpdateDialog 仅显示"立即更新"按钮）
-          # 本次为非强制更新（无 [强制更新] 标记），用户可选「稍后」跳过。
+          # 本次为强制更新（含 [强制更新] 标记），用户必须更新到新版本。
           cat > /tmp/release_notes.md <<'NOTES_EOF'
           ## 本次更新内容
 
-          ### 修复
-          - **播放页遮挡系统状态栏**：
-            视频详情页只有 SliverAppBar 没有 AppBar，顶部内联播放器会延伸到
-            状态栏区域遮挡时间和电量图标。修复：用 SafeArea(top: true) 包裹
-            CustomScrollView，让 SliverAppBar 顶部留出系统状态栏高度，
-            与首页 Scaffold+AppBar 行为一致。
+          [强制更新]
 
-          - **列表跳转播放页报错 418 重试几次又能正常打开**：
-            Quantum 反爬系统会概率性返回 HTTP 418 状态码标记"识别为爬虫"，
-            旧 RetryInterceptor 只重试 5xx 不重试 418，导致单次 418 直接失败。
-            修复：RetryInterceptor 新增 418 反爬重试分支：
-            - GET 和 POST 都重试（POST 解密接口也会被反爬误判）
-            - 最多重试 5 次（比普通错误 3 次更多）
-            - 每次重试切换 UA（绕过基于 UA 的反爬识别）
-            - 随机延迟 1-3 秒（避免固定节奏被识别为机器人）
+          ### 改进
+          - **播放页加载动画内嵌化**：
+            旧版进入播放页时是单独的全屏 LoadingView（黑色背景 + 居中 loading 圈），
+            视觉跳变明显，且与详情页封面无衔接。改为始终展示 SliverAppBar
+            （含列表页传入的封面占位 + 返回按钮 + 收藏按钮），下方用
+            SliverFillRemaining 居中显示轻量 loading 圈 + "加载中..." 文案。
+            详情加载完成后平滑切换为详情主体，加载/错误状态都在 SliverAppBar
+            下方呈现，避免页面跳变，提升用户体验。
 
-          - **播放视频报错 418**：
-            POST /static/count.php 解密接口同样会被反爬系统返回 418，
-            现在通过 RetryInterceptor 的 418 反爬重试分支自动恢复，
-            不再需要用户手动重试。
-
-          - **收藏页/播放历史页不显示播放次数/收藏次数/发布时间**：
-            根因是 VideoDetailParser.parse 把 playCount/likeCount/updateTime
-            写死为 0/0/''，VideoDetailController.loadDetail 调用
-            cacheVideo(detail.video) 时用 OnConflictStrategy.replace 覆盖了
-            VideoListParser 之前缓存的正确数据。
-            修复：cacheVideo 改用合并策略 — 先查现有 Video，
-            把 detail.video 中为空/为 0 的字段用现有数据补全，
-            然后再写入。这样列表页缓存的正确元信息不会被详情页覆盖。
-
-          - **跳转壳迁移到最新地址后被 Quantum 反爬拦截**：
-            testConnectivity 检测到跳转壳后请求新地址验证 macCMS 标志，
-            但新地址被 Quantum 反爬系统返回 418 + 空 body，导致验证失败。
-            修复：检测到 418 或空响应时仍切换地址（服务器实际存在），
-            后续请求由 RetryInterceptor 自动重试 + 切换 UA 绕过反爬。
+          - **播放页显示播放量/收藏数/发布时间等元信息**：
+            VideoDetailParser 之前把 playCount/likeCount/updateTime 写死为
+            0/0/''，导致从详情页解析出来的 Video 缺失元信息，UI 上无法显示。
+            改进：
+            1. VideoDetailParser 新增 _extractPlayCount/_extractLikeCount/
+               _extractUpdateTime 方法，尝试从详情页 HTML 提取
+               （多 selector 兜底：.stui-content__detail / .stui-content /
+               .module-info-content / body，匹配 fa-eye/fa-heart 图标
+               所在父元素的数字，以及带"更新时间/发布时间"标签的日期）。
+            2. VideoRepository.cacheVideo 改为返回合并后的 Video
+               （之前返回 void），调用方可直接拿到含完整元信息的数据。
+            3. VideoDetailController.loadDetail 用 cacheVideo 返回的
+               merged Video 回填 detail.value.video，让 UI 立即显示
+               播放量/收藏数/发布时间等信息。
+            4. 当详情页 HTML 无法提取元信息时（如站点结构变化），
+               cacheVideo 合并策略会用 VideoDao 中列表页缓存的正确数据补全，
+               确保 UI 始终有元信息可显示。
 
           NOTES_EOF
           # 移除 heredoc 导致的每行前导空格（保持 markdown 结构）

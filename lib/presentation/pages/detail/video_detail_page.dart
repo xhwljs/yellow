@@ -25,6 +25,11 @@ import 'package:yellow_depot/presentation/widgets/video_card.dart';
 ///
 /// 全屏播放使用 chewie 内联播放器自带的全屏按钮（点击切换横屏全屏），
 /// 不再需要 FAB 跳转到独立的播放页。
+///
+/// **加载状态**：不再单独全屏 LoadingView，而是始终展示 SliverAppBar
+/// （用列表页传入的 initialCoverUrl 占位封面 + 返回按钮 + 收藏按钮），
+/// 下方用 SliverFillRemaining 居中显示一个轻量加载动画。详情加载完成后
+/// 平滑切换为详情内容，避免页面跳变。
 class VideoDetailPage extends GetView<VideoDetailController> {
   const VideoDetailPage({super.key});
 
@@ -33,66 +38,73 @@ class VideoDetailPage extends GetView<VideoDetailController> {
     final colors = AppTheme.colorsOf(context);
     return Scaffold(
       backgroundColor: colors.background,
-      body: Obx(() {
-        if (controller.isLoading.value && controller.detail.value == null) {
-          return const LoadingView(message: '加载中...');
-        }
-        if (controller.errorMessage.value.isNotEmpty &&
-            controller.detail.value == null) {
-          return ErrorView(
-            message: controller.errorMessage.value,
-            onRetry: controller.loadDetail,
-          );
-        }
-        final detail = controller.detail.value;
-        if (detail == null) {
-          return const LoadingView(message: '加载中...');
-        }
-        return _buildContent(context, colors, detail);
-      }),
+      // SafeArea 包裹 CustomScrollView，让 SliverAppBar 顶部留出系统状态栏空间
+      body: SafeArea(
+        top: true,
+        bottom: false,
+        child: Obx(() => _buildContent(context, colors)),
+      ),
     );
   }
 
-  Widget _buildContent(BuildContext context, colors, VideoDetail detail) {
-    // SafeArea 包裹 CustomScrollView，让 SliverAppBar 顶部留出系统状态栏空间
-    // （与 home_page 一致：Scaffold + AppBar 自动留状态栏空间，详情页只有
-    //  SliverAppBar 没有 AppBar，需 SafeArea 显式留出状态栏高度）
-    return SafeArea(
-      top: true,
-      bottom: false,
-      child: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 220,
-            pinned: true,
-            backgroundColor: colors.surface,
-            foregroundColor: colors.onBackground,
-            elevation: 0,
-            scrolledUnderElevation: 0,
-            automaticallyImplyLeading: true,
-            flexibleSpace: FlexibleSpaceBar(
-              background: _InlinePlayerArea(
-                controller: controller,
-                colors: colors,
-              ),
+  /// 始终构造 CustomScrollView：SliverAppBar 显示封面 + 返回按钮 + 收藏按钮；
+  /// 下方根据状态切换内容（加载动画 / 错误重试 / 详情主体）。
+  Widget _buildContent(BuildContext context, ThemeColors colors) {
+    final detail = controller.detail.value;
+    final isLoading =
+        controller.isLoading.value && controller.detail.value == null;
+    final hasError = controller.errorMessage.value.isNotEmpty &&
+        controller.detail.value == null;
+
+    return CustomScrollView(
+      slivers: [
+        SliverAppBar(
+          expandedHeight: 220,
+          pinned: true,
+          backgroundColor: colors.surface,
+          foregroundColor: colors.onBackground,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          automaticallyImplyLeading: true,
+          flexibleSpace: FlexibleSpaceBar(
+            background: _InlinePlayerArea(
+              controller: controller,
+              colors: colors,
             ),
-            actions: [
-              Obx(() {
-                final favorited = controller.isFavorited.value;
-                return IconButton(
-                  icon: Icon(
-                    favorited
-                        ? PhosphorIconsFill.heart
-                        : PhosphorIconsRegular.heart,
-                    color: favorited ? colors.primary : colors.onBackground,
-                    size: 24,
-                  ),
-                  onPressed: controller.toggleFavorite,
-                  tooltip: favorited ? '取消收藏' : '收藏',
-                );
-              }),
-            ],
           ),
+          actions: [
+            Obx(() {
+              final favorited = controller.isFavorited.value;
+              final canToggle = controller.detail.value != null;
+              return IconButton(
+                icon: Icon(
+                  favorited
+                      ? PhosphorIconsFill.heart
+                      : PhosphorIconsRegular.heart,
+                  color: favorited ? colors.primary : colors.onBackground,
+                  size: 24,
+                ),
+                onPressed: canToggle ? controller.toggleFavorite : null,
+                tooltip: favorited ? '取消收藏' : '收藏',
+              );
+            }),
+          ],
+        ),
+        if (isLoading)
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: _InlineLoadingView(colors: colors),
+          )
+        else if (hasError)
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: _InlineErrorView(
+              message: controller.errorMessage.value,
+              onRetry: controller.loadDetail,
+              colors: colors,
+            ),
+          )
+        else if (detail != null)
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.all(DesignTokens.spaceLg),
@@ -111,8 +123,7 @@ class VideoDetailPage extends GetView<VideoDetailController> {
               ),
             ),
           ),
-        ],
-      ),
+      ],
     );
   }
 
@@ -224,6 +235,94 @@ class VideoDetailPage extends GetView<VideoDetailController> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// 详情页内嵌加载视图（不再全屏 LoadingView）
+///
+/// 在 SliverAppBar 下方居中显示一个轻量 loading 圈 + "加载中..." 文案，
+/// 与顶部 SliverAppBar 的封面无缝衔接，避免页面跳变。
+class _InlineLoadingView extends StatelessWidget {
+  final ThemeColors colors;
+  const _InlineLoadingView({required this.colors});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 32,
+            height: 32,
+            child: CircularProgressIndicator(
+              color: colors.primary,
+              strokeWidth: 2.5,
+            ),
+          ),
+          const SizedBox(height: DesignTokens.spaceMd),
+          Text(
+            '加载中...',
+            style: TextStyle(
+              color: colors.onSurfaceMuted,
+              fontSize: DesignTokens.textCaption,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 详情页内嵌错误视图（不再全屏 ErrorView）
+///
+/// 在 SliverAppBar 下方居中显示错误图标 + 错误信息 + 重试按钮，
+/// 与顶部 SliverAppBar 的封面无缝衔接，避免页面跳变。
+class _InlineErrorView extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+  final ThemeColors colors;
+
+  const _InlineErrorView({
+    required this.message,
+    required this.onRetry,
+    required this.colors,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(DesignTokens.spaceXl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              PhosphorIconsRegular.warningCircle,
+              color: colors.destructive,
+              size: 40,
+            ),
+            const SizedBox(height: DesignTokens.spaceMd),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: colors.onSurfaceMuted,
+                fontSize: DesignTokens.textBody,
+              ),
+            ),
+            const SizedBox(height: DesignTokens.spaceLg),
+            FilledButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh, size: 18),
+              label: const Text('重试'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

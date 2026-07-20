@@ -65,12 +65,16 @@ class VideoRepository {
   /// 保证用户收藏或播放后，下次打开收藏/历史列表能立即看到完整详情。
   ///
   /// **重要**：使用合并策略而非覆盖：
-  /// - VideoDetailParser 不提取 playCount/likeCount/updateTime（写死为 0/''）
+  /// - VideoDetailParser 不一定提取 playCount/likeCount/updateTime
+  ///   （取决于详情页 HTML 结构，没有时回退到 0/''）
   /// - VideoListParser 从 .stui-vodlist__detail .sub 提取这些字段
   /// - 如果直接 replace，详情页缓存会覆盖列表页缓存的正确数据
   /// - 修复：先查现有 Video，把 detail.video 中为空/为 0 的字段
   ///   用现有数据补全，然后再写入
-  Future<void> cacheVideo(Video video) async {
+  ///
+  /// 返回合并后的 [Video]，调用方可直接用于回填 detail.value.video，
+  /// 让 UI 立即显示播放量/收藏数/发布时间等元信息。
+  Future<Video> cacheVideo(Video video) async {
     final existing = await _db.videoDao.findById(video.id);
     final merged = video.copyWith(
       // 列表页缓存的 playCount/likeCount 大于 0 时保留，不覆盖为 0
@@ -98,6 +102,7 @@ class VideoRepository {
           : (existing?.title ?? video.title),
     );
     await _db.videoDao.insert(merged);
+    return merged;
   }
 
   /// 通过 ids 批量查询

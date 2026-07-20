@@ -39,6 +39,13 @@ class VideoDetailParser {
       // 封面（取相关推荐第一张图作为占位；上层 detail.video.coverUrl 来自列表页）
       final coverUrl = _extractCoverUrl(doc);
 
+      // 播放量 / 收藏数 / 发布时间（尝试从详情页 HTML 提取）
+      // 站点结构未确认，用多 selector 兜底；提取不到时返回 0/0/''
+      // 由 controller 经 cacheVideo 合并策略从列表页缓存补全
+      final playCount = _extractPlayCount(doc);
+      final likeCount = _extractLikeCount(doc);
+      final updateTime = _extractUpdateTime(doc);
+
       // AK Token
       final token = _extractToken(doc);
 
@@ -61,9 +68,9 @@ class VideoDetailParser {
           title: title,
           coverUrl: coverUrl,
           duration: duration,
-          updateTime: '',
-          playCount: 0,
-          likeCount: 0,
+          updateTime: updateTime,
+          playCount: playCount,
+          likeCount: likeCount,
           categoryId: 0,
         ),
         description: description,
@@ -150,6 +157,97 @@ class VideoDetailParser {
     final cover =
         thumbImg?.attributes['data-original'] ?? thumbImg?.attributes['src'];
     if (cover != null && cover.isNotEmpty) return cover;
+    return '';
+  }
+
+  /// 提取播放量（fa-eye 图标旁边的数字）
+  ///
+  /// macCMS V10 + stui 主题常见结构：
+  /// `<span><i class="fa fa-eye"></i> 61753</span>`
+  /// 或 `<li><i class="fa fa-eye"></i> 61753</li>`
+  ///
+  /// 提取失败返回 0，由 controller 经 cacheVideo 从列表页缓存补全。
+  static int _extractPlayCount(dom.Document doc) {
+    return _extractFaIconNumber(doc, 'fa-eye');
+  }
+
+  /// 提取收藏数（fa-heart 图标旁边的数字）
+  ///
+  /// 同 [_extractPlayCount]，提取失败返回 0。
+  static int _extractLikeCount(dom.Document doc) {
+    return _extractFaIconNumber(doc, 'fa-heart');
+  }
+
+  /// 通用提取：在指定 fa-{iconClass} 图标所在的 span/li/p 元素中提取数字
+  ///
+  /// 搜索范围（优先级）：
+  /// 1. `.stui-content__detail`（详情页元信息区，macCMS 标准结构）
+  /// 2. `.stui-content`（更宽范围）
+  /// 3. `.module-info-content`（其他 macCMS 主题）
+  /// 4. `body`（兜底全文档搜索）
+  ///
+  /// 找到图标后取其父元素的 text，正则匹配数字（支持千分位逗号）。
+  static int _extractFaIconNumber(dom.Document doc, String faClass) {
+    final scopes = <dom.Element>[
+      doc.querySelector('.stui-content__detail'),
+      doc.querySelector('.stui-content'),
+      doc.querySelector('.module-info-content'),
+      doc.body,
+    ].whereType<dom.Element>().toList();
+
+    for (final scope in scopes) {
+      final icons = scope.querySelectorAll('i.$faClass');
+      for (final icon in icons) {
+        final parent = icon.parent;
+        if (parent == null) continue;
+        final text = parent.text;
+        final match = RegExp(r'(\d[\d,]*)').firstMatch(text);
+        if (match != null) {
+          final num = int.tryParse(match.group(1)!.replaceAll(',', ''));
+          if (num != null && num > 0) return num;
+        }
+      }
+    }
+    return 0;
+  }
+
+  /// 提取发布时间（YYYY-MM-DD 或 MM-DD）
+  ///
+  /// 搜索范围同 [_extractFaIconNumber]，额外支持：
+  /// - 优先匹配带"更新时间/发布时间/时间"标签的元素
+  /// - 降级匹配整个 scope 文本中的日期模式
+  ///
+  /// macCMS 常见结构：
+  /// `<span>更新时间：2024-01-01</span>`
+  /// 或 `<li>2024-01-01</li>`
+  static String _extractUpdateTime(dom.Document doc) {
+    final scopes = <dom.Element>[
+      doc.querySelector('.stui-content__detail'),
+      doc.querySelector('.stui-content'),
+      doc.querySelector('.module-info-content'),
+      doc.body,
+    ].whereType<dom.Element>().toList();
+
+    const datePattern = r'(\d{4}-\d{1,2}-\d{1,2}|\d{1,2}-\d{1,2})';
+    const labeledPattern =
+        r'(?:更新时间|发布时间|时间|日期)\s*[:：]?\s*(\d{4}-\d{1,2}-\d{1,2}|\d{1,2}-\d{1,2})';
+
+    for (final scope in scopes) {
+      // 1) 优先找带"更新/发布时间"标签的元素
+      final labelEls = scope.querySelectorAll('span, li, p, div, em');
+      for (final el in labelEls) {
+        final text = el.text;
+        final labeledMatch = RegExp(labeledPattern).firstMatch(text);
+        if (labeledMatch != null) {
+          return labeledMatch.group(1)!;
+        }
+      }
+      // 2) 降级：scope 全文日期匹配
+      final match = RegExp(datePattern).firstMatch(scope.text);
+      if (match != null) {
+        return match.group(1)!;
+      }
+    }
     return '';
   }
 

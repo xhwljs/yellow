@@ -120,29 +120,33 @@ class VideoDetailController extends GetxController {
       ]);
 
       final d = results[0] as VideoDetail;
-      // 用列表页封面覆盖（详情页 parser 不提取封面）
-      if (d.video.coverUrl.isEmpty && initialCoverUrl.isNotEmpty) {
-        detail.value = d.copyWith(
-          video: d.video.copyWith(coverUrl: initialCoverUrl),
-        );
-      } else {
-        detail.value = d;
+
+      // 先用列表页封面/标题占位（详情页 parser 不提取封面）
+      Video video = d.video;
+      if (video.coverUrl.isEmpty && initialCoverUrl.isNotEmpty) {
+        video = video.copyWith(coverUrl: initialCoverUrl);
       }
+      if (video.title.isEmpty && initialTitle.isNotEmpty) {
+        video = video.copyWith(title: initialTitle);
+      }
+
+      // 同步缓存 + 合并元信息：
+      // - VideoDetailParser 提取不到 playCount/likeCount/updateTime 时
+      //   返回 0/0/''，cacheVideo 会用 VideoDao 中已缓存的列表页数据补全
+      // - 返回的 merged Video 含完整元信息，回填到 detail.value.video
+      //   让 UI 立即显示播放量/收藏数/发布时间等
+      try {
+        final merged = await _videoRepo.cacheVideo(video);
+        video = merged;
+      } catch (e) {
+        appLogger.w('同步缓存 video 到 VideoDao 失败: $e');
+      }
+
+      detail.value = d.copyWith(video: video);
       isFavorited.value = results[1] as bool;
       final history = results[2] as PlayHistory?;
       if (history != null && !history.isCompleted) {
         initialPositionMs.value = history.positionMs;
-      }
-
-      // 同步缓存当前 video 到 VideoDao，让收藏/历史列表加载时
-      // 能从 VideoDao 查到详情字段（duration/playCount/likeCount/updateTime）
-      // 并补全到 Favorite/PlayHistory 的 @ignore 字段。
-      //
-      // 失败不阻断详情页加载，下次进入详情页会再次同步。
-      try {
-        await _videoRepo.cacheVideo(detail.value!.video);
-      } catch (e) {
-        appLogger.w('同步缓存 video 到 VideoDao 失败: $e');
       }
     } catch (e) {
       errorMessage.value = e.toString();
