@@ -29,12 +29,12 @@ class VideoRepository {
   /// 判断 categoryId 的缓存是否过期
   ///
   /// - 无时间戳记录 → 视为过期（首次加载或进程重启）
-  /// - 当前时间 - 缓存时间 > [AppConstants.cacheMaxAgeMinutes] → 过期
+  /// - 当前时间 - 缓存时间 > [AppConstants.cacheMaxAgeMinutes] 分钟 → 过期
   bool _isCacheStale(int categoryId) {
     final cachedAt = _cacheTimestamps[categoryId];
     if (cachedAt == null) return true;
     final age = DateTime.now().difference(cachedAt);
-    return age > AppConstants.cacheMaxAgeMinutes;
+    return age > Duration(minutes: AppConstants.cacheMaxAgeMinutes);
   }
 
   /// 获取分类视频列表（带分页）
