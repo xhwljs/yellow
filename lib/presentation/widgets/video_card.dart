@@ -155,11 +155,13 @@ class VideoCard extends StatelessWidget {
   /// 元信息行：播放次数 · 收藏次数 · 更新时间
   ///
   /// 设计：
+  /// - **强制单行**（用 Row 替代 Wrap），避免换行导致卡片高度溢出
   /// - 三项以分隔点 "·" 连接，缺失项自动跳过
-  /// - 图标 + 数字紧凑展示，使用 onSurfaceMuted 颜色
-  /// - 全部缺失时不渲染（返回 SizedBox.shrink）
+  /// - 图标 + 数字紧凑展示（间距 2px），使用 onSurfaceMuted 颜色
+  /// - 最后一项用 Expanded + ellipsis 兜底，极端长内容也不会溢出
+  /// - 全部缺失时不渲染（返回 SizedBox.shrink），节省卡片高度
   Widget _buildMetaRow(ThemeColors colors) {
-    final items = <_MetaItem>[];
+    final items = <Widget>[];
 
     if (video.playCount > 0) {
       items.add(_MetaItem(
@@ -182,24 +184,36 @@ class VideoCard extends StatelessWidget {
 
     if (items.isEmpty) return const SizedBox.shrink();
 
+    // 构建单行：item0 · item1 · item2 ...
+    // 最后一项包 Expanded+ellipsis 兜底（理论上数据很短不会触发）
+    final children = <Widget>[];
+    for (var i = 0; i < items.length; i++) {
+      if (i > 0) {
+        children.add(Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 3),
+          child: Text(
+            '·',
+            style: TextStyle(
+              fontSize: DesignTokens.textCaption,
+              color: colors.onSurfaceMuted,
+            ),
+          ),
+        ));
+      }
+      if (i == items.length - 1) {
+        // 最后一项 Expanded 兜底防止极端溢出
+        children.add(Expanded(child: items[i]));
+      } else {
+        children.add(items[i]);
+      }
+    }
+
     return Padding(
       padding: const EdgeInsets.only(top: DesignTokens.spaceXs),
-      child: Wrap(
-        spacing: DesignTokens.spaceSm,
-        runSpacing: 2,
-        children: [
-          for (var i = 0; i < items.length; i++) ...[
-            items[i],
-            if (i < items.length - 1)
-              Text(
-                '·',
-                style: TextStyle(
-                  fontSize: DesignTokens.textCaption,
-                  color: colors.onSurfaceMuted,
-                ),
-              ),
-          ],
-        ],
+      child: Row(
+        mainAxisSize: MainAxisSize.max,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: children,
       ),
     );
   }
@@ -217,6 +231,8 @@ class VideoCard extends StatelessWidget {
 }
 
 /// 元信息单项（图标 + 文本）
+///
+/// 强制单行：Text overflow ellipsis 防止极端长内容溢出 Row
 class _MetaItem extends StatelessWidget {
   final IconData icon;
   final String text;
@@ -236,11 +252,15 @@ class _MetaItem extends StatelessWidget {
           color: colors.onSurfaceMuted,
         ),
         const SizedBox(width: 2),
-        Text(
-          text,
-          style: TextStyle(
-            fontSize: DesignTokens.textCaption,
-            color: colors.onSurfaceMuted,
+        Flexible(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: DesignTokens.textCaption,
+              color: colors.onSurfaceMuted,
+            ),
           ),
         ),
       ],

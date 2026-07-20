@@ -77,7 +77,7 @@ class SearchPage extends GetView<SearchController> {
           crossAxisCount: DesignTokens.videoGridCrossAxisCount,
           mainAxisSpacing: DesignTokens.videoGridMainAxisSpacing,
           crossAxisSpacing: DesignTokens.videoGridSpacing,
-          childAspectRatio: 1.0,
+          childAspectRatio: 0.88,
         ),
         itemCount: controller.results.length + 1,
         itemBuilder: (_, i) {
@@ -117,7 +117,7 @@ class SearchPage extends GetView<SearchController> {
         crossAxisCount: DesignTokens.videoGridCrossAxisCount,
         mainAxisSpacing: DesignTokens.videoGridMainAxisSpacing,
         crossAxisSpacing: DesignTokens.videoGridSpacing,
-        childAspectRatio: 1.0,
+        childAspectRatio: 0.88,
       ),
       itemCount: 6,
       itemBuilder: (_, __) => const VideoCardSkeleton(),

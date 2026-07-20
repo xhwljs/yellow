@@ -113,7 +113,7 @@ class _CategoryPageState extends State<CategoryPage> {
               crossAxisCount: DesignTokens.videoGridCrossAxisCount,
               mainAxisSpacing: DesignTokens.videoGridMainAxisSpacing,
               crossAxisSpacing: DesignTokens.videoGridSpacing,
-              childAspectRatio: 1.0,
+              childAspectRatio: 0.88,
             ),
             itemCount: _controller.videos.length +
                 (_controller.isLoadingMore.value ? 1 : 0),

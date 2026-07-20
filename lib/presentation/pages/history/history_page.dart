@@ -321,9 +321,11 @@ class _HistoryItem extends StatelessWidget {
   /// 详情元信息行：时长 · 播放次数 · 收藏次数 · 更新时间
   ///
   /// 设计：
+  /// - **强制单行**（用 Row 替代 Wrap），避免换行导致列表项高度抖动
   /// - 各项以分隔点 "·" 连接，缺失项自动跳过
   /// - 图标 + 文本紧凑展示，使用 onSurfaceMuted 颜色
   /// - 字段从 VideoDao 补全（@ignore），未命中时为空 → 自动跳过
+  /// - 最后一项 Expanded+ellipsis 兜底防止极端长内容溢出
   Widget _buildMetaRow(PlayHistory h, ThemeColors colors) {
     final items = <Widget>[];
 
@@ -356,22 +358,33 @@ class _HistoryItem extends StatelessWidget {
       ));
     }
 
-    return Wrap(
-      spacing: DesignTokens.spaceSm,
-      runSpacing: 2,
-      children: [
-        for (var i = 0; i < items.length; i++) ...[
-          items[i],
-          if (i < items.length - 1)
-            Text(
-              '·',
-              style: TextStyle(
-                fontSize: DesignTokens.textCaption,
-                color: colors.onSurfaceMuted,
-              ),
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    final children = <Widget>[];
+    for (var i = 0; i < items.length; i++) {
+      if (i > 0) {
+        children.add(Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 3),
+          child: Text(
+            '·',
+            style: TextStyle(
+              fontSize: DesignTokens.textCaption,
+              color: colors.onSurfaceMuted,
             ),
-        ],
-      ],
+          ),
+        ));
+      }
+      if (i == items.length - 1) {
+        children.add(Expanded(child: items[i]));
+      } else {
+        children.add(items[i]);
+      }
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.max,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: children,
     );
   }
 
@@ -386,11 +399,15 @@ class _HistoryItem extends StatelessWidget {
           color: colors.onSurfaceMuted,
         ),
         const SizedBox(width: 2),
-        Text(
-          text,
-          style: TextStyle(
-            fontSize: DesignTokens.textCaption,
-            color: colors.onSurfaceMuted,
+        Flexible(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: DesignTokens.textCaption,
+              color: colors.onSurfaceMuted,
+            ),
           ),
         ),
       ],

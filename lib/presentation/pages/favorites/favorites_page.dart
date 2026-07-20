@@ -57,7 +57,7 @@ class FavoritesPage extends GetView<FavoritesController> {
             crossAxisCount: DesignTokens.videoGridCrossAxisCount,
             mainAxisSpacing: DesignTokens.videoGridMainAxisSpacing,
             crossAxisSpacing: DesignTokens.videoGridSpacing,
-            childAspectRatio: 1.0,
+            childAspectRatio: 0.88,
           ),
           itemCount: controller.favorites.length,
           itemBuilder: (_, i) {
