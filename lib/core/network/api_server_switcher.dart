@@ -153,45 +153,96 @@ class ApiServerSwitcher {
   /// **重要**：跳转壳对 HEAD/GET 都返回 200 OK，但 GET 拿到的是 JS 跳转脚本
   /// （不到 1KB，无 macCMS HTML 结构）。仅靠 HTTP 状态码无法区分真实源站和跳转壳，
   /// 必须验证响应体包含 macCMS 标志（如 `.stui-vodlist__box` 或 `.stui-pannel__menu`）。
+  ///
+  /// **2026-07-20 修订**：
+  /// - 超时缩短为 5s + 5s（原 8s+8s 太长，用户感知"卡住"）
+  /// - 注入移动端 UA，避免源站对默认 UA 反爬返回错误内容
+  /// - 扩充 macCMS 标志库：覆盖 stui / module / myui / 默认 4 大主流模板
+  /// - 跳转壳判定更严格：必须同时满足"内容简短"+"含脚本跳转关键字"，避免真实源站被误判
+  /// - 既无 macCMS 标志也无跳转壳特征 → 视为通过（可能是新模板，不阻断用户）
   static Future<String?> testConnectivity(String baseUrl) async {
+    Dio? testDio;
     try {
-      final testDio = Dio(
+      testDio = Dio(
         BaseOptions(
           baseUrl: baseUrl,
-          connectTimeout: const Duration(seconds: 8),
-          receiveTimeout: const Duration(seconds: 8),
+          connectTimeout: const Duration(seconds: 5),
+          receiveTimeout: const Duration(seconds: 5),
           followRedirects: true,
           // 跳转壳也返回 200，validateStatus 必须放宽到所有状态码都通过
           // （让响应体进入下面的内容校验逻辑）
           validateStatus: (s) => s != null,
           responseType: ResponseType.plain,
+          headers: {
+            // 模拟移动浏览器 UA，避免源站对默认 Dio UA 返回反爬内容
+            'User-Agent':
+                'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 '
+                    '(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+          },
         ),
       );
       final resp = await testDio.get<String>('/');
-      testDio.close();
-
       final html = resp.data ?? '';
-      // 真实源站首页必含 macCMS 标志性 class（任一命中即视为真实源站）
+
+      // 1) 真实源站首页必含 macCMS 标志性 class（任一命中即视为真实源站）
+      //    涵盖主流模板：stui / module / myui / 默认 + 通用 vodlist
       const realSiteMarkers = [
+        // stui 模板
         'stui-vodlist__box',
         'stui-pannel__menu',
         'stui-header__menu',
+        'stui-page__item',
+        // module 模板
+        'module-vodlist__box',
+        'module-page-info',
+        'module-items',
+        // myui 模板
+        'myui-vodlist__box',
+        'myui-page-info',
+        'myui-content__list',
+        // 默认 / 通用 macCMS 标志
+        'class="vodlist',
+        'vodlist__box',
+        'mac_vod',
+        'maccms',
+        '/index.php/art/',
+        '/index.php/vod/',
+        '/api.php/provide',
       ];
       final isRealSite = realSiteMarkers.any((m) => html.contains(m));
-      if (!isRealSite) {
-        // 跳转壳特征：含 hao123 / location.href / script type="text/javascript"
-        if (html.contains('hao123') ||
-            html.contains('location.href') ||
-            html.length < 1000) {
-          return '该地址是跳转壳，非真实源站';
-        }
-        return '响应内容不是 macCMS 站点（缺少 stui 标志）';
+      if (isRealSite) return null; // 命中 macCMS 标志 → 通过
+
+      // 2) 跳转壳特征：必须同时满足"内容简短"+"含脚本跳转关键字"
+      //    仅含 location.href 不算跳转壳（macCMS 站点也常用 JS 增强）
+      final hasShortContent = html.length < 2000;
+      final hasRedirectScript = html.contains('top.location.href') ||
+          html.contains('window.location.replace') ||
+          html.contains("location.href='http") ||
+          html.contains('location.href = "http') ||
+          html.contains('document.location.replace');
+      final hasPortalContent = html.contains('hao123') ||
+          html.contains('2345.com') ||
+          html.contains('360.cn') ||
+          html.contains('nav.<') ||
+          html.contains('class="navs"');
+      if (hasShortContent &&
+          (hasRedirectScript || hasPortalContent) &&
+          !html.contains('</article>') &&
+          !html.contains('vodlist')) {
+        return '该地址是跳转壳，非真实源站';
       }
+
+      // 3) 既无 macCMS 标志也无跳转壳特征 → 视为通过
+      //    可能是站点启用了新模板或 SPA，不应阻断用户切换
       return null;
     } on DioException catch (e) {
       return e.message ?? e.type.name;
     } catch (e) {
       return e.toString();
+    } finally {
+      testDio?.close();
     }
   }
 }

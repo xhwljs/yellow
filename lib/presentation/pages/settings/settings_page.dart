@@ -489,15 +489,13 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
       ),
       builder: (sheetContext) {
+        // 自定义 URL 输入框已内部化到 _ApiServerSheet，
+        // 避免之前 sheet pop + Get.dialog push 之间的 race condition 闪退
         return _ApiServerSheet(
           colors: colors,
           currentBaseUrl: _currentBaseUrl,
           onClose: () => Navigator.of(sheetContext).pop(),
           onSwitched: _refreshBaseUrl,
-          onCustomUrl: () async {
-            Navigator.of(sheetContext).pop();
-            await _showCustomUrlDialog();
-          },
         );
       },
     );
@@ -564,76 +562,6 @@ class _SettingsPageState extends State<SettingsPage> {
         );
       },
     );
-  }
-
-  Future<void> _showCustomUrlDialog() async {
-    final colors = AppTheme.colorsOf(Get.context!);
-    final controller = TextEditingController(text: _currentBaseUrl);
-    final result = await Get.dialog<String>(
-      AlertDialog(
-        backgroundColor: colors.surface,
-        title: Text(
-          '自定义 API URL',
-          style: TextStyle(color: colors.onSurface),
-        ),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          keyboardType: TextInputType.url,
-          decoration: InputDecoration(
-            hintText: 'http://example.com',
-            hintStyle: TextStyle(color: colors.onSurfaceMuted),
-            enabledBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: colors.border),
-            ),
-            focusedBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: colors.primary),
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back<String>(),
-            child: Text(
-              '取消',
-              style: TextStyle(color: colors.onSurfaceMuted),
-            ),
-          ),
-          FilledButton(
-            onPressed: () => Get.back<String>(result: controller.text.trim()),
-            child: const Text('确定'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (result != null && result.isNotEmpty && result != _currentBaseUrl) {
-      await _switchBaseUrl(result);
-    }
-  }
-
-  Future<void> _switchBaseUrl(String newUrl) async {
-    final colors = AppTheme.colorsOf(Get.context!);
-    try {
-      await ApiServerSwitcher.switchTo(newUrl);
-      _refreshBaseUrl();
-      Get.snackbar(
-        '已切换',
-        '当前 API 服务器：$newUrl',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: colors.surface,
-        colorText: colors.onSurface,
-        duration: const Duration(seconds: 2),
-      );
-    } catch (e) {
-      Get.snackbar(
-        '切换失败',
-        e.toString(),
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: colors.destructive,
-        colorText: colors.surface,
-      );
-    }
   }
 
   Future<void> _clearCache() async {
@@ -1083,14 +1011,12 @@ class _ApiServerSheet extends StatefulWidget {
   final String currentBaseUrl;
   final VoidCallback onClose;
   final VoidCallback onSwitched;
-  final Future<void> Function() onCustomUrl;
 
   const _ApiServerSheet({
     required this.colors,
     required this.currentBaseUrl,
     required this.onClose,
     required this.onSwitched,
-    required this.onCustomUrl,
   });
 
   @override
@@ -1193,9 +1119,14 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
+                      // 内部直接弹自定义 URL 输入框，避免 sheet pop + dialog push 竞争闪退
                       onPressed: () async {
-                        widget.onClose();
-                        await widget.onCustomUrl();
+                        final result = await _showCustomUrlDialog();
+                        if (result != null &&
+                            result.isNotEmpty &&
+                            result != _currentBaseUrl) {
+                          await _switchBaseUrl(result);
+                        }
                       },
                       icon: const Icon(PhosphorIconsRegular.pencilSimpleLine),
                       label: const Text('自定义 URL'),
@@ -1335,6 +1266,71 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
       _testResult = result;
       _hasTested = true;
     });
+  }
+
+  /// 自定义 URL 输入框（在 sheet 内部使用 sheet 自己的 context）
+  ///
+  /// **重要设计**：之前是 sheet 关闭后调用 `Get.dialog` 依赖 Get.context，
+  /// 但 sheet pop 与 Get.dialog push 之间存在 race condition（GetX 的 overlayContext
+  /// 在 sheet 关闭动画期间可能未就绪），导致"自定义 API 服务器卡住且闪退"。
+  ///
+  /// 现在改为：sheet 保持打开，用 `showDialog(context: context)` 直接 push
+  /// 到 sheet 的 Navigator 上方，dialog 关闭后 sheet 仍然存在。
+  /// 用户确认 → 调用方切换 baseUrl 并关闭 sheet；用户取消 → sheet 保持。
+  Future<String?> _showCustomUrlDialog() async {
+    final controller = TextEditingController(text: _currentBaseUrl);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: colors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(DesignTokens.radiusLg),
+        ),
+        title: Text(
+          '自定义 API URL',
+          style: TextStyle(
+            color: colors.onSurface,
+            fontSize: DesignTokens.textH2,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: TextInputType.url,
+          autocorrect: false,
+          enableSuggestions: false,
+          decoration: InputDecoration(
+            hintText: 'http://example.com',
+            hintStyle: TextStyle(color: colors.onSurfaceMuted),
+            filled: true,
+            fillColor: colors.surfaceVariant,
+            enabledBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: colors.border),
+            ),
+            focusedBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: colors.primary, width: 2),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(
+              '取消',
+              style: TextStyle(color: colors.onSurfaceMuted),
+            ),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext)
+                .pop(controller.text.trim()),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    return result;
   }
 }
 
