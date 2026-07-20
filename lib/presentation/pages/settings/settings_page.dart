@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:yellow_depot/core/constants/app_constants.dart';
 import 'package:yellow_depot/core/network/api_server_switcher.dart';
@@ -77,8 +76,8 @@ class _SettingsPageState extends State<SettingsPage> {
           DesignTokens.space2xl,
         ),
         children: [
-          // App Hero Header
-          _buildAppHero(colors),
+          // App Header（扁平卡片风格，与其它页一致）
+          _buildAppHeader(colors),
           const SizedBox(height: DesignTokens.spaceXl),
 
           // Group 1: 个性化
@@ -184,248 +183,245 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   // ============================================================
-  // App Hero Header — 重新设计（多层渐变 + 沉浸式纹理）
+  // App Header — 扁平卡片风格（与其它页 _SectionCard 一致）
   // ============================================================
   //
-  // 设计要点（基于 ui-ux-pro-max 技能建议）：
-  // 1. **多层渐变**：LinearGradient (135°) primary → secondary + RadialGradient 光晕
-  // 2. **沉浸式纹理**：右上角半透明几何装饰（圆形/方形）增加层次
-  // 3. **Logo 卡片**：玻璃拟态效果（BackdropFilter blur）让 logo 浮在主色之上
-  // 4. **App 名称**：Poppins Bold，shadow 让白字在彩色背景上更易读
-  // 5. **版本徽章**：低透明度白色背景 pill，避免抢戏
-  // 6. **副标题**：从主色派生的浅色调，传达"视频聚合"主题
+  // 设计原则：与 home_page / favorites_page / history_page 风格统一。
+  // 这些页面均为 MD3 扁平卡片（surface + radiusLg + elevation1），
+  // 不使用渐变、几何装饰、玻璃拟态、GoogleFonts.poppins。
   //
-  // 颜色搭配：
-  // - 背景：colors.primary → colors.secondary（135° 渐变）
-  // - 装饰圆：白色 0.08 / 0.15 透明度，营造层次
-  // - 文字：白色（在彩色背景上 WCAG AAA 对比度）
-  // - 阴影：colors.primary 30% 透明度，blurRadius 28，模拟 elevation2
-  Widget _buildAppHero(ThemeColors colors) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(
-        DesignTokens.spaceXl,
-        DesignTokens.space2xl,
-        DesignTokens.spaceXl,
-        DesignTokens.spaceXl,
-      ),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(DesignTokens.radiusXl),
-        // 多层渐变：LinearGradient 主渐变 + 通过 Stack 叠加 RadialGradient 光晕
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          stops: const [0.0, 0.55, 1.0],
-          colors: [
-            colors.primary,
-            colors.secondary,
-            colors.primary.withOpacity(0.85),
-          ],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: colors.primary.withOpacity(0.32),
-            blurRadius: 28,
-            offset: const Offset(0, 14),
-          ),
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      // Stack 用于叠加装饰元素
-      child: Stack(
-        children: [
-          // 右上角装饰：半透明圆形 + 方形（几何纹理）
-          Positioned(
-            top: -20,
-            right: -20,
-            child: Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.08),
-              ),
+  // 本 Header 与 _SettingsListTile 共享视觉语言：
+  // - 左侧 48x48 icon chip（primary 浅色背景 + primary 前景）
+  // - 中间 title（textH2 + w700 + onBackground）+ subtitle（textCaption + onSurfaceMuted）
+  // - 右侧 trailing：主题色圆点 + 主题名 caption（点击可切换主题）
+  // - 整行 InkWell，点击进入主题色卷帘菜单
+  Widget _buildAppHeader(ThemeColors colors) {
+    return _SectionCard(
+      colors: colors,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _showThemeSheet(context, colors),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: DesignTokens.spaceLg,
+              vertical: DesignTokens.spaceLg,
             ),
-          ),
-          Positioned(
-            top: 24,
-            right: 18,
-            child: Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(DesignTokens.radiusMd),
-                color: Colors.white.withOpacity(0.06),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -28,
-            left: -28,
-            child: Container(
-              width: 88,
-              height: 88,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.05),
-              ),
-            ),
-          ),
-          // 主内容
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Logo 卡片：玻璃拟态效果（半透明白色背景 + blur 模拟）
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.20),
-                  borderRadius: BorderRadius.circular(DesignTokens.radiusLg),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(0.32),
-                    width: 1.5,
+            child: Row(
+              children: [
+                // 左侧 icon chip
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: colors.primary.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(DesignTokens.radiusMd),
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.12),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
+                  child: Center(
+                    child: Icon(
+                      PhosphorIconsFill.filmSlate,
+                      size: 24,
+                      color: colors.primary,
                     ),
-                  ],
+                  ),
                 ),
-                child: const Center(
-                  child: Icon(
-                    PhosphorIconsFill.filmSlate,
-                    size: 40,
-                    color: Colors.white,
-                    shadows: [
-                      Shadow(
-                        color: Color(0x66000000),
-                        blurRadius: 4,
-                        offset: Offset(0, 2),
+                const SizedBox(width: DesignTokens.spaceMd),
+                // 中间：App 名称 + 副标题 + 版本号
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        AppConstants.appName,
+                        style: TextStyle(
+                          fontSize: DesignTokens.textH2,
+                          fontWeight: FontWeight.w700,
+                          color: colors.onBackground,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '视频聚合 · 随心播放',
+                        style: TextStyle(
+                          fontSize: DesignTokens.textCaption,
+                          color: colors.onSurfaceMuted,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'v${AppConstants.appVersion}',
+                        style: TextStyle(
+                          fontSize: DesignTokens.textCaption,
+                          color: colors.onSurfaceMuted,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ],
                   ),
                 ),
-              ),
-              const SizedBox(height: DesignTokens.spaceLg),
-              // App 名称
-              Text(
-                AppConstants.appName,
-                style: GoogleFonts.poppins(
-                  fontSize: DesignTokens.textDisplay,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                  letterSpacing: 0.6,
-                  shadows: const [
-                    Shadow(
-                      color: Color(0x40000000),
-                      blurRadius: 8,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: DesignTokens.spaceXs),
-              // 副标题
-              Text(
-                '视频聚合 · 随心播放',
-                style: GoogleFonts.poppins(
-                  fontSize: DesignTokens.textBody,
-                  fontWeight: FontWeight.w400,
-                  color: Colors.white.withOpacity(0.85),
-                  letterSpacing: 0.4,
-                ),
-              ),
-              const SizedBox(height: DesignTokens.spaceLg),
-              // 版本徽章 + 主题色预览圆点
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // 版本徽章
-                  Container(
+                // 右侧：主题色圆点 + 主题名
+                Obx(() {
+                  final themeController = Get.find<ThemeController>();
+                  final current = themeController.presetRx.value;
+                  final dotColor = current.isCustom
+                      ? themeController.customColorRx.value
+                      : current.primaryColor;
+                  return Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: DesignTokens.spaceMd,
-                      vertical: 4,
+                      horizontal: DesignTokens.spaceSm,
+                      vertical: DesignTokens.spaceXs,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.22),
-                      borderRadius: BorderRadius.circular(DesignTokens.radiusPill),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.32),
-                        width: 0.8,
-                      ),
+                      color: colors.surfaceVariant,
+                      borderRadius:
+                          BorderRadius.circular(DesignTokens.radiusPill),
                     ),
-                    child: Text(
-                      'v${AppConstants.appVersion}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: DesignTokens.textCaption,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: DesignTokens.spaceSm),
-                  // 主题色名称徽章
-                  Obx(() {
-                    final themeController = Get.find<ThemeController>();
-                    final current = themeController.presetRx.value;
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: DesignTokens.spaceMd,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.18),
-                        borderRadius:
-                            BorderRadius.circular(DesignTokens.radiusPill),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            PhosphorIconsFill.palette,
-                            size: 11,
-                            color: Colors.white.withOpacity(0.85),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            current.name,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: DesignTokens.textCaption,
-                              fontWeight: FontWeight.w500,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: dotColor,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: colors.surface,
+                              width: 1.5,
                             ),
                           ),
-                        ],
-                      ),
-                    );
-                  }),
-                ],
-              ),
-            ],
+                        ),
+                        const SizedBox(width: DesignTokens.spaceXs),
+                        Text(
+                          current.name,
+                          style: TextStyle(
+                            fontSize: DesignTokens.textCaption,
+                            fontWeight: FontWeight.w600,
+                            color: colors.onSurface,
+                          ),
+                        ),
+                        const SizedBox(width: DesignTokens.spaceXs),
+                        Icon(
+                          PhosphorIconsRegular.caretRight,
+                          size: 14,
+                          color: colors.onSurfaceMuted,
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
   }
 
   // ============================================================
-  // 卷帘菜单 1: 主题色选择（预设 + 自定义选色盘）
+  // 卷帘菜单 1: 主题色选择（仅预设列表 + 自定义入口项）
   // ============================================================
   //
-  // 风格与 home_page._showCatalogSheet 完全一致：
-  // - 圆角顶部 + drag handle
-  // - 标题栏：左侧 icon + 标题 + 右侧关闭按钮
-  // - 列表项：左侧色块圆点 + 中间 name/description + 右侧 check
-  // - 底部增加 HSV 选色盘（CustomColorPicker），用户可拖动选择任意色
+  // 交互设计：
+  // - 主菜单显示 5 个预设色块 + 1 个「自定义」入口项（与其它项同款 _ThemeSheetItem）
+  // - 点击预设项：直接应用并关闭菜单
+  // - 点击「自定义」项：先关闭主菜单，再弹出 _showCustomColorSheet 二级菜单显示 HSV 选色盘
+  //
+  // 这样默认卷帘菜单保持简洁（与其他卷帘菜单 _showApiServerSheet / _showAboutSheet 视觉一致），
+  // 仅当用户主动选择"自定义"时才进入选色盘交互。
   Future<void> _showThemeSheet(BuildContext context, ThemeColors colors) async {
+    final themeController = Get.find<ThemeController>();
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: colors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(DesignTokens.radiusLg),
+        ),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // drag handle
+              _SheetDragHandle(colors: colors),
+              // 标题栏
+              _SheetHeader(
+                icon: PhosphorIconsRegular.palette,
+                title: '主题色',
+                colors: colors,
+                onClose: () => Navigator.of(sheetContext).pop(),
+              ),
+              Divider(height: 1, thickness: 1, color: colors.border),
+              // 预设色块列表（5 个预设 + 1 个自定义入口，共 6 项）
+              Obx(() {
+                final current = themeController.presetRx.value;
+                final customColor = themeController.customColorRx.value;
+                return ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: DesignTokens.spaceSm,
+                  ),
+                  itemCount: ThemePreset.values.length,
+                  separatorBuilder: (_, __) => Divider(
+                    height: 1,
+                    indent: DesignTokens.spaceLg,
+                    endIndent: DesignTokens.spaceLg,
+                    color: colors.border.withOpacity(0.5),
+                  ),
+                  itemBuilder: (_, i) {
+                    final preset = ThemePreset.values[i];
+                    final selected = preset == current;
+                    return _ThemeSheetItem(
+                      preset: preset,
+                      selected: selected,
+                      colors: colors,
+                      customColor: preset.isCustom ? customColor : null,
+                      onTap: () async {
+                        if (preset.isCustom) {
+                          // 自定义入口：关闭主菜单后弹出选色盘二级菜单
+                          Navigator.of(sheetContext).pop();
+                          await _showCustomColorSheet(context, colors);
+                        } else {
+                          // 普通预设：直接应用并关闭
+                          await themeController.switchPreset(preset);
+                          if (sheetContext.mounted) {
+                            Navigator.of(sheetContext).pop();
+                          }
+                        }
+                      },
+                    );
+                  },
+                );
+              }),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // ============================================================
+  // 卷帘菜单 1b: 自定义颜色选色盘（点「自定义」入口后才弹出）
+  // ============================================================
+  //
+  // 二级卷帘菜单，仅当用户在主题色主菜单点「自定义」时调用。
+  // 风格与 _showThemeSheet / _showApiServerSheet 完全一致：
+  // drag handle + 标题栏（"自定义颜色" + 关闭按钮）+ HSV 选色盘 + 应用按钮。
+  //
+  // 选色盘初始 HSV 从当前 ThemeController.colors.primary 派生：
+  // - 如果之前选过自定义色 → 从该色开始调整
+  // - 如果是从其它预设过来 → 从该预设的 primary 开始调整
+  Future<void> _showCustomColorSheet(
+    BuildContext context,
+    ThemeColors colors,
+  ) async {
     final themeController = Get.find<ThemeController>();
     await showModalBottomSheet<void>(
       context: context,
@@ -446,85 +442,27 @@ class _SettingsPageState extends State<SettingsPage> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // drag handle
                 _SheetDragHandle(colors: colors),
-                // 标题栏
                 _SheetHeader(
-                  icon: PhosphorIconsRegular.palette,
-                  title: '主题色',
+                  icon: PhosphorIconsRegular.paintBrush,
+                  title: '自定义颜色',
                   colors: colors,
                   onClose: () => Navigator.of(sheetContext).pop(),
                 ),
                 Divider(height: 1, thickness: 1, color: colors.border),
-                // 预设色块列表（可滚动）
+                // HSV 选色盘（_CustomColorSection 从当前 colors.primary 初始化）
                 Flexible(
-                  child: Obx(() {
-                    final current = themeController.presetRx.value;
-                    final customColor = themeController.customColorRx.value;
-                    return ListView.separated(
-                      shrinkWrap: true,
-                      padding: const EdgeInsets.symmetric(
-                        vertical: DesignTokens.spaceSm,
-                      ),
-                      itemCount: ThemePreset.values.length,
-                      separatorBuilder: (_, __) => Divider(
-                        height: 1,
-                        indent: DesignTokens.spaceLg,
-                        endIndent: DesignTokens.spaceLg,
-                        color: colors.border.withOpacity(0.5),
-                      ),
-                      itemBuilder: (_, i) {
-                        final preset = ThemePreset.values[i];
-                        final selected = preset == current;
-                        return _ThemeSheetItem(
-                          preset: preset,
-                          selected: selected,
-                          colors: colors,
-                          customColor: preset.isCustom ? customColor : null,
-                          onTap: () {
-                            themeController.switchPreset(preset);
-                            Navigator.of(sheetContext).pop();
-                          },
-                        );
+                  child: SingleChildScrollView(
+                    child: _CustomColorSection(
+                      colors: colors,
+                      onApply: (color) async {
+                        await themeController.applyCustomColor(color);
+                        if (sheetContext.mounted) {
+                          Navigator.of(sheetContext).pop();
+                        }
                       },
-                    );
-                  }),
-                ),
-                // 自定义颜色分隔标题
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    DesignTokens.spaceLg,
-                    DesignTokens.spaceSm,
-                    DesignTokens.spaceLg,
-                    DesignTokens.spaceXs,
+                    ),
                   ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        PhosphorIconsRegular.paintBrush,
-                        size: 14,
-                        color: colors.onSurfaceMuted,
-                      ),
-                      const SizedBox(width: DesignTokens.spaceXs),
-                      Text(
-                        '自定义颜色',
-                        style: TextStyle(
-                          fontSize: DesignTokens.textLabel,
-                          fontWeight: FontWeight.w600,
-                          color: colors.onSurfaceMuted,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // HSV 选色盘 + 预览 + 应用按钮
-                _CustomColorSection(
-                  colors: colors,
-                  onApply: (color) async {
-                    await themeController.applyCustomColor(color);
-                    if (sheetContext.mounted) Navigator.of(sheetContext).pop();
-                  },
                 ),
               ],
             ),

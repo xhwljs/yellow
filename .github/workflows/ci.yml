@@ -260,19 +260,18 @@ jobs:
           ## 本次更新内容
 
           ### 新增
-          - 设置页顶部 Yellow Depot Hero 卡片重新设计：多层渐变背景 + 几何纹理装饰 + 玻璃拟态 Logo + 主题色徽章
-          - 主题色选择新增 HSV 选色盘：可在饱和度×明度面板和色相滑块上拖动选择任意颜色，实时预览 + Hex 值显示
-          - 新增「自定义」主题预设，用户保存的颜色持久化到 SharedPreferences，重启后保留
-          - 自定义颜色的 secondary 由 primary 自动派生（HSL 降低 8% 亮度）
+          - 设置页顶部 App Header 改为扁平卡片风格（与首页/收藏/历史页 _SectionCard 视觉一致），取消多层渐变和几何装饰
+          - App Header 整行可点击进入主题色卷帘菜单，右侧显示当前主题色圆点 + 名称 + caret
+          - 主题色选择交互拆分：主菜单仅显示 5 个预设 + 1 个「自定义」入口项；点击「自定义」才弹出二级卷帘菜单显示 HSV 选色盘
 
           ### 改进
-          - ThemeColors 支持 customPrimary 参数，自定义色不再被错误识别为预设色
-          - AppTheme.colorsOf 优先从 ThemeController 读取（支持自定义色），splash 阶段回退到 Theme primary 推断
-          - 主题卷帘菜单列表项在 custom 预设下显示实际保存的颜色，而非占位色
+          - 更新弹窗标题简化为「新版本」（去除"发现"/"（必须更新）"等冗余后缀，强制/非强制状态改由 mode badge 区分）
+          - 更新内容展示框去除 maxLines 限制，自适应内容高度，避免内容被截断
+          - HSV 选色盘移至二级菜单后，主菜单保持简洁，与 _showApiServerSheet / _showAboutSheet 视觉一致
 
           ### 修复
-          - 对话框不显示：splash_page 用 Builder 捕获 MaterialApp 内部 context，避免 showDialog 找不到 Navigator
-          - 已安装最新版本仍提示更新：CI 用 sed 把 tag（去掉 v 前缀）注入 AppConstants.appVersion，启动时直接比较版本号
+          - Flutter 3.24 Color 没有 .r/.g/.b getter 编译错误（改用 .red/.green/.blue int API）
+          - 之前 Hero 渐变卡片与其它页面风格不一致的问题
 
           [强制更新]
           NOTES_EOF

@@ -202,10 +202,11 @@ class _UpdateDialogState extends State<UpdateDialog> {
   }
 
   /// 标题栏：图标 + 标题文案
+  ///
+  /// 标题仅保留「新版本」字样（去除"发现"/"（必须更新）"等冗余后缀），
+  /// 是否强制更新已通过下方 [_buildModeBadge] 红色/绿色徽章区分。
   Widget _buildTitle() {
-    final title = _downloaded
-        ? '请完成安装'
-        : (widget.forceUpdate ? '发现新版本（必须更新）' : '发现新版本');
+    final title = _downloaded ? '请完成安装' : '新版本';
     return Row(
       children: [
         Container(
@@ -305,7 +306,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
     );
   }
 
-  /// Release body 更新内容（截断显示）
+  /// Release body 更新内容（自适应高度，外层 SingleChildScrollView 处理超长内容）
   Widget _buildReleaseNotes() {
     if (widget.release.body.isEmpty) return const SizedBox.shrink();
     return Column(
@@ -321,6 +322,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
         ),
         const SizedBox(height: DesignTokens.spaceXs),
         Container(
+          width: double.infinity,
           padding: const EdgeInsets.all(DesignTokens.spaceMd),
           decoration: BoxDecoration(
             color: _UpdateColors.neutralBg,
@@ -328,8 +330,6 @@ class _UpdateDialogState extends State<UpdateDialog> {
           ),
           child: Text(
             widget.release.body,
-            maxLines: 6,
-            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               fontSize: DesignTokens.textCaption,
               color: _UpdateColors.onSurface,
