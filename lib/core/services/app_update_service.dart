@@ -5,8 +5,6 @@ import 'package:flutter/foundation.dart';
 import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:yellow_depot/core/constants/app_constants.dart';
 import 'package:yellow_depot/core/services/github_release_service.dart';
 import 'package:yellow_depot/core/utils/logger.dart';
 
@@ -99,25 +97,19 @@ class AppUpdateService {
       dio.close();
     }
 
-    // 2.5. 写入已安装 tag 到 SharedPreferences
+    // 2.5. 版本判断说明（无需 SharedPreferences）
     //
-    // 强制更新模式：[GitHubReleaseService.checkForUpdate] 启动时读取此字段，
-    // 与 latest release tag 比较。相同 → 跳过更新；不同 → 强制更新。
-    // 写入时机：APK 下载完成、即将唤起安装器之前。
-    // （如果用户在安装器界面取消安装，SP 已写入但用户未真正更新，
-    //   下次启动 App 仍会进入 splash 跳过更新 → 用户停留在旧版本。
-    //   此时若想强制再触发更新，需用户手动在系统设置中卸载 App 触发首次安装逻辑。
-    //   此权衡可接受，避免每次启动都被强制更新困扰。）
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(
-        AppConstants.keyLastInstalledReleaseTag,
-        release.tagName,
-      );
-      appLogger.i('已写入 lastInstalledReleaseTag = ${release.tagName}');
-    } catch (e) {
-      appLogger.w('写入 lastInstalledReleaseTag 失败: $e');
-    }
+    // 之前用 SP 记录 lastInstalledReleaseTag 来判断是否已安装最新版本，
+    // 但存在两个问题：
+    // 1. 如果对话框没显示，下载流程根本不触发，SP 永远是空，重复提示更新
+    // 2. 如果用户从 GitHub 直接下载 APK 手动安装，SP 不记录，仍会提示更新
+    //
+    // 现在改为：CI 在构建 APK 时把 tag（去掉 v 前缀）注入到
+    // AppConstants.appVersion（见 .github/workflows/ci.yml build-android
+    // 的 Inject appVersion step）。
+    // 启动时 GitHubReleaseService.checkForUpdate 直接比较
+    // AppConstants.appVersion 与 latest release.tagName（去掉 v 前缀）。
+    // 这样无论用户从哪里安装 APK，appVersion 都是正确的，能正确判断是否最新版本。
 
     // 3. 打开 APK 安装器
     //

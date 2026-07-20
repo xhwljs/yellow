@@ -37,6 +37,17 @@ const Color _kOnBackgroundMutedColor = Color(0xFF8E8E93);
 ///        用户可选"稍后"进入 App
 ///    - 无新版本或检查失败 → 直接切换到 MainShell
 ///
+/// **关键设计：用 [GlobalKey]<[NavigatorState]> 获取 Navigator context**
+///
+/// SplashPage 是 runApp 的根 widget，build 返回 MaterialApp（含 Navigator）。
+/// 但 [_SplashPageState] 的 `context` 是 SplashPage widget 的 context，
+/// 在 MaterialApp 之上，**不在 Navigator 树下**。
+/// 直接调用 `showDialog(context: context, ...)` 会抛
+/// "Navigator operation requested with a context that does not include a Navigator"。
+///
+/// 解决方案：给 MaterialApp 设置 `navigatorKey`，通过 `_navigatorKey.currentContext`
+/// 获取 MaterialApp 内部 Navigator 的 context，用它调用 showDialog。
+///
 /// 设计要点：
 /// - **背景色**：与 App 主题背景一致 (#F5F5F7)，避免从 native 黑屏到 App 浅色背景的突兀跳变
 /// - **Logo**：phosphor FilmSlate 图标（视频聚合主题）+ 圆角卡片容器
@@ -51,20 +62,23 @@ class SplashPage extends StatefulWidget {
 }
 
 class _SplashPageState extends State<SplashPage> {
+  /// MaterialApp 的 Navigator key
+  ///
+  /// 用于获取 MaterialApp 内部的 context（在 Navigator 树下），
+  /// 让 showDialog 能正常工作（详见类文档说明）。
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+
+  /// 是否已启动初始化序列（防止重复触发）
+  bool _startupStarted = false;
+
   /// 当前加载阶段文案（动态更新）
   String _loadingText = '正在加载...';
 
-  @override
-  void initState() {
-    super.initState();
-    // 异步启动整个初始化流程（不阻塞首次 build）
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _runStartupSequence();
-    });
-  }
-
   /// 启动序列：initializeApp + checkForUpdate + 最小展示 2 秒
-  Future<void> _runStartupSequence() async {
+  ///
+  /// [dialogContext] 是 MaterialApp 内部 Navigator 的 context，
+  /// 用于调用 UpdateDialog.show（showDialog 需要 context 在 Navigator 树下）。
+  Future<void> _runStartupSequence(BuildContext dialogContext) async {
     final stopwatch = Stopwatch()..start();
 
     // 阶段 1：初始化（数据 / 网络 / 主题）
@@ -101,8 +115,11 @@ class _SplashPageState extends State<SplashPage> {
       //   关闭对话框意味着用户已退出 App 或正在安装新版本，不调用 _enterApp
       // - 非强制更新：用户可选"稍后"跳过本次更新，调用 _enterApp 进入 App
       setState(() => _loadingText = '发现新版本');
+      // 用 MaterialApp 内部 Navigator 的 context 调用 showDialog
+      // 不能用 _SplashPageState.context（它不在 Navigator 树下，showDialog 会抛错）
+      if (!dialogContext.mounted) return;
       await UpdateDialog.show(
-        context,
+        dialogContext,
         release: update,
         forceUpdate: update.forceUpdate,
         onLater: update.forceUpdate ? null : _enterApp,
@@ -125,6 +142,7 @@ class _SplashPageState extends State<SplashPage> {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      navigatorKey: _navigatorKey,
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.light,
@@ -141,33 +159,51 @@ class _SplashPageState extends State<SplashPage> {
         child: Scaffold(
           backgroundColor: _kBackgroundColor,
           body: SafeArea(
-            child: SizedBox(
-              width: double.infinity,
-              height: double.infinity,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Spacer(flex: 2),
-                  // Logo 区域：圆角卡片容器 + FilmSlate 图标
-                  _buildLogo(),
-                  const SizedBox(height: DesignTokens.spaceXl),
-                  // App 名称
-                  _buildAppName(),
-                  const SizedBox(height: DesignTokens.spaceXs),
-                  // 副标题
-                  _buildSubtitle(),
-                  const Spacer(flex: 3),
-                  // 加载指示器
-                  _buildLoadingIndicator(),
-                  const SizedBox(height: DesignTokens.spaceXl),
-                  // 版本号
-                  _buildVersion(),
-                  const SizedBox(height: DesignTokens.space2xl),
-                ],
-              ),
+            child: Builder(
+              builder: (innerContext) {
+                // Builder 内部 context 在 MaterialApp 的 Navigator 树下，
+                // 用它触发 _runStartupSequence（在第一帧渲染后）。
+                // 用 _startupStarted 防止 rebuild 时重复触发。
+                if (!_startupStarted) {
+                  _startupStarted = true;
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    _runStartupSequence(innerContext);
+                  });
+                }
+                return _buildSplashBody();
+              },
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  /// splash 主体内容（Logo / 名称 / 加载指示 / 版本号）
+  Widget _buildSplashBody() {
+    return SizedBox(
+      width: double.infinity,
+      height: double.infinity,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Spacer(flex: 2),
+          // Logo 区域：圆角卡片容器 + FilmSlate 图标
+          _buildLogo(),
+          const SizedBox(height: DesignTokens.spaceXl),
+          // App 名称
+          _buildAppName(),
+          const SizedBox(height: DesignTokens.spaceXs),
+          // 副标题
+          _buildSubtitle(),
+          const Spacer(flex: 3),
+          // 加载指示器
+          _buildLoadingIndicator(),
+          const SizedBox(height: DesignTokens.spaceXl),
+          // 版本号
+          _buildVersion(),
+          const SizedBox(height: DesignTokens.space2xl),
+        ],
       ),
     );
   }

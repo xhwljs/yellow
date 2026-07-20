@@ -18,14 +18,31 @@ jobs:
   # 说明：原 `analyze-and-test` job 已取消。
   # 如需恢复静态检查 / 单元测试 / dart format 自动提交，
   # 重新加回 `analyze-and-test` job 并让 `build-android` `needs` 依赖它即可。
+  #
+  # 关键设计（强制更新机制）：
+  # 仅在 push 到 main 分支时，本 job 内部计算下一个 tag（v{YYYY.MMDD.N}），
+  # 并用 sed 把 tag（去掉 v 前缀）注入到 lib/core/constants/app_constants.dart
+  # 的 appVersion 字段。这样：
+  #   - CI 构建的 APK 内部 AppConstants.appVersion = "2026.0720.0"
+  #   - 用户安装此 APK 后，启动时 GitHubReleaseService.checkForUpdate 比较
+  #     AppConstants.appVersion 与 latest release.tagName（去掉 v 前缀）
+  #   - 相同 → 跳过更新；不同（latest 更大）→ 弹强制更新对话框
+  #   - 避免了"已安装最新版本但仍提示有新版本"的问题
+  #
+  # tag 通过 job outputs 传给下游 auto-release job 创建 GitHub Release。
   build-android:
     name: Build Android APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'
+    outputs:
+      next_tag: ${{ steps.tag.outputs.next_tag }}
+      version: ${{ steps.tag.outputs.version }}
     steps:
-      - name: Checkout
+      - name: Checkout (full history for tag listing)
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -51,6 +68,48 @@ jobs:
 
       - name: Install dependencies
         run: flutter pub get
+
+      - name: Compute next tag (only on main push)
+        #
+        # 仅在 push 到 main 时计算 tag，并注入到 AppConstants.appVersion。
+        # PR / develop 分支不计算 tag，appVersion 保持原值（用于本地调试）。
+        # 格式：v{YYYY.MMDD.N}
+        #   - 当天首次构建 → v2026.0720.0
+        #   - 当天后续构建 → v2026.0720.1, v2026.0720.2 ...
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        id: tag
+        run: |
+          DATE=$(date -u +'%Y.%m%d')
+          BASE="v${DATE}"
+          # 列出当天已有的所有 tag，取最大编号 +1
+          EXISTING=$(git tag -l "${BASE}.*" | sort -V | tail -n 1)
+          if [ -z "$EXISTING" ]; then
+            NEXT="${BASE}.0"
+          else
+            N=$(echo "$EXISTING" | awk -F. '{print $NF}')
+            NEXT="${BASE}.$((N+1))"
+          fi
+          # version 是去掉 v 前缀的纯数字版本号（用于注入 AppConstants.appVersion）
+          VERSION="${NEXT#v}"
+          echo "next_tag=$NEXT" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Computed next tag: $NEXT (version: $VERSION)"
+
+      - name: Inject appVersion into AppConstants (only on main push)
+        #
+        # 用 sed 把 lib/core/constants/app_constants.dart 中的
+        # `static const String appVersion = '...';` 替换为
+        # `static const String appVersion = '2026.0720.0';`
+        #
+        # 这样 App 启动时比较 AppConstants.appVersion 与 latest release.tagName，
+        # 如果相同就跳过更新，避免"已安装最新版本但仍提示有新版本"的问题。
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          VERSION=${{ steps.tag.outputs.version }}
+          echo "Injecting appVersion = '$VERSION' into lib/core/constants/app_constants.dart"
+          sed -i "s|static const String appVersion = '[^']*';|static const String appVersion = '${VERSION}';|" lib/core/constants/app_constants.dart
+          echo "--- AppConstants.appVersion after injection ---"
+          grep "appVersion" lib/core/constants/app_constants.dart
 
       - name: Generate native platform scaffolding (android only)
         #
@@ -95,9 +154,12 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
-  # ===== 2. Release 构建（打 tag 时自动发布）=====
+  # ===== 2. Release 构建（手动 push v* tag 时自动发布）=====
+  #
+  # 此 job 处理手动 push tag（如 git tag v1.2.3 && git push origin v1.2.3）的场景，
+  # 与 auto-release job（push 到 main 自动打 tag）互不影响。
   release:
-    name: Release
+    name: Release (manual tag)
     needs: [build-android]
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -143,17 +205,17 @@ jobs:
   #
   # 触发条件：仅 push 到 main 分支时执行。
   # 流程：
-  #   1. 等待 build-android 完成（复用其上传的 APK artifact）
-  #   2. 计算下一个递增 tag：v{YYYY.MMDD.N}
-  #      - 当天首次构建 → v2026.0720.0
-  #      - 当天后续构建 → v2026.0720.1, v2026.0720.2 ...
-  #   3. 通过 `gh release create` 一次性创建 tag + Release + 上传 APK
+  #   1. 等待 build-android 完成（build-android 已计算 tag 并注入到 APK）
+  #   2. 使用 build-android 输出的 tag 创建 GitHub Release（含 APK）
   #
   # 关键点：
-  #   - 通过 GitHub API 创建的 tag 不会触发 push 事件，避免循环触发 build-android。
-  #   - 因此每次 git push 到 main 都会强制生成新版本，App 启动时检测到
-  #     tag > 本地版本即弹强制更新对话框（无"稍后"按钮）。
-  #   - 与 release job（处理手动 push v* tag）独立，两者互不影响。
+  #   - tag 计算和版本号注入都在 build-android 中完成（避免重复计算）
+  #   - 通过 gh release create 创建的 tag 不会触发 push 事件，避免循环触发
+  #   - 每次 git push 到 main 都会强制生成新版本：
+  #     * APK 内的 AppConstants.appVersion 已被注入为 tag（去掉 v）
+  #     * App 启动时比较 AppConstants.appVersion 与 latest release.tagName
+  #     * 不同（latest 更大）→ 弹强制更新对话框（无"稍后"按钮）
+  #     * 相同 → 跳过更新（已安装最新版本）
   auto-release:
     name: Auto Tag + Release
     needs: [build-android]
@@ -163,10 +225,8 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Checkout (full history for tag listing)
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Download APK artifact
         uses: actions/download-artifact@v4
@@ -174,26 +234,22 @@ jobs:
           name: android-apk
           path: artifacts/
 
-      - name: Compute next tag (v{YYYY.MMDD.N})
-        id: tag
+      - name: Verify tag from build-android
+        env:
+          NEXT_TAG: ${{ needs.build-android.outputs.next_tag }}
+          VERSION: ${{ needs.build-android.outputs.version }}
         run: |
-          DATE=$(date -u +'%Y.%m%d')
-          BASE="v${DATE}"
-          # 列出当天已有的所有 tag（如 v2026.0720.0, v2026.0720.1, ...），取最大编号 +1
-          EXISTING=$(git tag -l "${BASE}.*" | sort -V | tail -n 1)
-          if [ -z "$EXISTING" ]; then
-            NEXT="${BASE}.0"
-          else
-            N=$(echo "$EXISTING" | awk -F. '{print $NF}')
-            NEXT="${BASE}.$((N+1))"
+          echo "Tag from build-android: $NEXT_TAG"
+          echo "Version from build-android: $VERSION"
+          if [ -z "$NEXT_TAG" ]; then
+            echo "ERROR: next_tag is empty, cannot create release"
+            exit 1
           fi
-          echo "next_tag=$NEXT" >> "$GITHUB_OUTPUT"
-          echo "Computed next tag: $NEXT"
 
       - name: Create tag + GitHub Release (with APK)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NEXT_TAG: ${{ steps.tag.outputs.next_tag }}
+          NEXT_TAG: ${{ needs.build-android.outputs.next_tag }}
         run: |
           # release body 包含 "[强制更新]" 标记，
           # App 启动时 GitHubReleaseService 会解析此标记并设置 forceUpdate=true，
@@ -213,7 +269,7 @@ jobs:
         if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NEXT_TAG: ${{ steps.tag.outputs.next_tag }}
+          NEXT_TAG: ${{ needs.build-android.outputs.next_tag }}
         run: |
           echo "Release $NEXT_TAG:"
           gh release view "$NEXT_TAG" --json url,name,tagName,createdAt -q '.' || true

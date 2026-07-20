@@ -1,5 +1,4 @@
 import 'package:dio/dio.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yellow_depot/core/constants/app_constants.dart';
 import 'package:yellow_depot/core/utils/logger.dart';
 
@@ -207,21 +206,23 @@ class GitHubReleaseService {
     }
   }
 
-  /// 检查是否有新版本可用（强制更新模式）
+  /// 检查是否有新版本可用
   ///
   /// 流程：
   /// 1. 调用 GitHub API 拿最新 release
   /// 2. 跳过预发布版本
-  /// 3. 比较 release.tagName 与 SharedPreferences 中的 lastInstalledReleaseTag
+  /// 3. 比较 release.tagName 与 [AppConstants.appVersion]
   ///    - 相同 → 已是最新版本，返回 null
-  ///    - 不同（或无记录）→ 返回 release，触发强制更新
+  ///    - release.tagName 更大 → 返回 release，触发更新
   ///
-  /// 强制更新模式说明：
-  /// 不再使用 [AppConstants.appVersion]（硬编码常量，CI 不注入 tag）。
-  /// 改用 [AppConstants.keyLastInstalledReleaseTag] 记录实际安装的 release tag，
-  /// 由 [AppUpdateService.downloadAndInstall] 下载成功后写入。
-  /// 这样每次 git push 触发新 release 时，tag 不同就会强制更新；
-  /// 用户已更新到该 tag 后，下次启动会跳过更新（相同 tag）。
+  /// 版本号来源说明：
+  /// [AppConstants.appVersion] 由 CI 在构建 APK 时注入：
+  /// - CI 在 push 到 main 时计算 tag（v{YYYY.MMDD.N}），
+  ///   用 sed 把 tag（去掉 v 前缀）写入 lib/core/constants/app_constants.dart
+  ///   的 appVersion 字段
+  /// - 因此用户安装的 APK 内部 appVersion 已经是该 release 对应的版本号
+  /// - 启动时比较 AppConstants.appVersion 与 latest release.tagName（去掉 v）
+  /// - 相同 → 跳过更新；不同（latest 更大）→ 触发更新
   ///
   /// 返回 GitHubRelease 表示有新版本（含 APK 下载链接），否则返回 null。
   /// 不抛异常（内部捕获，失败时返回 null 让调用方静默跳过更新流程）。
@@ -236,19 +237,18 @@ class GitHubReleaseService {
         return null;
       }
 
-      // 读取上次已安装的 release tag
-      final prefs = await SharedPreferences.getInstance();
-      final installedTag =
-          prefs.getString(AppConstants.keyLastInstalledReleaseTag) ?? '';
-
-      if (installedTag == release.tagName) {
-        appLogger.i('已安装最新版本 ${installedTag}，无需更新');
+      // 版本比较：release.tagName（去掉 v 前缀）vs AppConstants.appVersion
+      final hasNewVersion = release.isNewerThan(AppConstants.appVersion);
+      if (!hasNewVersion) {
+        appLogger.i(
+          '当前已是最新版本 (app: ${AppConstants.appVersion} ≥ release: ${release.tagName})',
+        );
         return null;
       }
 
       appLogger.i(
-        '发现新版本：${release.tagName}'
-        '${installedTag.isEmpty ? '（首次安装）' : '（当前已安装: $installedTag）'}',
+        '发现新版本：${release.tagName}（当前 ${AppConstants.appVersion}，'
+        '强制更新: ${release.forceUpdate}）',
       );
       return release;
     } catch (e) {

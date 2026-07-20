@@ -4,6 +4,19 @@ class AppConstants {
 
   // App
   static const String appName = 'Yellow Depot';
+
+  /// App 版本号
+  ///
+  /// **CI 注入说明**：本字段在 push 到 main 分支时会被 CI 用 sed
+  /// 自动替换为当前构建的 tag（去掉 v 前缀），如 `2026.0720.0`。
+  /// 见 `.github/workflows/ci.yml` 的 `Inject appVersion` step。
+  ///
+  /// 启动时 [GitHubReleaseService.checkForUpdate] 比较
+  /// [appVersion] 与 latest release.tagName（去掉 v 前缀）：
+  /// - 相同 → 已是最新版本，跳过更新
+  /// - release.tagName 更大 → 弹强制更新对话框
+  ///
+  /// 本地开发 / PR 构建时不会被注入，保持 `1.0.0`。
   static const String appVersion = '1.0.0';
 
   // API base URL（默认源站点根路径）
@@ -55,20 +68,6 @@ class AppConstants {
   static const String keyLastCategoryId = 'last_category_id';
   static const String keyApiBaseUrl = 'api_base_url';
   static const String keySearchHistory = 'search_history';
-
-  /// 上次成功下载并安装的 GitHub Release tag（强制更新模式）
-  ///
-  /// 用于 [GitHubReleaseService.checkForUpdate] 判断是否需要更新：
-  /// - 启动时读取 latest release tag，与本字段比较
-  /// - 相同 → 已是最新版本，跳过更新
-  /// - 不同（或本字段为空）→ 触发强制更新
-  /// - 在 [AppUpdateService.downloadAndInstall] 下载成功后写入此字段
-  ///
-  /// 之所以不直接用 [AppConstants.appVersion]：
-  /// AppConstants.appVersion 是硬编码常量（如 '1.0.0'），CI 不注入 tag，
-  /// 更新后本地版本号仍是 1.0.0，会重复触发"发现新版本"。
-  /// 用 SP 记录实际安装的 tag 可避免此问题。
-  static const String keyLastInstalledReleaseTag = 'last_installed_release_tag';
 
   /// 首页"目录"区块分类 id 集合（来自 `.stui-pannel__menu`）
   ///
