@@ -1394,8 +1394,8 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
       // 同步镜像列表的状态：当前 URL 标记为通过 / 失败
       if (result == null) {
         _mirrorStatus[newBaseUrl] = true;
-      } else {
-        _mirrorStatus[_originalBaseUrlBeforeTest] = false;
+      } else if (_originalBaseUrlBeforeTest != null) {
+        _mirrorStatus[_originalBaseUrlBeforeTest!] = false;
       }
     });
     // 若发生自动迁移，通知外层 settings page 同步「API 服务器」行的 URL 显示
