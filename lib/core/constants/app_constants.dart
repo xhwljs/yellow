@@ -42,8 +42,13 @@ class AppConstants {
   static const int searchHistoryMax = 20;
 
   // 数据库
+  //
+  // version 1: 初始版本
+  // version 2: 升级 CategoryParser 解析首页"目录"区块（.stui-pannel__menu）
+  //            旧版本缓存的 Category 表只有导航菜单分类（count=0），
+  //            migration 2→1 清空 Category + Video 表强制重新拉取
   static const String databaseName = 'videohub.db';
-  static const int databaseVersion = 1;
+  static const int databaseVersion = 2;
 
   // SharedPreferences keys
   static const String keyThemePreset = 'theme_preset';

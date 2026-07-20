@@ -31,9 +31,31 @@ abstract class AppDatabase extends FloorDatabase {
   FavoriteDao get favoriteDao;
 
   /// 工厂构造 — 初始化数据库到应用文档目录
+  ///
+  /// 包含 migration 1→2：
+  /// - 旧版本 CategoryParser 只解析导航菜单（无 count）
+  /// - 新版本优先解析首页"目录"区块（.stui-pannel__menu，含 count 视频数量）
+  /// - 清空 Category + Video 表强制重新拉取，让用户立即看到目录卷帘菜单的 count
   static Future<AppDatabase> build() async {
     final dir = await getApplicationDocumentsDirectory();
     final dbPath = p.join(dir.path, AppConstants.databaseName);
-    return $FloorAppDatabase.databaseBuilder(dbPath).build();
+
+    final callback = Callback(
+      onCreate: (db, version) async {
+        // Floor 已通过 @Database entities 自动建表，这里无需额外操作
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          // 1→2: 清空旧分类缓存（无 count），强制重新解析首页"目录"区块
+          await db.execute('DELETE FROM Category');
+          await db.execute('DELETE FROM Video');
+        }
+      },
+    );
+
+    return $FloorAppDatabase
+        .databaseBuilder(dbPath)
+        .addCallback(callback)
+        .build();
   }
 }
