@@ -51,13 +51,17 @@ class HomePage extends GetView<HomeController> {
       ),
       // 右下角悬浮目录按钮 — 点击弹出卷帘式分类目录
       //
+      // 仅当存在"目录"区块分类（catalog）时显示。
+      // catalog 分类来自 `.stui-pannel__menu`（含 count 视频数量），
+      // 不在顶部 Tab 和推荐 sections 中展示。
+      //
       // 设计参考 ui-ux-pro-max FAB UX 建议：
       // - 不破坏现有首页结构（Tab 栏 + 内容区不变）
       // - 按钮固定在右下角，滚动时仍可见
       // - 不与底部导航栏冲突（FAB 默认位置在底部导航上方）
       // - 主题色切换时 Obx 自动重建（外层 build 已在 Obx 外）
       floatingActionButton: Obx(
-        () => controller.categories.isEmpty
+        () => controller.catalogCategories.isEmpty
             ? const SizedBox.shrink()
             : FloatingActionButton(
                 heroTag: 'home_catalog_fab',
@@ -205,9 +209,12 @@ class HomePage extends GetView<HomeController> {
                 color: colors.border,
               ),
               // 分类列表（含 count 视频数量）
+              //
+              // 卷帘菜单仅展示"目录"区块分类（isCatalog=true），
+              // 不包含顶部导航菜单中独有的分类。
               Flexible(
                 child: Obx(() {
-                  final cats = controller.categories;
+                  final cats = controller.catalogCategories;
                   if (cats.isEmpty) {
                     return Padding(
                       padding: const EdgeInsets.all(DesignTokens.spaceXl),
@@ -311,20 +318,24 @@ class HomePage extends GetView<HomeController> {
   /// 分类菜单 Tab 栏（pill-shaped，参考 ui-ux-pro-max MD3 风格）
   ///
   /// 设计：
-  /// - 横向滚动 Tab 列表（含"推荐" + 各分类）
+  /// - 横向滚动 Tab 列表（含"推荐" + nav 分类）
   /// - 选中态：primary 背景 + onPrimary 文字 + elevation1 阴影
   /// - 未选中态：surface 背景 + onSurfaceMuted 文字 + outline 边框
   /// - pill 形状（radiusPill = 999）
   /// - 主题色切换时通过 Obx 自动重建
+  ///
+  /// **不包含"目录"区块分类**（用户需求）：
+  /// Tab 列表只展示导航菜单中独有的分类（isCatalog=false），
+  /// 目录分类通过右下角卷帘菜单访问。
   Widget _buildCategoryTabs(colors) {
     return SizedBox(
       height: 40,
       child: Obx(() {
         final selectedId = controller.selectedCategoryId.value;
-        // Tab 列表：推荐 + 各分类
+        // Tab 列表：推荐 + nav 分类（不含目录区块分类）
         final tabs = <_CategoryTab>[
           const _CategoryTab(id: null, name: '推荐'),
-          ...controller.categories.map(
+          ...controller.navCategories.map(
             (c) => _CategoryTab(id: c.id, name: c.name),
           ),
         ];
@@ -375,14 +386,18 @@ class HomePage extends GetView<HomeController> {
     );
   }
 
-  /// "推荐"Tab 内容：所有分类 section（保留原布局）
+  /// "推荐"Tab 内容：所有 nav 分类 section（保留原布局）
+  ///
+  /// **不包含"目录"区块分类**（用户需求）：
+  /// 推荐 sections 只展示导航菜单中独有的分类（isCatalog=false），
+  /// 目录分类通过右下角卷帘菜单跳转独立分类页查看。
   Widget _buildRecommendView(colors) {
     return ListView(
       padding: const EdgeInsets.symmetric(
         vertical: DesignTokens.spaceSm,
       ),
       children: [
-        ...controller.categories.map(
+        ...controller.navCategories.map(
           (c) => _buildCategorySection(
             colors,
             c,

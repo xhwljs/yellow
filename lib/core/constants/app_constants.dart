@@ -55,4 +55,11 @@ class AppConstants {
   static const String keyLastCategoryId = 'last_category_id';
   static const String keyApiBaseUrl = 'api_base_url';
   static const String keySearchHistory = 'search_history';
+
+  /// 首页"目录"区块分类 id 集合（来自 `.stui-pannel__menu`）
+  ///
+  /// 用于 [CategoryRepository] 启动时给从数据库读取的 Category 标记
+  /// isCatalog 字段（数据库不持久化此字段，需用 id 集合在内存中重建分组）。
+  /// 序列化格式：逗号分隔的 int 字符串，如 "8,9,10,15,21,26,7"
+  static const String keyCatalogCategoryIds = 'catalog_category_ids';
 }

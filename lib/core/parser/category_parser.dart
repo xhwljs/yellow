@@ -42,6 +42,8 @@ class CategoryParser {
       //   </a></li>
       //   ...
       // </ul>
+      //
+      // 这些分类 isCatalog=true，仅用于右下角悬浮目录卷帘菜单。
       final catalogItems = doc.querySelectorAll('.stui-pannel__menu li a');
       for (final element in catalogItems) {
         final href = element.attributes['href'] ?? '';
@@ -66,12 +68,14 @@ class CategoryParser {
             name: name,
             url: href,
             count: count,
+            isCatalog: true,
           ),
         );
       }
 
       // 2. 补充顶部导航菜单（.stui-header__menu）中"目录"区块没有的分类
       //    导航菜单的 count 通常为 0，仅用于补充缺失的入口。
+      //    这些分类 isCatalog=false，用于首页顶部 Tab + 推荐 sections。
       final navItems = doc.querySelectorAll('.stui-header__menu li a');
       for (final element in navItems) {
         final href = element.attributes['href'] ?? '';
@@ -89,6 +93,7 @@ class CategoryParser {
             name: name,
             url: href,
             count: 0,
+            isCatalog: false,
           ),
         );
       }
@@ -164,6 +169,50 @@ class CategoryParser {
   /// 用于过滤历史缓存中可能存在的动漫分类。
   static List<Category> filterBlocked(List<Category> categories) {
     return categories.where((c) => !_isBlocked(c.name)).toList();
+  }
+
+  /// 仅解析首页"目录"区块（`.stui-pannel__menu`）返回 catalog 分类 id 集合
+  ///
+  /// 用于 [CategoryRepository] 启动时从 SharedPreferences 读取已缓存的
+  /// catalog id 集合，给从数据库读取的 Category 标记 isCatalog
+  /// （数据库不持久化 isCatalog 字段，需用此集合在内存中重建分组）。
+  static Set<int> parseCatalogIds(String html) {
+    if (html.isEmpty) return const {};
+    try {
+      final doc = html_parser.parse(html);
+      final ids = <int>{};
+      for (final element in doc.querySelectorAll('.stui-pannel__menu li a')) {
+        final href = element.attributes['href'] ?? '';
+        final id = _extractCategoryId(href);
+        if (id == null) continue;
+        final name = _extractCategoryName(element);
+        if (name.isEmpty || _isBlocked(name)) continue;
+        ids.add(id);
+      }
+      return ids;
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  /// 给从数据库读取的 Category 列表标记 isCatalog
+  ///
+  /// 数据库不持久化 isCatalog 字段，从数据库读取时默认 isCatalog=false。
+  /// 调用此方法用 catalogIds 集合在内存中重建分组：
+  /// - id 在 catalogIds 中 → isCatalog=true（来自"目录"区块）
+  /// - 否则 → isCatalog=false（来自导航菜单）
+  static List<Category> markCatalog(
+    List<Category> categories,
+    Set<int> catalogIds,
+  ) {
+    if (catalogIds.isEmpty) return categories;
+    return categories
+        .map(
+          (c) => c.isCatalog || catalogIds.contains(c.id)
+              ? c.copyWith(isCatalog: true)
+              : c,
+        )
+        .toList();
   }
 
   static int? _extractCategoryId(String href) {

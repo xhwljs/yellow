@@ -52,13 +52,17 @@ class HomeController extends GetxController {
     isLoading.value = true;
     error.value = '';
     try {
-      // 1. 分类
+      // 1. 分类（catalog + nav 合并，已通过 CategoryParser.markCatalog 标记 isCatalog）
       final cats =
           await _categoryRepo.getCategories(forceRefresh: forceRefresh);
       categories.value = cats;
 
-      // 2. 各分类首页视频（并发拉取前 3 个分类，用于"推荐"Tab 展示）
-      final futures = cats.take(3).map((c) async {
+      // 2. 各分类首页视频（并发拉取前 3 个 nav 分类，用于"推荐"Tab 展示）
+      //
+      // 推荐 sections 只展示 nav 分类（用户需求：首页展示不需要目录区块的列表），
+      // 不为 catalog 分类预加载视频（catalog 分类通过右下角卷帘菜单跳转独立分类页查看）。
+      final navCats = navCategories;
+      final futures = navCats.take(3).map((c) async {
         final videos = await _videoRepo.getCategoryVideos(
           c.id,
           forceRefresh: forceRefresh,
@@ -72,6 +76,20 @@ class HomeController extends GetxController {
       isLoading.value = false;
     }
   }
+
+  /// "目录"区块分类（isCatalog=true）— 用于右下角卷帘菜单
+  ///
+  /// 来自首页 `.stui-pannel__menu` 区块，含 count 视频数量。
+  /// 仅在卷帘菜单展示，不出现在顶部 Tab 和推荐 sections。
+  List<Category> get catalogCategories =>
+      categories.where((c) => c.isCatalog).toList(growable: false);
+
+  /// 导航菜单分类（isCatalog=false）— 用于顶部 Tab + 推荐 sections
+  ///
+  /// 来自首页 `.stui-header__menu` 中"目录"区块没有的分类。
+  /// 不出现在右下角卷帘菜单。
+  List<Category> get navCategories =>
+      categories.where((c) => !c.isCatalog).toList(growable: false);
 
   Future<void> loadCategoryVideos(int categoryId) async {
     if (categoryVideos.containsKey(categoryId)) return;
