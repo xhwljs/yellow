@@ -20,9 +20,9 @@ import 'package:yellow_depot/core/theme/design_tokens.dart';
 /// 子路由处理 pop，不会触发本 wrapper 的 PopScope。
 ///
 /// **提示设计**（不用 Get.snackbar）：
-/// 用 OverlayEntry 自定义浮动 Toast，定位在屏幕中央：
-///   - 彻底避开顶部 AppBar 与底部 BottomNavigationBar（用户明确要求
-///     不能遮挡底部 tab 页）
+/// 用 OverlayEntry 自定义浮动 Toast，定位在屏幕底部、BottomNavigationBar 上方：
+///   - 底部对齐符合"退出应用"的语义习惯（用户期望从底部退出）
+///   - 通过固定 bottom inset（88dp）避开 BottomNavigationBar，不遮挡 tab 页
 ///   - 圆角卡片 + 阴影 + 倒计时进度环（让用户感知 2 秒窗口剩余时间，
 ///     符合 UX "Active States" + "Toast Notifications" 原则）
 ///   - 进入 fade+scale（200ms easeOutCubic），退出 fade out（150ms）
@@ -126,9 +126,10 @@ class _BackPressExitWrapperState extends State<BackPressExitWrapper> {
 
 /// "再按一次退出应用"浮动 Toast
 ///
-/// **布局**：屏幕中央，SafeArea 内
-///   - 完全避开顶部 AppBar 与底部 BottomNavigationBar
-///   - 不会遮挡任何 tab 内容（用户可以继续与 tab 交互）
+/// **布局**：屏幕底部、BottomNavigationBar 上方
+///   - bottom inset = _bottomInset，避开 BottomNavigationBar（不遮挡 tab）
+///   - SafeArea 处理底部手势条
+///   - IgnorePointer 不拦截下层手势（用户可继续操作 tab 页）
 ///
 /// **视觉**：
 ///   - 圆角卡片（radiusLg）+ 阴影（24 blur, 8 y offset）
@@ -158,6 +159,15 @@ class _ExitToastState extends State<_ExitToast>
 
   /// 进入动画占比（前 15% 的时间用于 fade+scale，剩余 85% 倒计时进度环）
   static const double _enterRatio = 0.15;
+
+  /// Toast 距离屏幕底部的偏移（避开 BottomNavigationBar）
+  ///
+  /// MainShell 的 BottomNavigationBar 为 fixed 类型 + 显示 label，
+  /// 标准高度约 80dp（含 icon + label + padding）。
+  /// 在 root Overlay 层级（全屏），SafeArea 处理手势条后，
+  /// 再加 80dp 把 Toast 推到 BottomNavigationBar 上方，
+  /// + 8dp margin 让 Toast 不紧贴 tab bar 顶部。
+  static const double _bottomInset = 88;
 
   @override
   void initState() {
@@ -213,79 +223,87 @@ class _ExitToastState extends State<_ExitToast>
       ),
     );
 
-    return Positioned.fill(
+    return Positioned(
+      // 不指定 top：让 Toast 自然高度向上展开，定位在屏幕底部
+      bottom: 0,
+      left: 0,
+      right: 0,
       child: SafeArea(
-        // IgnorePointer 让 Toast 不拦截下层手势 — 用户可以在 Toast 显示期间
-        // 继续操作 tab 页（如继续滑动列表），仅按返回键才会触发"再次按"逻辑
-        child: IgnorePointer(
-          child: Center(
-            child: AnimatedBuilder(
-              animation: _controller,
-              builder: (_, child) => Opacity(
-                opacity: fadeAnim.value.clamp(0.0, 1.0),
-                child: Transform.scale(
-                  scale: scaleAnim.value,
-                  child: child,
+        // SafeArea 处理底部手势条（root Overlay 全屏，需要手动避开）
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: _bottomInset),
+          // IgnorePointer 让 Toast 不拦截下层手势 — 用户可以在 Toast 显示期间
+          // 继续操作 tab 页（如继续滑动列表），仅按返回键才会触发"再次按"逻辑
+          child: IgnorePointer(
+            child: Center(
+              child: AnimatedBuilder(
+                animation: _controller,
+                builder: (_, child) => Opacity(
+                  opacity: fadeAnim.value.clamp(0.0, 1.0),
+                  child: Transform.scale(
+                    scale: scaleAnim.value,
+                    child: child,
+                  ),
                 ),
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: DesignTokens.spaceLg,
-                    vertical: DesignTokens.spaceMd,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colors.surface,
-                    borderRadius:
-                        BorderRadius.circular(DesignTokens.radiusLg),
-                    // 阴影：onSurface 18% 透明 + 24 blur + 8 y offset
-                    // 符合 Material Elevation 3 的视觉重量
-                    boxShadow: [
-                      BoxShadow(
-                        color: colors.onSurface.withOpacity(0.18),
-                        blurRadius: 24,
-                        offset: const Offset(0, 8),
-                        spreadRadius: 0,
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // 倒计时进度环 + 中心退出图标
-                      SizedBox(
-                        width: 28,
-                        height: 28,
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            CircularProgressIndicator(
-                              value: progressAnim.value.clamp(0.0, 1.0),
-                              strokeWidth: 2.5,
-                              backgroundColor: colors.border,
-                              valueColor: AlwaysStoppedAnimation(
-                                colors.primary,
+                child: Material(
+                  color: Colors.transparent,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: DesignTokens.spaceLg,
+                      vertical: DesignTokens.spaceMd,
+                    ),
+                    decoration: BoxDecoration(
+                      color: colors.surface,
+                      borderRadius:
+                          BorderRadius.circular(DesignTokens.radiusLg),
+                      // 阴影：onSurface 18% 透明 + 24 blur + 8 y offset
+                      // 符合 Material Elevation 3 的视觉重量
+                      boxShadow: [
+                        BoxShadow(
+                          color: colors.onSurface.withOpacity(0.18),
+                          blurRadius: 24,
+                          offset: const Offset(0, 8),
+                          spreadRadius: 0,
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // 倒计时进度环 + 中心退出图标
+                        SizedBox(
+                          width: 28,
+                          height: 28,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              CircularProgressIndicator(
+                                value: progressAnim.value.clamp(0.0, 1.0),
+                                strokeWidth: 2.5,
+                                backgroundColor: colors.border,
+                                valueColor: AlwaysStoppedAnimation(
+                                  colors.primary,
+                                ),
                               ),
-                            ),
-                            Icon(
-                              PhosphorIconsFill.signOut,
-                              size: 14,
-                              color: colors.primary,
-                            ),
-                          ],
+                              Icon(
+                                PhosphorIconsFill.signOut,
+                                size: 14,
+                                color: colors.primary,
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: DesignTokens.spaceMd),
-                      Text(
-                        '再按一次退出应用',
-                        style: TextStyle(
-                          fontSize: DesignTokens.textBody,
-                          fontWeight: FontWeight.w600,
-                          color: colors.onSurface,
+                        const SizedBox(width: DesignTokens.spaceMd),
+                        Text(
+                          '再按一次退出应用',
+                          style: TextStyle(
+                            fontSize: DesignTokens.textBody,
+                            fontWeight: FontWeight.w600,
+                            color: colors.onSurface,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
