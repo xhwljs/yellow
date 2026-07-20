@@ -1025,6 +1025,8 @@ class _ApiServerSheet extends StatefulWidget {
 
 class _ApiServerSheetState extends State<_ApiServerSheet> {
   late String _currentBaseUrl;
+  /// 测试开始时的 baseUrl，用于测试完成后判断是否发生自动迁移
+  String? _originalBaseUrlBeforeTest;
   bool _testingUrl = false;
   String? _testResult;
   bool _hasTested = false;
@@ -1063,7 +1065,21 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
                 children: [
                   // 当前 URL + 状态徽章
                   _buildCurrentRow(),
-                  if (_testResult != null) ...[
+                  // 测试结果：成功（含自动迁移）/ 失败
+                  if (_hasTested && _testResult == null) ...[
+                    const SizedBox(height: DesignTokens.spaceXs),
+                    Text(
+                      _originalBaseUrlBeforeTest != null &&
+                              _originalBaseUrlBeforeTest != _currentBaseUrl
+                          ? '连接成功，已自动迁移到 $_currentBaseUrl'
+                          : '连接成功',
+                      style: TextStyle(
+                        fontSize: DesignTokens.textCaption,
+                        color: colors.success,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ] else if (_testResult != null) ...[
                     const SizedBox(height: DesignTokens.spaceXs),
                     Text(
                       '连接失败：$_testResult',
@@ -1255,17 +1271,33 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
   }
 
   Future<void> _testConnectivity() async {
+    _originalBaseUrlBeforeTest = _currentBaseUrl;
     setState(() {
       _testingUrl = true;
       _testResult = null;
     });
     final result = await ApiServerSwitcher.testConnectivity(_currentBaseUrl);
     if (!mounted) return;
+    // 测试可能触发跳转壳自动迁移 → 读取 ApiServerSwitcher.current 显示最新地址
+    // （如：用户测 http://555973.xyz，跳转壳指向 http://555980.xyz → switchTo 已持久化）
+    final newBaseUrl = ApiServerSwitcher.current;
+    final migrated = newBaseUrl != _originalBaseUrlBeforeTest;
     setState(() {
       _testingUrl = false;
-      _testResult = result;
+      _currentBaseUrl = newBaseUrl;
+      // 若发生自动迁移 + 测试成功 → _testResult 留空，UI 显示"已自动迁移到 xxx"
+      // 若迁移后仍失败 → 显示"已迁移到 xxx，但 <错误信息>"
+      if (migrated && result != null) {
+        _testResult = '已迁移到 $newBaseUrl，但 $result';
+      } else {
+        _testResult = result;
+      }
       _hasTested = true;
     });
+    // 若发生自动迁移，通知外层 settings page 同步「API 服务器」行的 URL 显示
+    if (migrated) {
+      widget.onSwitched();
+    }
   }
 
   /// 自定义 URL 输入框（在 sheet 内部使用 sheet 自己的 context）

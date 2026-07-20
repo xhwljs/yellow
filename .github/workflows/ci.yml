@@ -255,22 +255,36 @@ jobs:
           # 1. 本次具体修改内容（让用户知道更新了什么）
           # 2. "[强制更新]" 标记（App 启动时 GitHubReleaseService 解析此标记
           #    设置 forceUpdate=true，UpdateDialog 仅显示"立即更新"按钮）
-          # 本次为可选更新（无 [强制更新] 标记），用户可选「稍后」跳过。
-          # 如需改为强制更新，在 release body 末尾加一行 [强制更新] 即可。
+          # 本次为强制更新（release body 末尾含 [强制更新] 标记），
+          # 用户无法选「稍后」跳过，必须更新到最新版本。
           cat > /tmp/release_notes.md <<'NOTES_EOF'
           ## 本次更新内容
 
-          ### 改进
-          - 更新弹窗布局重构：标题/版本/发布时间/按钮/状态提示都固定，
-            仅"更新内容"区域可单独上下滑动（限高 240px + 内部 SingleChildScrollView），
-            避免长 changelog 导致整弹窗滚动让用户看不清版本号和操作按钮
+          ### 新增
+          - 跳转壳自动迁移机制：
+            源站域名被封后运营方会换新入口（如 555973.xyz → 555980.xyz），
+            老入口实际是返回 200 + JS 跳转脚本的"跳转壳"（425 字节 HTML
+            含 `var strU = "https://hk234.space:8899/?u=...&p=..."` 模拟
+            点击 hao123 锚点跳转），跳转服务返回 302 Location 指向最新真实地址。
+            本次更新让 App 自动完成整个迁移链路：
+            1) 检测跳转壳特征（< 3KB + hao123 + var strU）
+            2) 正则提取 strU 跳转服务 URL
+            3) 用 followRedirects:false 请求跳转服务，读取 302 Location header
+            4) 用 Location 作为新 baseUrl 重新请求首页
+            5) 新地址通过 macCMS 标志检测后调 switchTo 持久化并切换
+
+          - 启动时异步健康检查：
+            App 启动时不再阻塞，用 Future.microtask 异步检测当前 baseUrl
+            是否是跳转壳，是则自动迁移到最新真实地址（Dio 重建 + 刷新首页）。
+            即便用户旧版持久化了已变跳转壳的地址（如 555973.xyz）也能自愈。
 
           ### 修复
-          - 更新中途被强杀后再次启动不弹更新对话框：
-            GitHubReleaseService.checkForUpdate 增加缓存机制，发现新版本时持久化
-            release 信息到 SharedPreferences；下次启动时 GitHub API 调用失败
-            （网络抖动 / 限流）会从缓存读取 release 并重新弹出更新对话框。
-            用户安装新版本后 appVersion ≥ 缓存版本 → 自动跳过更新
+          - http://555973.xyz/ 等跳转壳地址测试连接被误判为无法访问：
+            旧逻辑只匹配 macCMS 标志，跳转壳返回 425 字节 HTML 不含标志
+            就直接判为失败。现在改为检测到跳转壳后自动解析到最新真实地址
+            （如 555980.xyz）并切换，测试结果显示"连接成功，已自动迁移到 xxx"。
+
+          [强制更新]
           NOTES_EOF
           # 移除 heredoc 导致的每行前导空格（保持 markdown 结构）
           sed -i 's/^          //' /tmp/release_notes.md
