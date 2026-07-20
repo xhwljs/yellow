@@ -167,18 +167,47 @@ class _UpdateDialogState extends State<UpdateDialog> {
   Widget build(BuildContext context) {
     return PopScope(
       canPop: !widget.forceUpdate,
-      child: AlertDialog(
+      // 用 Dialog 替代 AlertDialog，避免 AlertDialog 内部自动 SingleChildScrollView
+      // 把整个 content 一起滚动（与"标题/版本/发布时间/按钮固定"的诉求冲突）。
+      //
+      // 布局结构（全部固定，仅 release notes 内容区域可滚动）：
+      // ┌─────────────────────────────────┐
+      // │ Title（图标 + 「新版本」）       │ ← 固定
+      // ├─────────────────────────────────┤
+      // │ ModeBadge（强制/普通徽章）       │ ← 固定
+      // │ 版本: v2026.xxx                  │ ← 固定
+      // │ 发布时间: 2026-xx-xx             │ ← 固定
+      // │ 更新内容（标题）                 │ ← 固定
+      // │ ┌─────────────────────────────┐ │
+      // │ │ Release body (可上下滑动)    │ │ ← 可滚动
+      // │ │                             │ │
+      // │ └─────────────────────────────┘ │
+      // │ DownloadedHint / ErrorHint      │ ← 固定（按状态显示）
+      // │ ProgressSection                  │ ← 固定（按状态显示）
+      // ├─────────────────────────────────┤
+      // │ [立即更新] [稍后]                │ ← 固定（按钮区）
+      // └─────────────────────────────────┘
+      child: Dialog(
         backgroundColor: _UpdateColors.surface,
+        insetPadding: const EdgeInsets.symmetric(
+          horizontal: DesignTokens.spaceLg,
+          vertical: DesignTokens.spaceXl,
+        ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(DesignTokens.radiusLg),
         ),
-        title: _buildTitle(),
-        content: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(DesignTokens.spaceLg),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // 标题栏（固定）
+              _buildTitle(),
+              const SizedBox(height: DesignTokens.spaceMd),
+              // 模式徽章（固定）
               _buildModeBadge(),
+              // 版本信息（固定）
               _InfoLine(
                 label: '版本',
                 value: widget.release.tagName,
@@ -189,14 +218,38 @@ class _UpdateDialogState extends State<UpdateDialog> {
                 value: _formatDate(widget.release.publishedAt),
               ),
               const SizedBox(height: DesignTokens.spaceMd),
-              _buildReleaseNotes(),
-              if (_downloaded) _buildDownloadedHint(),
-              if (_error != null) _buildErrorHint(),
-              if (_downloading) _buildProgressSection(),
+              // 更新内容标题（固定）
+              _buildReleaseNotesHeader(),
+              const SizedBox(height: DesignTokens.spaceXs),
+              // 更新内容本身：限高 + 单独滚动
+              // ConstrainedBox 限制最大高度避免极长 changelog 撑爆 Dialog，
+              // 内层 SingleChildScrollView 仅此区域可上下滑动
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 240),
+                child: _buildReleaseNotesBody(),
+              ),
+              // 状态提示（固定，按状态显示）
+              if (_downloaded) ...[
+                const SizedBox(height: DesignTokens.spaceMd),
+                _buildDownloadedHint(),
+              ],
+              if (_error != null) ...[
+                const SizedBox(height: DesignTokens.spaceMd),
+                _buildErrorHint(),
+              ],
+              if (_downloading) ...[
+                const SizedBox(height: DesignTokens.spaceMd),
+                _buildProgressSection(),
+              ],
+              const SizedBox(height: DesignTokens.spaceMd),
+              // 按钮区（固定）
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: _buildActions(),
+              ),
             ],
           ),
         ),
-        actions: _buildActions(),
       ),
     );
   }
@@ -306,38 +359,42 @@ class _UpdateDialogState extends State<UpdateDialog> {
     );
   }
 
-  /// Release body 更新内容（自适应高度，外层 SingleChildScrollView 处理超长内容）
-  Widget _buildReleaseNotes() {
+  /// Release body 更新内容标题（固定，不滚动）
+  Widget _buildReleaseNotesHeader() {
     if (widget.release.body.isEmpty) return const SizedBox.shrink();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '更新内容',
-          style: TextStyle(
+    return Text(
+      '更新内容',
+      style: TextStyle(
+        fontSize: DesignTokens.textCaption,
+        fontWeight: FontWeight.w600,
+        color: _UpdateColors.onSurfaceMuted,
+      ),
+    );
+  }
+
+  /// Release body 更新内容主体（可单独上下滑动）
+  ///
+  /// 由外层 [ConstrainedBox] 限制最大高度，超出部分在此 [SingleChildScrollView]
+  /// 内部滚动。其它信息（标题/版本/发布时间/按钮/状态提示）都固定不动。
+  Widget _buildReleaseNotesBody() {
+    if (widget.release.body.isEmpty) return const SizedBox.shrink();
+    return SingleChildScrollView(
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(DesignTokens.spaceMd),
+        decoration: BoxDecoration(
+          color: _UpdateColors.neutralBg,
+          borderRadius: BorderRadius.circular(DesignTokens.radiusMd),
+        ),
+        child: Text(
+          widget.release.body,
+          style: const TextStyle(
             fontSize: DesignTokens.textCaption,
-            fontWeight: FontWeight.w600,
-            color: _UpdateColors.onSurfaceMuted,
+            color: _UpdateColors.onSurface,
+            height: 1.5,
           ),
         ),
-        const SizedBox(height: DesignTokens.spaceXs),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(DesignTokens.spaceMd),
-          decoration: BoxDecoration(
-            color: _UpdateColors.neutralBg,
-            borderRadius: BorderRadius.circular(DesignTokens.radiusMd),
-          ),
-          child: Text(
-            widget.release.body,
-            style: const TextStyle(
-              fontSize: DesignTokens.textCaption,
-              color: _UpdateColors.onSurface,
-              height: 1.5,
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 

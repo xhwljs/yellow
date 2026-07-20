@@ -75,6 +75,16 @@ class AppConstants {
   /// 加载时由 ThemeController._loadPreset 读取并设置到 customColorRx。
   static const String keyCustomPrimaryColor = 'custom_primary_color';
 
+  /// 缓存的最新 release 信息（JSON 字符串）
+  ///
+  /// GitHubReleaseService.checkForUpdate 成功发现新版本时持久化到这里。
+  /// 下次启动时如果 GitHub API 调用失败（网络问题/限流），
+  /// 会从该缓存读取 release 信息，避免"更新中途被强杀后再次启动不弹对话框"。
+  ///
+  /// 缓存条件：仅当 release.tagName > AppConstants.appVersion 时才缓存。
+  /// 用户安装新版本后 appVersion >= 缓存版本 → 比较返回 false → 不弹对话框。
+  static const String keyCachedReleaseInfo = 'cached_release_info';
+
   /// 首页"目录"区块分类 id 集合（来自 `.stui-pannel__menu`）
   ///
   /// 用于 [CategoryRepository] 启动时给从数据库读取的 Category 标记

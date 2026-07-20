@@ -260,19 +260,17 @@ jobs:
           cat > /tmp/release_notes.md <<'NOTES_EOF'
           ## 本次更新内容
 
-          ### 修复
-          - 自定义 API 服务器切换时闪退：sheet pop 与 Get.dialog push 之间的 race condition。
-            改为在 sheet 内部用 `showDialog(context: context)`，dialog 关闭后 sheet 仍然存在
-          - http://555976.xyz 测试连接被误判为跳转壳：
-            * 超时从 8s+8s 缩短为 5s+5s（用户感知更敏捷）
-            * 注入移动端 User-Agent + Accept 头，避免源站对默认 Dio UA 返回反爬内容
-            * 扩充 macCMS 标志库：覆盖 stui / module / myui / 默认 4 大主流模板
-            * 跳转壳判定更严格：必须同时满足"内容简短"+"含脚本跳转关键字"，避免真实源站被误判
-            * 既无 macCMS 标志也无跳转壳特征 → 视为通过（可能是新模板，不阻断用户）
-
           ### 改进
-          - _ApiServerSheet 的「自定义 URL」按钮内部化输入框，不再依赖外部 Get.context
-          - 移除未使用的外部 _showCustomUrlDialog / _switchBaseUrl 方法
+          - 更新弹窗布局重构：标题/版本/发布时间/按钮/状态提示都固定，
+            仅"更新内容"区域可单独上下滑动（限高 240px + 内部 SingleChildScrollView），
+            避免长 changelog 导致整弹窗滚动让用户看不清版本号和操作按钮
+
+          ### 修复
+          - 更新中途被强杀后再次启动不弹更新对话框：
+            GitHubReleaseService.checkForUpdate 增加缓存机制，发现新版本时持久化
+            release 信息到 SharedPreferences；下次启动时 GitHub API 调用失败
+            （网络抖动 / 限流）会从缓存读取 release 并重新弹出更新对话框。
+            用户安装新版本后 appVersion ≥ 缓存版本 → 自动跳过更新
           NOTES_EOF
           # 移除 heredoc 导致的每行前导空格（保持 markdown 结构）
           sed -i 's/^          //' /tmp/release_notes.md
