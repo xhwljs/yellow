@@ -259,15 +259,18 @@ jobs:
           cat > /tmp/release_notes.md <<'NOTES_EOF'
           ## 本次更新内容
 
-          ### 新增
-          - **连续两秒内按两次返回键退出 App**：
-            在首页、收藏页、历史记录页、设置页按系统返回键不直接退出，
-            而是显示"再按一次退出应用"提示，连续两秒内再按一次才退出。
-            1. 新增 BackPressExitWrapper widget（PopScope + 2 秒窗口 +
-               Get.snackbar 提示 + SystemNavigator.pop 退出）。
-            2. 集成到 MainShell._ShellBody，覆盖 4 个 Tab。
-            3. 子路由（detail / category / search / player）在栈顶时由
-               各自处理 pop，不受影响。
+          ### 改进
+          - **重新设计"两次返回键退出"提示**：
+            原提示用 Get.snackbar BOTTOM 会贴近底部，与底部 tab 页视觉冲突。
+            重新设计为 OverlayEntry 自定义浮动 Toast：
+            1. 定位在屏幕中央（SafeArea 内），彻底避开顶部 AppBar 与
+               底部 BottomNavigationBar，不遮挡 tab 页。
+            2. 圆角卡片 + 阴影（24 blur, 8 y offset）+ 倒计时进度环
+               + 中心 signOut 图标，让用户直观感知 2 秒窗口剩余时间。
+            3. 进入动画 fade+scale（200ms easeOutCubic），退出 fade out
+               （150ms），动画由 AnimationController 正反向驱动。
+            4. IgnorePointer 让 Toast 不拦截下层手势，用户在 Toast 显示
+               期间仍可继续操作 tab 页（如继续滑动列表）。
 
           NOTES_EOF
           # 移除 heredoc 导致的每行前导空格（保持 markdown 结构）
