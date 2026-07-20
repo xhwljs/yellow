@@ -245,23 +245,27 @@ class ApiServerSwitcher {
   /// 返回 null 表示成功，否则返回错误信息。
   ///
   /// **跳转壳自动迁移机制**：
-  /// 源站 555973.xyz 等老入口实际是"跳转壳"——返回 200 + JS 跳转脚本：
-  /// ```html
-  /// <a href="" id="hao123"></a>
-  /// <script>var strU = "https://cktongji.com:8899/?u=...&p=..."; hao123.href = strU; ...click...</script>
-  /// ```
-  /// 跳转服务（cktongji.com:8899 / hk234.space:8899 是同服务不同域名）返回
-  /// **HTTP 302 Location** 指向最新真实地址（如 555980.xyz）。
-  /// 运营方每次被封就更新 302 的 Location，相当于"动态域名解析"。
+  /// 源站 55596x.xyz 等老入口实际是"跳转壳"——返回 200 + 424 字节 HTML
+  /// 含 `var strU="https://hk234.space:8899/?u="+window.location+"&p="+...`
+  /// 模拟点击 hao123 锚点跳转。跳转服务（cktongji.com:8899 /
+  /// hk234.space:8899 是同服务不同域名）返回 302 Location 指向最新真实地址。
   ///
-  /// Dio 不会执行 JS，所以拿到 425 字节 HTML 就停了，被旧代码误判为跳转壳。
-  /// 现在改为：
-  /// 1. 检测到跳转壳模式（含 strU + hao123）→ 提取 strU URL
-  /// 2. 请求 strU → 读取 302 Location header
-  /// 3. 用 Location 作为新 baseUrl，重新请求首页
-  /// 4. 新地址通过 macCMS 标志检测 → 调用 [switchTo] 持久化并切换 → 返回 null（成功）
+  /// **关键修复（2026-07-20）**：
+  /// JS 中 strU 是字符串字面量 + JS 表达式拼接构造的，不是完整的字面量。
+  /// 例如 `var strU="https://hk234.space:8899/?u="+window.location+"&p="+window.location.pathname+window.location.search;`
+  /// 字符串字面量只是 `"https://hk234.space:8899/?u="`，后面用 + 拼接 window.location 等。
+  /// 旧代码只提取字面量导致请求 URL 不完整。
+  /// 现在改为：模拟 JS 字符串拼接，把 window.location 替换为 [baseUrl]，
+  /// pathname 替换为 `/`，search 替换为空字符串，构造完整 URL。
+  ///
+  /// 流程：
+  /// 1. 检测到跳转壳模式（含 strU + hao123）→ 提取 strU 完整表达式
+  /// 2. 模拟 JS 拼接构造完整跳转服务 URL
+  /// 3. 请求该 URL → 读取 302 Location header
+  /// 4. 用 Location 作为新 baseUrl，重新请求首页
+  /// 5. 新地址通过 macCMS 标志检测 → 调用 [switchTo] 持久化并切换 → 返回 null（成功）
   ///    （switchTo 内部会把新地址自动添加到 [presetMirrors] 并持久化到 SP）
-  /// 5. 新地址仍失败 → 返回错误信息
+  /// 6. 新地址仍失败 → 返回错误信息
   ///
   /// 调用方应在测试完成后重新读取 [current] 显示当前地址（若发生自动迁移会显示新地址）。
   static Future<String?> testConnectivity(String baseUrl) async {
@@ -275,7 +279,7 @@ class ApiServerSwitcher {
 
     // 2) 检测跳转壳 → 尝试自动迁移到最新真实地址
     if (_isRedirectShell(html)) {
-      final migratedUrl = await _tryMigrateFromRedirectShell(html);
+      final migratedUrl = await _tryMigrateFromRedirectShell(html, baseUrl);
       if (migratedUrl == null) {
         return '跳转壳中未找到跳转服务 URL，无法自动迁移';
       }
@@ -375,24 +379,92 @@ class ApiServerSwitcher {
 
   /// 从跳转壳 HTML 中提取跳转服务 URL 并请求，返回 302 Location（最新真实地址）
   ///
-  /// 跳转壳 JS 形如：
+  /// **关键修复（2026-07-20）**：JS 中 strU 是字符串字面量 + JS 表达式拼接构造的。
+  /// 例如：
   /// ```js
-  /// var strU = "https://cktongji.com:8899/?u=http://555973.xyz/&p=/";
+  /// var strU="https://hk234.space:8899/?u="+window.location+"&p="+window.location.pathname+window.location.search;
   /// ```
-  /// 请求 strU → 服务器返回 302 Found + Location: http://555980.xyz
+  /// 字符串字面量只是 `"https://hk234.space:8899/?u="`，后面用 `+` 拼接 JS 表达式。
+  /// 旧代码只提取字面量导致请求 URL 不完整，请求 `https://hk234.space:8899/?u=`
+  /// 拿不到正确的 302 Location。
+  ///
+  /// 修复方案：模拟 JS 字符串拼接，把 JS 表达式替换为实际值：
+  /// - `window.location` → [originalBaseUrl]（用户测试的镜像 URL）
+  /// - `window.location.pathname` → `/`
+  /// - `window.location.search` → `''`（空字符串）
+  /// - `window.location.href` → [originalBaseUrl]
+  /// - `window.location.origin` → 协议 + 域名（http://555976.xyz）
+  /// - `location`（无 window. 前缀）→ 同 window.location
+  ///
+  /// 然后提取所有字符串字面量并拼接成完整 URL。
+  ///
+  /// 流程：
+  /// 1. 提取 `var strU = ...;` 的完整赋值表达式（到 `;` 为止）
+  /// 2. 替换 JS 表达式为字符串字面量
+  /// 3. 提取所有 `"..."` / `'...'` 字面量并拼接
+  /// 4. 请求完整 URL → 读取 302 Location header
   ///
   /// 返回值：
-  /// - 成功：Location URL（最新真实地址）
+  /// - 成功：Location URL（最新真实地址，如 http://555980.xyz）
   /// - 失败：null
-  static Future<String?> _tryMigrateFromRedirectShell(String html) async {
-    // 1. 提取 var strU = "..." 中的 URL
-    final regex = RegExp(r'''var\s+strU\s*=\s*["']([^"']+)["']''');
-    final match = regex.firstMatch(html);
-    if (match == null) return null;
-    final redirectServiceUrl = match.group(1);
-    if (redirectServiceUrl == null || redirectServiceUrl.isEmpty) return null;
+  static Future<String?> _tryMigrateFromRedirectShell(
+    String html,
+    String originalBaseUrl,
+  ) async {
+    // 1. 提取 var strU = ...; 的完整赋值表达式（到第一个 ; 为止）
+    final stmtMatch = RegExp(
+      r'''var\s+strU\s*=\s*([^;]+);''',
+    ).firstMatch(html);
+    if (stmtMatch == null) return null;
+    String expr = stmtMatch.group(1) ?? '';
 
-    // 2. 请求跳转服务，禁用 followRedirects 拿到原始 302 响应
+    // 2. 计算 originalBaseUrl 的 origin（去掉 path/query 部分）
+    //    例如 http://555976.xyz/ → http://555976.xyz
+    String origin = originalBaseUrl;
+    final originMatch = RegExp(r'''^(https?://[^/]+)''').firstMatch(originalBaseUrl);
+    if (originMatch != null) {
+      origin = originMatch.group(1) ?? originalBaseUrl;
+    }
+
+    // 3. 模拟 JS 表达式替换（注意顺序：先替换长的，避免部分替换冲突）
+    //    window.location.pathname → '/'
+    //    window.location.search → ''
+    //    window.location.href → originalBaseUrl
+    //    window.location.origin → origin
+    //    window.location → originalBaseUrl
+    //    location.pathname → '/'
+    //    location.search → ''
+    //    location.href → originalBaseUrl
+    //    location.origin → origin
+    //    location → originalBaseUrl
+    expr = expr
+        .replaceAll('window.location.pathname', "'/'")
+        .replaceAll('window.location.search', "''")
+        .replaceAll('window.location.href', "'$originalBaseUrl'")
+        .replaceAll('window.location.origin', "'$origin'")
+        .replaceAll('window.location', "'$originalBaseUrl'")
+        .replaceAll('location.pathname', "'/'")
+        .replaceAll('location.search', "''")
+        .replaceAll('location.href', "'$originalBaseUrl'")
+        .replaceAll('location.origin', "'$origin'")
+        // 残留的 location（无 .xxx 后缀）也替换为 originalBaseUrl
+        .replaceAll(RegExp(r'''\blocation\b'''), "'$originalBaseUrl'");
+
+    // 4. 统一引号：把 " 改为 ' 方便提取
+    expr = expr.replaceAll('"', "'");
+
+    // 5. 提取所有 'xxx' 字符串字面量并按顺序拼接
+    final parts = RegExp(r"""'([^']*)'""").allMatches(expr).map((m) => m.group(1) ?? '').toList();
+    if (parts.isEmpty) return null;
+    final redirectServiceUrl = parts.join('');
+
+    if (redirectServiceUrl.isEmpty ||
+        !redirectServiceUrl.startsWith('http://') &&
+            !redirectServiceUrl.startsWith('https://')) {
+      return null;
+    }
+
+    // 6. 请求跳转服务，禁用 followRedirects 拿到原始 302 响应
     final dio = Dio(
       BaseOptions(
         connectTimeout: const Duration(seconds: 5),

@@ -260,37 +260,26 @@ jobs:
           cat > /tmp/release_notes.md <<'NOTES_EOF'
           ## 本次更新内容
 
-          ### 新增
-          - 镜像列表自动测试 + 持久化：
-            打开「API 服务器」卷帘菜单时自动批量测试镜像列表中的每个域名，
-            发现跳转壳则自动通过跳转服务（hk234.space:8899）解析到最新真实
-            地址并切换；镜像列表 chip 旁边显示绿色对勾（通过）/红色叉
-            （失败）/小 loading 圈（测试中）状态徽章。测试通过的新地址自动
-            保存到镜像列表，下次启动仍可见。
-
-          - GitHubReleaseService fallback 机制：
-            api.github.com 不可达时（中国大陆常见 DNS 污染或网络问题），
-            自动 fallback 到 github.com/releases/latest 页面 302 redirect
-            解析最新 tag_name，构造 release 信息并按强制更新处理，避免
-            网络问题导致 App 不弹更新对话框直接进入软件。
-
-          ### 改进
-          - 跳转壳自动迁移机制完整版：
-            1) ApiServerSwitcher.presetMirrors 改为可变 List + 持久化到 SP
-               （key: api_mirror_list）
-            2) loadFromPrefs 启动时加载用户保存的镜像列表覆盖默认值
-            3) switchTo 切换 baseUrl 时，如果新 URL 不在镜像列表则自动添加
-               到列表头部并持久化
-            4) autoTestMirrors() 批量串行测试所有镜像，避免并发触发反爬
-            5) _ApiServerSheet initState 异步触发自动测试，发现跳转壳
-               自动迁移后立即更新镜像列表显示
-
           ### 修复
-          - 跳转壳还是无法获取到最新地址：
-            之前 testConnectivity 检测到跳转壳后会自动迁移，但镜像列表
-            不会更新显示最新可用域名。现在改为：自动测试时遇到跳转壳
-            自动 switchTo 最新地址 → 新地址自动加入镜像列表并持久化 →
-            UI 立即显示最新可用域名并启用。
+          - **跳转壳 strU URL 拼接提取根本性问题**：
+            旧代码用正则 `var strU = "..."` 只能提取字符串字面量部分，
+            但实际跳转壳 JS 是字符串拼接形式：
+            `var strU="https://hk234.space:8899/?u="+window.location+"&p="+window.location.pathname+window.location.search;`
+            字符串字面量只有 `"https://hk234.space:8899/?u="`，导致请求这个
+            不完整 URL 拿不到 302 Location，迁移失败。
+
+            修复方案：模拟 JS 字符串拼接，把 window.location / window.location.pathname /
+            window.location.search / window.location.href / window.location.origin 等
+            JS 表达式替换为实际值（originalBaseUrl / '/' / ''），然后提取所有字符串
+            字面量拼接成完整 URL：`https://hk234.space:8899/?u=http://555976.xyz&p=/`，
+            请求此 URL 即可拿到 302 Location: http://555980.xyz，自动迁移成功。
+
+          - 镜像列表测试失败时自动通过跳转壳获取最新地址并加入镜像列表：
+            打开「API 服务器」卷帘菜单时自动批量测试镜像列表，发现某镜像已是
+            跳转壳则自动通过跳转服务解析到最新真实地址（如 555980.xyz）并
+            切换 + 加入镜像列表 + 持久化到 SP。镜像列表 chip 旁边显示
+            绿色对勾（通过）/红色叉（失败）/小 loading 圈（测试中）状态徽章。
+
           - 测试连通性是跳转壳则切换镜像列表显示：
             点击「测试连通性」按钮测试当前 baseUrl，如果是跳转壳则自动
             获取最新网址 → switchTo 持久化 + 加入镜像列表 → 镜像列表
