@@ -18,27 +18,27 @@ class HistoryRepository {
   /// 缓存按 videoId 批量补全，避免触发 schema migration：
   /// - VideoDao 命中 → 显示完整详情
   /// - VideoDao 未命中 → 字段为空，UI 自动隐藏对应行
+  ///
+  /// 旧实现每条记录都 findById 一次（N+1），改为一次 IN 查询批量补全。
   Future<List<PlayHistory>> getAllHistory({int limit = 500}) async {
     final list = await _db.historyDao.findAll(limit);
     if (list.isEmpty) return const [];
 
-    final enriched = <PlayHistory>[];
-    for (final h in list) {
-      final video = await _db.videoDao.findById(h.videoId);
-      if (video != null) {
-        enriched.add(
-          h.withDetail(
-            durationText: video.duration,
-            playCount: video.playCount,
-            likeCount: video.likeCount,
-            updateTime: video.updateTime,
-          ),
-        );
-      } else {
-        enriched.add(h);
-      }
-    }
-    return enriched;
+    // 批量查询 Video 详情，一次 SQL 拿全
+    final videoIds = list.map((h) => h.videoId).toList();
+    final videos = await _db.videoDao.findByIds(videoIds);
+    final videoMap = {for (final v in videos) v.id: v};
+
+    return list.map((h) {
+      final v = videoMap[h.videoId];
+      if (v == null) return h;
+      return h.withDetail(
+        durationText: v.duration,
+        playCount: v.playCount,
+        likeCount: v.likeCount,
+        updateTime: v.updateTime,
+      );
+    }).toList();
   }
 
   /// 分页获取历史
@@ -57,6 +57,8 @@ class HistoryRepository {
   /// 更新或插入播放记录
   ///
   /// 自动裁剪超过 [AppConstants.historyMaxRecords] 的旧记录。
+  /// 为避免每秒 upsert 都跑 trimOld（DB 写放大），仅当当前条数超过
+  /// 阈值的 1.2 倍时才触发裁剪。
   Future<void> upsertHistory({
     required String videoId,
     required String title,
@@ -78,8 +80,12 @@ class HistoryRepository {
       ),
     );
 
-    // 自动裁剪
-    await _db.historyDao.trimOld(AppConstants.historyMaxRecords);
+    // 仅在超阈值 1.2 倍时才裁剪，避免每秒 upsert 都跑 DELETE
+    // （详情页 _historySaveInterval = 5s，长时间播放会触发多次 upsert）
+    final count = await _db.historyDao.count();
+    if (count > (AppConstants.historyMaxRecords * 1.2).ceil()) {
+      await _db.historyDao.trimOld(AppConstants.historyMaxRecords);
+    }
     appLogger.d(
       '更新播放历史: $videoId progress=${positionMs / (durationMs > 0 ? durationMs : 1)}',
     );

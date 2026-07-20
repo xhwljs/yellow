@@ -33,23 +33,59 @@ class DioClient {
   /// 异步初始化 Dio 实例，注入所有拦截器
   static Future<Dio> ensureInitialized() async {
     if (_instance != null) return _instance!;
+    final dio = await _buildDio(null);
+    _instance = dio;
+    return dio;
+  }
 
+  /// 清理所有 Cookie（登出场景）
+  static Future<void> clearCookies() async {
+    final jar = await cookieInterceptorJar();
+    await jar.deleteAll();
+  }
+
+  static Future<CookieJar> cookieInterceptorJar() async {
+    final interceptor = (await CookieInterceptor.create());
+    return interceptor.cookieJar;
+  }
+
+  /// 重建 Dio 实例（切换 baseUrl 后调用）
+  ///
+  /// 保留所有拦截器配置，仅关闭旧 Dio、创建新 Dio、重新注入拦截器。
+  /// 调用前需先更新 [AppConstants.baseUrl]。
+  static Future<Dio> rebuildWithBaseUrl(String newBaseUrl) async {
+    // 关闭旧 Dio
+    _instance?.close();
+    final dio = await _buildDio(newBaseUrl);
+    _instance = dio;
+    return dio;
+  }
+
+  /// 统一装配 Dio（[ensureInitialized] 与 [rebuildWithBaseUrl] 共用）
+  ///
+  /// [newBaseUrl] 为 null 时不设置 baseUrl（首启场景，由 [ApiService] 拼
+  /// 完整 URL）；非 null 时作为新 baseUrl（镜像切换场景）。
+  ///
+  /// 装配内容：BaseOptions / IOHttpClientAdapter（自动解压 + 容错证书）/
+  /// 拦截器链（UA → Cookie → Log → Retry → Error）。
+  static Future<Dio> _buildDio(String? newBaseUrl) async {
     final cookieInterceptor = await CookieInterceptor.create();
 
-    final dio = Dio(
-      BaseOptions(
-        connectTimeout:
-            const Duration(milliseconds: AppConstants.connectTimeoutMs),
-        receiveTimeout:
-            const Duration(milliseconds: AppConstants.receiveTimeoutMs),
-        sendTimeout: const Duration(milliseconds: AppConstants.sendTimeoutMs),
-        responseType: ResponseType.plain, // 返回原始字符串用于 HTML 解析
-        followRedirects: true,
-        maxRedirects: 5,
-        validateStatus: (status) =>
-            status != null && status >= 200 && status < 400,
-      ),
+    final baseOptions = BaseOptions(
+      connectTimeout:
+          const Duration(milliseconds: AppConstants.connectTimeoutMs),
+      receiveTimeout:
+          const Duration(milliseconds: AppConstants.receiveTimeoutMs),
+      sendTimeout: const Duration(milliseconds: AppConstants.sendTimeoutMs),
+      responseType: ResponseType.plain, // 返回原始字符串用于 HTML 解析
+      followRedirects: true,
+      maxRedirects: 5,
+      validateStatus: (status) =>
+          status != null && status >= 200 && status < 400,
     );
+    if (newBaseUrl != null) baseOptions.baseUrl = newBaseUrl;
+
+    final dio = Dio(baseOptions);
 
     // 关键：使用 IOHttpClientAdapter 并显式启用自动解压
     // （Dio 5.x 默认不自动解压 gzip，必须显式开启）
@@ -77,67 +113,6 @@ class DioClient {
       ErrorInterceptor(),
     ]);
 
-    _instance = dio;
-    return dio;
-  }
-
-  /// 清理所有 Cookie（登出场景）
-  static Future<void> clearCookies() async {
-    final jar = await cookieInterceptorJar();
-    await jar.deleteAll();
-  }
-
-  static Future<CookieJar> cookieInterceptorJar() async {
-    final interceptor = (await CookieInterceptor.create());
-    return interceptor.cookieJar;
-  }
-
-  /// 重建 Dio 实例（切换 baseUrl 后调用）
-  ///
-  /// 保留所有拦截器配置，仅关闭旧 Dio、创建新 Dio、重新注入拦截器。
-  /// 调用前需先更新 [AppConstants.baseUrl]。
-  static Future<Dio> rebuildWithBaseUrl(String newBaseUrl) async {
-    // 关闭旧 Dio
-    _instance?.close();
-
-    // 重新创建（沿用 ensureInitialized 的所有配置）
-    final cookieInterceptor = await CookieInterceptor.create();
-
-    final dio = Dio(
-      BaseOptions(
-        baseUrl: newBaseUrl,
-        connectTimeout:
-            const Duration(milliseconds: AppConstants.connectTimeoutMs),
-        receiveTimeout:
-            const Duration(milliseconds: AppConstants.receiveTimeoutMs),
-        sendTimeout: const Duration(milliseconds: AppConstants.sendTimeoutMs),
-        responseType: ResponseType.plain,
-        followRedirects: true,
-        maxRedirects: 5,
-        validateStatus: (status) =>
-            status != null && status >= 200 && status < 400,
-      ),
-    );
-
-    dio.httpClientAdapter = IOHttpClientAdapter(
-      createHttpClient: () {
-        final client = HttpClient()
-          ..autoUncompress = true
-          ..userAgent = null;
-        return client;
-      },
-      validateCertificate: (cert, host, port) => true,
-    );
-
-    dio.interceptors.addAll([
-      UserAgentInterceptor(),
-      cookieInterceptor,
-      LoggingInterceptor(),
-      RetryInterceptor(dioProvider: () => _instance ?? dio),
-      ErrorInterceptor(),
-    ]);
-
-    _instance = dio;
     return dio;
   }
 

@@ -288,6 +288,45 @@ jobs:
                cacheVideo 合并策略会用 VideoDao 中列表页缓存的正确数据补全，
                确保 UI 始终有元信息可显示。
 
+          - **播放器稳定性优化**：
+            1. App 切后台自动暂停播放，切回前台按需恢复，避免后台继续
+               播放音频被系统判定为异常占用资源（详情页内联播放器 + 全屏
+               播放页都加 WidgetsBindingObserver）。
+            2. ChewieController 提升到 StatefulWidget 的 State 中，
+               不再每次 Obx 重建都 new/dispose Chewie，避免黑屏、卡顿、
+               内存抖动。
+            3. 历史记录保存从 1s 节流改为 5s（与文档对齐），HistoryController
+               列表刷新做 2s 节流，避免长时间播放时 DB 写放大 + RxList
+               全量重建导致卡顿。
+
+          - **性能与缓存优化**：
+            1. 收藏/历史列表从 VideoDao 补全 @ignore 详情字段，旧实现
+               是 N+1 查询（每条记录都 findById），改为一次 IN 查询批量
+               补全，列表加载速度显著提升。
+            2. VideoRepository 缓存 TTL 真正生效（旧实现只判断「缓存是否存在」
+               永不过期），30 分钟过期后自动走网络拉取最新数据。
+            3. 历史记录 trimOld 仅在条数超过阈值 1.2 倍时才触发，避免
+               每次 upsert 都跑 DELETE（5s 保存周期下 DB 写放大明显）。
+
+          - **代码整洁度**：
+            1. 删除死代码：VideoDetailController.goToPlayer /
+               VideoListParser.parseTotalPages（全工程无调用）。
+            2. DioClient.ensureInitialized 与 rebuildWithBaseUrl 抽取
+               _buildDio 私有方法去重（~70 行重复代码合并）。
+            3. ApiServerSwitcher 3 处 Dio 装配抽取 _buildProbeDio，
+               UA 改走 UserAgentUtils.random() 与正式请求保持一致。
+            4. 路由名字面量集中到 AppPages 常量，所有 Get.toNamed
+               调用方改为引用常量，避免重命名遗漏。
+
+          - **工程规范**：
+            1. 修复 smoke_test 断言错误（ThemePreset 实际 6 个枚举值
+               而非 5，custom 占位色与 pink 相同导致 primaryColor 唯一性
+               断言失败），CI 之前必然失败的测试现已通过。
+            2. analysis_options.yaml 的 avoid_print 改为 true，
+               统一走 appLogger，避免生产代码漏出调试输出。
+            3. 启动异常不再静默吞掉，Splash 展示错误信息 + 重试按钮，
+               用户能看到失败原因并主动重试。
+
           NOTES_EOF
           # 移除 heredoc 导致的每行前导空格（保持 markdown 结构）
           sed -i 's/^          //' /tmp/release_notes.md

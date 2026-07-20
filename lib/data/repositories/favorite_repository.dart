@@ -18,28 +18,27 @@ class FavoriteRepository {
   FavoriteRepository(this._db);
 
   /// 获取全部收藏（按创建时间倒序，已补全 @ignore 详情字段）
+  ///
+  /// 旧实现每条记录都 findById 一次（N+1），改为一次 IN 查询批量补全。
   Future<List<Favorite>> getAllFavorites() async {
     final favs = await _db.favoriteDao.findAll();
     if (favs.isEmpty) return const [];
 
-    // 批量从 VideoDao 查询详情并补全 @ignore 字段
-    final enriched = <Favorite>[];
-    for (final fav in favs) {
-      final video = await _db.videoDao.findById(fav.videoId);
-      if (video != null) {
-        enriched.add(
-          fav.withDetail(
-            duration: video.duration,
-            playCount: video.playCount,
-            likeCount: video.likeCount,
-            updateTime: video.updateTime,
-          ),
-        );
-      } else {
-        enriched.add(fav);
-      }
-    }
-    return enriched;
+    // 批量查询 Video 详情，一次 SQL 拿全
+    final videoIds = favs.map((f) => f.videoId).toList();
+    final videos = await _db.videoDao.findByIds(videoIds);
+    final videoMap = {for (final v in videos) v.id: v};
+
+    return favs.map((fav) {
+      final v = videoMap[fav.videoId];
+      if (v == null) return fav;
+      return fav.withDetail(
+        duration: v.duration,
+        playCount: v.playCount,
+        likeCount: v.likeCount,
+        updateTime: v.updateTime,
+      );
+    }).toList();
   }
 
   /// 检查是否已收藏

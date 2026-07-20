@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 import 'package:screen_brightness/screen_brightness.dart';
 import 'package:video_player/video_player.dart' as vp;
@@ -51,7 +52,11 @@ class PlayerArgs {
 /// - 页面退出自动暂停释放播放器资源
 /// - 记录视频播放进度，再次进入自动续播
 /// - 适配解密后动态视频 URL 实时加载
-class PlayerPageController extends GetxController {
+///
+/// **生命周期**：实现 [WidgetsBindingObserver]，App 切到后台时自动暂停播放，
+/// 切回前台时按需恢复。避免后台继续播放音频被系统判定为异常占用资源。
+class PlayerPageController extends GetxController
+    with WidgetsBindingObserver {
   PlayerPageController({
     required this.args,
     required this.decryptor,
@@ -89,16 +94,55 @@ class PlayerPageController extends GetxController {
   double _originalVolume = 0.5;
   DateTime? _lastHistorySave;
 
+  /// App 切后台前是否正在播放（用于切回前台时恢复）
+  bool _wasPlayingBeforePause = false;
+
   @override
   void onInit() {
     super.onInit();
+    WidgetsBinding.instance.addObserver(this);
     _initializeAndPlay();
   }
 
   @override
   void onClose() {
     _disposeResources();
+    WidgetsBinding.instance.removeObserver(this);
     super.onClose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final vc = _videoController;
+    if (vc == null || !vc.value.isInitialized) return;
+
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.inactive:
+        // App 切后台/失焦 → 暂停播放，记录原状态用于恢复
+        _wasPlayingBeforePause = vc.value.isPlaying;
+        if (_wasPlayingBeforePause) {
+          vc.pause();
+        }
+        // 关闭屏幕常亮，避免后台未暂停时浪费电
+        try {
+          WakelockPlus.disable();
+        } catch (_) {}
+        break;
+      case AppLifecycleState.resumed:
+        // 切回前台 → 若之前在播放则恢复
+        if (_wasPlayingBeforePause) {
+          vc.play();
+          _wasPlayingBeforePause = false;
+          // 恢复屏幕常亮
+          try {
+            WakelockPlus.enable();
+          } catch (_) {}
+        }
+        break;
+      default:
+        break;
+    }
   }
 
   Future<void> _initializeAndPlay() async {

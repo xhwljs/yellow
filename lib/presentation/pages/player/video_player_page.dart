@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:video_player/video_player.dart' as vp;
 import 'package:yellow_depot/core/theme/app_theme.dart';
 import 'package:yellow_depot/core/theme/design_tokens.dart';
 import 'package:yellow_depot/presentation/controllers/video_player_controller.dart';
@@ -170,7 +171,13 @@ class _LoadingView extends StatelessWidget {
 /// 我们通过 [ChewieController] 注入主题色，外层叠加 [_BrightnessVolumeGesture]
 /// 处理**亮度/音量**纵向拖动（chewie 默认不支持亮度/音量手势）。
 /// 横向拖动、双击、点击等手势交给 chewie 处理，避免冲突。
-class _PlayingView extends StatelessWidget {
+///
+/// **实现为 StatefulWidget**：把 [ChewieController] 提升到 [State]：
+/// - 旧实现在 [build] 内 new ChewieController，每次 [Obx] 重建（播放进度变化）
+///   都会 dispose + new Chewie，引发黑屏、卡顿、内存抖动。
+/// - 现在 [initState] 创建一次，[dispose] 释放，[didUpdateWidget] 检测
+///   videoController 引用变化时才重建（如 retry 后换了底层 VideoPlayerController）。
+class _PlayingView extends StatefulWidget {
   final PlayerPageController controller;
   final bool showBufferingIndicator;
 
@@ -180,18 +187,70 @@ class _PlayingView extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final videoController = controller.videoController;
+  State<_PlayingView> createState() => _PlayingViewState();
+}
+
+class _PlayingViewState extends State<_PlayingView> {
+  ChewieController? _chewieController;
+  vp.VideoPlayerController? _boundVideoController;
+  Color? _boundPrimaryColor;
+
+  PlayerPageController get c => widget.controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _rebuildChewieIfNeeded(force: true);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 主题色变化时让 Chewie 重建以应用新颜色
+    _rebuildChewieIfNeeded();
+  }
+
+  @override
+  void didUpdateWidget(covariant _PlayingView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 父 widget 重建（如 showBufferingIndicator 变化）时检查是否需要重建 Chewie
+    _rebuildChewieIfNeeded();
+  }
+
+  @override
+  void dispose() {
+    _chewieController?.dispose();
+    _chewieController = null;
+    super.dispose();
+  }
+
+  /// 检查 videoController 引用 + 主题色是否变化，必要时重建 [ChewieController]
+  ///
+  /// [force] = true 时强制重建（[initState] 首次创建）。
+  void _rebuildChewieIfNeeded({bool force = false}) {
+    final videoController = c.videoController;
     if (videoController == null || !videoController.value.isInitialized) {
-      return const _LoadingView(message: '初始化播放器...');
+      return;
+    }
+    final primaryColor = AppTheme.colorsOf(context).primary;
+    if (!force &&
+        _chewieController != null &&
+        _boundVideoController == videoController &&
+        _boundPrimaryColor == primaryColor) {
+      return;
     }
 
-    final colors = AppTheme.colorsOf(context);
+    _chewieController?.dispose();
+    _chewieController = _buildChewieController(videoController, primaryColor);
+    _boundVideoController = videoController;
+    _boundPrimaryColor = primaryColor;
+  }
 
-    // ChewieController 必须在 build 中重建，以便主题色切换后立即生效。
-    // 注意：Chewie 内部会持有 controller 引用，重复创建不会泄漏
-    // （因为 oldController 会被 dispose）。
-    final chewieController = ChewieController(
+  ChewieController _buildChewieController(
+    vp.VideoPlayerController videoController,
+    Color primaryColor,
+  ) {
+    return ChewieController(
       videoPlayerController: videoController,
       autoPlay: false,
       looping: false,
@@ -201,26 +260,40 @@ class _PlayingView extends StatelessWidget {
       playbackSpeeds: const [0.5, 0.75, 1.0, 1.25, 1.5, 2.0],
       showControlsOnInitialize: true,
       materialProgressColors: ChewieProgressColors(
-        playedColor: colors.primary,
-        handleColor: colors.primary,
+        playedColor: primaryColor,
+        handleColor: primaryColor,
         bufferedColor: Colors.white38,
         backgroundColor: Colors.white24,
       ),
       customControls: const MaterialControls(
         showPlayButton: true,
       ),
-      placeholder: showBufferingIndicator
+      placeholder: widget.showBufferingIndicator
           ? Center(
-              child: CircularProgressIndicator(color: colors.primary),
+              child: CircularProgressIndicator(color: primaryColor),
             )
           : null,
       errorBuilder: (context, errorMessage) {
         return _PlayerErrorView(
           message: errorMessage,
-          onRetry: controller.retry,
+          onRetry: c.retry,
         );
       },
     );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final videoController = c.videoController;
+    if (videoController == null || !videoController.value.isInitialized) {
+      return const _LoadingView(message: '初始化播放器...');
+    }
+    // videoController 引用变了（如 retry 后）→ 重建 Chewie
+    _rebuildChewieIfNeeded();
+    final chewieController = _chewieController;
+    if (chewieController == null) {
+      return const _LoadingView(message: '初始化播放器...');
+    }
 
     return Stack(
       children: [
@@ -234,7 +307,7 @@ class _PlayingView extends StatelessWidget {
         // 亮度 / 音量手势层（仅纵向拖动，不拦截横向拖动/双击/点击）
         // 让 chewie 自带的手势（横向滑动快进 / 双击暂停 / 点击显示控件）正常工作。
         Positioned.fill(
-          child: _BrightnessVolumeGesture(controller: controller),
+          child: _BrightnessVolumeGesture(controller: c),
         ),
       ],
     );

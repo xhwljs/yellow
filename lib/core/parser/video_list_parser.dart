@@ -90,29 +90,6 @@ class VideoListParser {
     );
   }
 
-  /// 提取总页数（用于分页加载）
-  int parseTotalPages(String html) {
-    try {
-      final doc = html_parser.parse(html);
-      final pagination = doc.querySelector('.stui-page, .pagination, .page');
-      if (pagination == null) return 1;
-
-      final links = pagination.querySelectorAll('a');
-      var maxPage = 1;
-      for (final link in links) {
-        final href = link.attributes['href'] ?? '';
-        final match = RegExp(r'-(\d+)\.html').firstMatch(href);
-        if (match != null) {
-          final page = int.tryParse(match.group(1) ?? '1') ?? 1;
-          if (page > maxPage) maxPage = page;
-        }
-      }
-      return maxPage;
-    } catch (_) {
-      return 1;
-    }
-  }
-
   /// 提取 videoId（支持 `/v5/{aid}-{sid}-{nid}.html` 与旧 `/voddetail/{id}.html`）
   ///
   /// 返回值：

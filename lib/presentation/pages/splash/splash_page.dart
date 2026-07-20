@@ -7,6 +7,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:yellow_depot/core/constants/app_constants.dart';
 import 'package:yellow_depot/core/services/github_release_service.dart';
 import 'package:yellow_depot/core/theme/design_tokens.dart';
+import 'package:yellow_depot/core/utils/logger.dart';
 import 'package:yellow_depot/presentation/bindings/app_binding.dart';
 import 'package:yellow_depot/presentation/pages/main_shell.dart';
 import 'package:yellow_depot/presentation/widgets/update_dialog.dart';
@@ -74,6 +75,12 @@ class _SplashPageState extends State<SplashPage> {
   /// 当前加载阶段文案（动态更新）
   String _loadingText = '正在加载...';
 
+  /// 初始化失败的错误信息（非空时展示重试按钮）
+  ///
+  /// 旧实现把 initializeApp 异常静默吞掉，用户看到的是「卡在 Splash」，
+  /// 无法重试也无法获知原因。这里把错误展示出来并加重试按钮。
+  String _initError = '';
+
   /// 启动序列：initializeApp + checkForUpdate + 最小展示 2 秒
   ///
   /// [dialogContext] 是 MaterialApp 内部 Navigator 的 context，
@@ -82,12 +89,18 @@ class _SplashPageState extends State<SplashPage> {
     final stopwatch = Stopwatch()..start();
 
     // 阶段 1：初始化（数据 / 网络 / 主题）
-    setState(() => _loadingText = '正在加载应用数据...');
+    setState(() {
+      _loadingText = '正在加载应用数据...';
+      _initError = '';
+    });
     try {
       await initializeApp();
-    } catch (e) {
-      // 初始化失败仍然继续进入 App（用户可手动重试）
-      debugPrint('initializeApp failed: $e');
+    } catch (e, st) {
+      // 初始化失败：展示错误 + 重试按钮，不再继续后续阶段
+      appLogger.e('initializeApp failed', error: e, stackTrace: st);
+      if (!mounted) return;
+      setState(() => _initError = e.toString());
+      return;
     }
 
     // 阶段 2：检查更新（与剩余最小展示时间并行）
@@ -95,8 +108,9 @@ class _SplashPageState extends State<SplashPage> {
     GitHubRelease? update;
     try {
       update = await GitHubReleaseService.checkForUpdate();
-    } catch (e) {
-      debugPrint('checkForUpdate failed: $e');
+    } catch (e, st) {
+      // 更新检查失败不阻塞进入 App（用户离线时仍可使用）
+      appLogger.w('checkForUpdate failed: $e', error: e, stackTrace: st);
     }
 
     // 阶段 3：保证 splash 至少展示 2 秒（避免快速加载导致闪屏）
@@ -180,6 +194,9 @@ class _SplashPageState extends State<SplashPage> {
   }
 
   /// splash 主体内容（Logo / 名称 / 加载指示 / 版本号）
+  ///
+  /// 当 [_initError] 非空时切换为错误视图 + 重试按钮，
+  /// 让用户能看到初始化失败原因并主动重试。
   Widget _buildSplashBody() {
     return SizedBox(
       width: double.infinity,
@@ -197,8 +214,11 @@ class _SplashPageState extends State<SplashPage> {
           // 副标题
           _buildSubtitle(),
           const Spacer(flex: 3),
-          // 加载指示器
-          _buildLoadingIndicator(),
+          // 加载指示器 / 错误视图
+          if (_initError.isEmpty)
+            _buildLoadingIndicator()
+          else
+            _buildErrorIndicator(),
           const SizedBox(height: DesignTokens.spaceXl),
           // 版本号
           _buildVersion(),
@@ -206,6 +226,60 @@ class _SplashPageState extends State<SplashPage> {
         ],
       ),
     );
+  }
+
+  /// 初始化失败视图（错误图标 + 错误信息 + 重试按钮）
+  Widget _buildErrorIndicator() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: DesignTokens.spaceXl),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            PhosphorIconsRegular.warningCircle,
+            color: const Color(0xFFDC2626),
+            size: 40,
+          ),
+          const SizedBox(height: DesignTokens.spaceMd),
+          Text(
+            '初始化失败',
+            style: GoogleFonts.poppins(
+              fontSize: DesignTokens.textBody,
+              fontWeight: FontWeight.w600,
+              color: _kOnBackgroundColor,
+            ),
+          ),
+          const SizedBox(height: DesignTokens.spaceXs),
+          Text(
+            _initError,
+            textAlign: TextAlign.center,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.poppins(
+              fontSize: DesignTokens.textCaption,
+              color: _kOnBackgroundMutedColor,
+            ),
+          ),
+          const SizedBox(height: DesignTokens.spaceLg),
+          FilledButton.icon(
+            onPressed: _retryInitialization,
+            icon: const Icon(Icons.refresh, size: 18),
+            label: const Text('重试'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 重试初始化：清空错误状态后重新触发启动序列
+  void _retryInitialization() {
+    final ctx = _navigatorKey.currentContext;
+    if (ctx == null) return;
+    setState(() {
+      _initError = '';
+      _loadingText = '正在加载...';
+    });
+    _runStartupSequence(ctx);
   }
 
   /// Logo：圆角卡片容器 + phosphor FilmSlate 图标 + 渐变光晕

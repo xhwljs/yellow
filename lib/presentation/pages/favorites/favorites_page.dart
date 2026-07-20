@@ -6,6 +6,7 @@ import 'package:yellow_depot/core/theme/design_tokens.dart';
 import 'package:yellow_depot/data/models/favorite.dart';
 import 'package:yellow_depot/data/models/video.dart';
 import 'package:yellow_depot/presentation/controllers/favorites_controller.dart';
+import 'package:yellow_depot/presentation/routes/app_pages.dart';
 import 'package:yellow_depot/presentation/widgets/video_card.dart';
 
 /// 我的收藏页
@@ -69,7 +70,7 @@ class FavoritesPage extends GetView<FavoritesController> {
                 video: video,
                 isFavorited: true,
                 onTap: () => Get.toNamed(
-                  '/detail',
+                  AppPages.detail,
                   arguments: {
                     'videoId': fav.videoId,
                     'coverUrl': fav.coverUrl,

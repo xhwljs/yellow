@@ -61,8 +61,8 @@ void main() {
   });
 
   group('ThemePreset 主题预设', () {
-    test('应有 5 套预设', () {
-      expect(ThemePreset.values.length, 5);
+    test('应有 6 个枚举值（5 套预设 + custom）', () {
+      expect(ThemePreset.values.length, 6);
     });
 
     test('fromId 应支持往返', () {
@@ -75,10 +75,12 @@ void main() {
       expect(ThemePreset.fromId('not-exist'), ThemePreset.pink);
     });
 
-    test('每个预设应有不同的 primaryColor', () {
-      final colors =
-          ThemePreset.values.map((p) => p.primaryColor.value).toSet();
-      expect(colors.length, ThemePreset.values.length);
+    test('5 套预设之间应有不同的 primaryColor（custom 占位除外）', () {
+      final colors = ThemePreset.values
+          .where((p) => !p.isCustom)
+          .map((p) => p.primaryColor.value)
+          .toSet();
+      expect(colors.length, 5);
     });
   });
 

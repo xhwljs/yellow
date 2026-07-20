@@ -11,6 +11,14 @@ abstract class VideoDao {
   @Query('SELECT * FROM Video WHERE id = :id')
   Future<Video?> findById(String id);
 
+  /// 批量查询 — 用于历史/收藏列表一次性补全 @ignore 详情字段，
+  /// 避免 N+1 查询（旧实现每条记录都 findById 一次）。
+  ///
+  /// 不存在的 id 不会出现在返回结果中，调用方需自行处理缺失项。
+  /// 返回值不保证顺序与输入一致，调用方应按 id 索引使用。
+  @Query('SELECT * FROM Video WHERE id IN (:ids)')
+  Future<List<Video>> findByIds(List<String> ids);
+
   @Insert(onConflict: OnConflictStrategy.replace)
   Future<void> insertAll(List<Video> videos);
 

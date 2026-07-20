@@ -8,6 +8,7 @@ import 'package:yellow_depot/core/theme/design_tokens.dart';
 import 'package:yellow_depot/core/theme/theme_presets.dart';
 import 'package:yellow_depot/data/models/video_detail.dart';
 import 'package:yellow_depot/presentation/controllers/video_detail_controller.dart';
+import 'package:yellow_depot/presentation/routes/app_pages.dart';
 import 'package:yellow_depot/presentation/widgets/video_card.dart';
 
 /// 视频详情页
@@ -222,7 +223,7 @@ class VideoDetailPage extends GetView<VideoDetailController> {
                 child: VideoCard(
                   video: v,
                   onTap: () => Get.toNamed(
-                    '/detail',
+                    AppPages.detail,
                     arguments: {
                       'videoId': v.id,
                       'coverUrl': v.coverUrl,

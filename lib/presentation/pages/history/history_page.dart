@@ -7,6 +7,7 @@ import 'package:yellow_depot/core/theme/design_tokens.dart';
 import 'package:yellow_depot/core/theme/theme_presets.dart';
 import 'package:yellow_depot/data/models/play_history.dart';
 import 'package:yellow_depot/presentation/controllers/history_controller.dart';
+import 'package:yellow_depot/presentation/routes/app_pages.dart';
 import 'package:yellow_depot/presentation/widgets/video_card.dart';
 
 /// 播放历史页
@@ -104,7 +105,7 @@ class HistoryPage extends GetView<HistoryController> {
               child: _HistoryItem(
                 history: h,
                 onTap: () => Get.toNamed(
-                  '/detail',
+                  AppPages.detail,
                   arguments: {
                     'videoId': h.videoId,
                     'coverUrl': h.coverUrl,

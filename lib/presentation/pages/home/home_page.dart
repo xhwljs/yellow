@@ -8,6 +8,7 @@ import 'package:yellow_depot/core/theme/theme_presets.dart';
 import 'package:yellow_depot/data/models/category.dart';
 import 'package:yellow_depot/data/models/video.dart';
 import 'package:yellow_depot/presentation/controllers/home_controller.dart';
+import 'package:yellow_depot/presentation/routes/app_pages.dart';
 import 'package:yellow_depot/presentation/widgets/video_card.dart';
 
 /// 首页
@@ -129,7 +130,7 @@ class HomePage extends GetView<HomeController> {
   /// - 圆角顶部 + drag handle（MD3 BottomSheet 风格）
   /// - 标题栏：左侧"目录"标题 + 右侧"取消"按钮
   /// - 列表项：左侧分类名 + 右侧视频数量（如 "4827"）
-  /// - 点击项关闭 BottomSheet 并 Get.toNamed('/category')
+  /// - 点击项关闭 BottomSheet 并 Get.toNamed(AppPages.category)
   void _showCatalogSheet(BuildContext context, ThemeColors colors) {
     showModalBottomSheet<void>(
       context: context,
@@ -249,7 +250,7 @@ class HomePage extends GetView<HomeController> {
                         onTap: () {
                           Navigator.of(sheetContext).pop();
                           // 跳转到独立分类页（保留完整分页能力）
-                          Get.toNamed('/category', arguments: c.id);
+                          Get.toNamed(AppPages.category, arguments: c.id);
                         },
                       );
                     },
@@ -274,7 +275,7 @@ class HomePage extends GetView<HomeController> {
         horizontal: DesignTokens.spaceMd,
       ),
       child: GestureDetector(
-        onTap: () => Get.toNamed('/search'),
+        onTap: () => Get.toNamed(AppPages.search),
         behavior: HitTestBehavior.opaque,
         child: Container(
           padding: const EdgeInsets.symmetric(
@@ -468,7 +469,7 @@ class HomePage extends GetView<HomeController> {
             return VideoCard(
               video: v,
               onTap: () => Get.toNamed(
-                '/detail',
+                AppPages.detail,
                 arguments: {
                   'videoId': v.id,
                   'coverUrl': v.coverUrl,
@@ -530,7 +531,7 @@ class HomePage extends GetView<HomeController> {
                 GestureDetector(
                   onTap: () {
                     // 跳转到独立分类页（保留完整分页能力）
-                    Get.toNamed('/category', arguments: category.id);
+                    Get.toNamed(AppPages.category, arguments: category.id);
                   },
                   behavior: HitTestBehavior.opaque,
                   child: Padding(
@@ -593,7 +594,7 @@ class HomePage extends GetView<HomeController> {
                     child: VideoCard(
                       video: v,
                       onTap: () => Get.toNamed(
-                        '/detail',
+                        AppPages.detail,
                         arguments: {
                           'videoId': v.id,
                           'coverUrl': v.coverUrl,

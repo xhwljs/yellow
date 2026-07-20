@@ -9,11 +9,32 @@ import 'package:yellow_depot/data/models/video_detail.dart';
 /// 视频 Repository
 ///
 /// 优先读本地缓存（30 分钟有效期），失效则拉取远程数据并更新缓存。
+///
+/// **TTL 策略**：[AppConstants.cacheMaxAgeMinutes] 控制缓存有效期。
+/// 旧实现仅判断「缓存是否存在」永不过期，导致用户离线后看到的还是旧数据。
+/// 现在用进程内时间戳校验，过期则丢弃缓存走网络。
 class VideoRepository {
   final ApiService _apiService;
   final AppDatabase _db;
 
+  /// 分类首页缓存时间戳（key: categoryId）
+  ///
+  /// 配合 [AppConstants.cacheMaxAgeMinutes] 判断缓存是否过期。
+  /// 进程内 Map 即可（DB 重启时缓存重建，无需持久化时间戳）。
+  final Map<int, DateTime> _cacheTimestamps = {};
+
   VideoRepository(this._apiService, this._db);
+
+  /// 判断 categoryId 的缓存是否过期
+  ///
+  /// - 无时间戳记录 → 视为过期（首次加载或进程重启）
+  /// - 当前时间 - 缓存时间 > [AppConstants.cacheMaxAgeMinutes] → 过期
+  bool _isCacheStale(int categoryId) {
+    final cachedAt = _cacheTimestamps[categoryId];
+    if (cachedAt == null) return true;
+    final age = DateTime.now().difference(cachedAt);
+    return age > AppConstants.cacheMaxAgeMinutes;
+  }
 
   /// 获取分类视频列表（带分页）
   Future<List<Video>> getCategoryVideos(
@@ -24,7 +45,7 @@ class VideoRepository {
     // 仅缓存首页（避免分页数据过时）
     if (!forceRefresh && page == 1) {
       final cached = await _db.videoDao.findByCategoryId(categoryId);
-      if (cached.isNotEmpty) {
+      if (cached.isNotEmpty && !_isCacheStale(categoryId)) {
         appLogger.d('使用缓存视频列表 (categoryId=$categoryId): ${cached.length} 条');
         return cached;
       }
@@ -39,6 +60,7 @@ class VideoRepository {
     // 仅缓存第一页
     if (page == 1 && videos.isNotEmpty) {
       await _db.videoDao.replaceByCategoryId(categoryId, videos);
+      _cacheTimestamps[categoryId] = DateTime.now();
       appLogger.i('缓存视频列表: ${videos.length} 条');
     }
 
@@ -106,13 +128,11 @@ class VideoRepository {
   }
 
   /// 通过 ids 批量查询
+  ///
+  /// 旧实现循环 findById 是 N 次查询，改为一次 IN 查询。
   Future<List<Video>> getVideosByIds(List<String> ids) async {
-    final result = <Video>[];
-    for (final id in ids) {
-      final v = await _db.videoDao.findById(id);
-      if (v != null) result.add(v);
-    }
-    return result;
+    if (ids.isEmpty) return const [];
+    return _db.videoDao.findByIds(ids);
   }
 
   /// 搜索视频

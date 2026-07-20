@@ -23,8 +23,15 @@ import 'package:yellow_depot/presentation/controllers/history_controller.dart';
 /// （播放/暂停/进度/全屏/倍速/横向滑动快进/双击暂停/控件自动隐藏）。
 ///
 /// 全屏播放使用 chewie 内联播放器自带的全屏按钮（点击切换横屏全屏），
-/// 不再需要 FAB 跳转到独立的播放页。[goToPlayer] 保留作为备用入口。
-class VideoDetailController extends GetxController {
+/// 不再需要 FAB 跳转到独立的播放页。
+///
+/// **生命周期**：实现 [WidgetsBindingObserver]，App 切到后台时自动暂停播放，
+/// 切回前台时按需恢复。避免后台继续播放音频被系统判定为异常占用资源。
+///
+/// **历史记录节流**：[_historySaveInterval] 控制 DB 写入节奏（5s 一次），
+/// HistoryController 的 RxList 刷新做 2s 节流，避免每秒重建 History Tab。
+class VideoDetailController extends GetxController
+    with WidgetsBindingObserver {
   final VideoRepository _videoRepo;
   final FavoriteRepository _favoriteRepo;
   final HistoryRepository _historyRepo;
@@ -70,11 +77,25 @@ class VideoDetailController extends GetxController {
 
   // 历史记录实时保存
   //
-  // 每秒读取 video_player 当前 position/duration 写入数据库，
+  // 每 5 秒读取 video_player 当前 position/duration 写入数据库，
   // 并同步刷新 HistoryController 的 RxList，让 History Tab 实时更新。
   // 退出详情页（onClose）时也会保存最后一次进度。
+  //
+  // 旧实现是 1 秒一次，长时间播放会带来 DB 写放大 + RxList 全量重建。
+  // 现在改为 5 秒一次（与文档对齐），HistoryController 刷新也做 2s 节流，
+  // 让 UI 仍有「实时更新」体验但不会卡顿。
   Timer? _historySaveTimer;
-  static const Duration _historySaveInterval = Duration(seconds: 1);
+  static const Duration _historySaveInterval = Duration(seconds: 5);
+
+  /// HistoryController 刷新节流定时器
+  ///
+  /// 每次 [_saveHistoryFromPlayer] 完成后调 [_refreshHistoryController]，
+  /// 但全量 loadHistory() 触发 RxList 重建会引发 History Tab UI 重建。
+  /// 这里用 2 秒节流：5s 保存周期内最多刷新一次 UI。
+  Timer? _historyRefreshThrottle;
+
+  /// App 切后台前是否正在播放（用于切回前台时恢复）
+  bool _wasPlayingBeforePause = false;
 
   /// 当前生效的封面 URL
   ///
@@ -96,6 +117,7 @@ class VideoDetailController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    WidgetsBinding.instance.addObserver(this);
     loadDetail();
   }
 
@@ -105,8 +127,43 @@ class VideoDetailController extends GetxController {
     _saveHistoryFromPlayer();
     _historySaveTimer?.cancel();
     _historySaveTimer = null;
+    _historyRefreshThrottle?.cancel();
+    _historyRefreshThrottle = null;
     _disposeInlinePlayer();
+    WidgetsBinding.instance.removeObserver(this);
     super.onClose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final vc = inlineVideoController.value;
+    if (vc == null || !vc.value.isInitialized) return;
+
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.inactive:
+        // App 切后台/失焦 → 暂停播放，记录原状态用于恢复
+        _wasPlayingBeforePause = vc.value.isPlaying;
+        if (_wasPlayingBeforePause) {
+          vc.pause();
+        }
+        // 同时暂停历史保存定时器，避免后台继续写 DB
+        _historySaveTimer?.cancel();
+        _historySaveTimer = null;
+        break;
+      case AppLifecycleState.resumed:
+        // 切回前台 → 若之前在播放则恢复，并继续定时保存
+        if (_wasPlayingBeforePause) {
+          vc.play();
+          _wasPlayingBeforePause = false;
+        }
+        if (inlineChewieController.value != null && _historySaveTimer == null) {
+          _startHistorySaveTimer();
+        }
+        break;
+      default:
+        break;
+    }
   }
 
   Future<void> loadDetail() async {
@@ -297,23 +354,6 @@ class VideoDetailController extends GetxController {
     await startInlinePlay();
   }
 
-  /// 跳转到全屏播放页（保留现有逻辑，不受内联播放器影响）
-  void goToPlayer() {
-    final d = detail.value;
-    if (d == null) return;
-    Get.toNamed(
-      '/player',
-      arguments: {
-        'videoId': videoId,
-        'title': effectiveTitle,
-        'coverUrl': effectiveCoverUrl,
-        'categoryId': d.video.categoryId,
-        'initialPositionMs': initialPositionMs.value,
-        'existingDetail': d,
-      },
-    );
-  }
-
   void _disposeInlinePlayer() {
     try {
       inlineChewieController.value?.dispose();
@@ -382,8 +422,17 @@ class VideoDetailController extends GetxController {
   ///
   /// 调用 [HistoryController.loadHistory] 会触发 RxList 重建，
   /// History Tab 的 Obx 自动重建 UI，实现"实时添加到播放历史列表"。
+  ///
+  /// **节流**：5s 保存周期内最多刷新一次 UI（2s 节流），避免 History Tab
+  /// 频繁重建导致卡顿。最后一次刷新会在节流定时器触发时执行。
   void _refreshHistoryController() {
     if (!Get.isRegistered<HistoryController>()) return;
-    Get.find<HistoryController>().loadHistory();
+    // 已有待触发的节流定时器 → 不重复安排
+    if (_historyRefreshThrottle?.isActive ?? false) return;
+    _historyRefreshThrottle =
+        Timer(const Duration(seconds: 2), () {
+      if (!Get.isRegistered<HistoryController>()) return;
+      Get.find<HistoryController>().loadHistory();
+    });
   }
 }

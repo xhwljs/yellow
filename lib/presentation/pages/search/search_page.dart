@@ -5,6 +5,7 @@ import 'package:yellow_depot/core/theme/app_theme.dart';
 import 'package:yellow_depot/core/theme/design_tokens.dart';
 import 'package:yellow_depot/core/theme/theme_presets.dart';
 import 'package:yellow_depot/presentation/controllers/search_controller.dart';
+import 'package:yellow_depot/presentation/routes/app_pages.dart';
 import 'package:yellow_depot/presentation/widgets/video_card.dart';
 
 /// 搜索页
@@ -96,7 +97,7 @@ class SearchPage extends GetView<SearchController> {
           return VideoCard(
             video: v,
             onTap: () => Get.toNamed(
-              '/detail',
+              AppPages.detail,
               arguments: {
                 'videoId': v.id,
                 'coverUrl': v.coverUrl,

@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yellow_depot/core/constants/app_constants.dart';
 import 'package:yellow_depot/core/network/dio_client.dart';
+import 'package:yellow_depot/core/utils/user_agent_utils.dart';
 import 'package:yellow_depot/data/database/app_database.dart';
 import 'package:yellow_depot/presentation/controllers/favorites_controller.dart';
 import 'package:yellow_depot/presentation/controllers/history_controller.dart';
@@ -317,23 +318,7 @@ class ApiServerSwitcher {
   /// Quantum 反爬系统会概率性返回 418，但服务器实际可用。
   /// App 后续请求会通过 RetryInterceptor 自动重试 + 切换 UA 绕过。
   static Future<bool> _lastFetchWasAntiCrawler(String baseUrl) async {
-    final dio = Dio(
-      BaseOptions(
-        baseUrl: baseUrl,
-        connectTimeout: const Duration(seconds: 5),
-        receiveTimeout: const Duration(seconds: 5),
-        followRedirects: true,
-        validateStatus: (s) => s != null,
-        responseType: ResponseType.plain,
-        headers: {
-          'User-Agent':
-              'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 '
-              '(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-        },
-      ),
-    );
+    final dio = _buildProbeDio(baseUrl);
     try {
       final resp = await dio.get<String>('/');
       // 418 = Quantum 反爬系统拦截，服务器实际存在
@@ -349,7 +334,26 @@ class ApiServerSwitcher {
   ///
   /// 失败（网络错误/超时）返回 null。
   static Future<String?> _fetchHomepage(String baseUrl) async {
-    final dio = Dio(
+    final dio = _buildProbeDio(baseUrl);
+    try {
+      final resp = await dio.get<String>('/');
+      return resp.data ?? '';
+    } catch (_) {
+      return null;
+    } finally {
+      dio.close();
+    }
+  }
+
+  /// 统一装配「探测用」Dio — 用于 [_fetchHomepage] / [_lastFetchWasAntiCrawler]
+  ///
+  /// 不同于 [DioClient._buildDio]：
+  /// - 短超时（5s），快速判断连通性
+  /// - 不走拦截器链（无 Cookie/Retry/Error），返回原始响应
+  /// - validateStatus 接受所有状态码（跳转壳也返回 200，Quantum 反爬返回 418）
+  /// - UA 走 [UserAgentUtils.random()] 与正式请求保持一致
+  static Dio _buildProbeDio(String baseUrl) {
+    return Dio(
       BaseOptions(
         baseUrl: baseUrl,
         connectTimeout: const Duration(seconds: 5),
@@ -359,23 +363,13 @@ class ApiServerSwitcher {
         validateStatus: (s) => s != null,
         responseType: ResponseType.plain,
         headers: {
-          // 模拟移动浏览器 UA，避免源站对默认 Dio UA 反爬返回错误内容
-          'User-Agent':
-              'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 '
-              '(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'User-Agent': UserAgentUtils.random(),
+          'Accept':
+              'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
           'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
         },
       ),
     );
-    try {
-      final resp = await dio.get<String>('/');
-      return resp.data ?? '';
-    } catch (_) {
-      return null;
-    } finally {
-      dio.close();
-    }
   }
 
   /// 检测 HTML 是否包含 macCMS 标志（任一命中即视为真实源站）
@@ -517,9 +511,7 @@ class ApiServerSwitcher {
         followRedirects: false, // 不自动跟随，拿原始 302
         validateStatus: (s) => s != null, // 接受所有状态码
         headers: {
-          'User-Agent':
-              'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 '
-              '(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+          'User-Agent': UserAgentUtils.random(),
         },
       ),
     );
