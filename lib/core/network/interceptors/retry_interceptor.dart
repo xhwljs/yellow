@@ -116,8 +116,21 @@ class RetryInterceptor extends Interceptor {
         return code >= 500 && code < 600;
       case DioExceptionType.cancel:
       case DioExceptionType.badCertificate:
-      case DioExceptionType.unknown:
         return false;
+      case DioExceptionType.unknown:
+        // unknown 类型常见原因：
+        // - DNS 解析失败（域名暂时不可达）
+        // - SocketException（连接重置、网络切换）
+        // - HandshakeException（TLS 握手失败，源站偶发）
+        // - 反爬系统主动断开连接
+        // 这些通常是暂时的，重试可恢复
+        // 排除用户主动取消（cancel 已在上面处理）
+        final msg = err.error?.toString() ?? err.message ?? '';
+        // 手动 cancel 信息（部分场景被包装成 unknown）
+        if (msg.contains('cancelled') || msg.contains('Canceled')) {
+          return false;
+        }
+        return true;
     }
   }
 }

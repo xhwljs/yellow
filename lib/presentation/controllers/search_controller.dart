@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:yellow_depot/core/utils/logger.dart';
 import 'package:yellow_depot/data/models/video.dart';
 import 'package:yellow_depot/data/repositories/video_repository.dart';
 import 'package:yellow_depot/data/services/search_history_service.dart';
@@ -159,8 +160,13 @@ class SearchController extends GetxController {
         results.addAll(list);
         _currentPage = next;
       }
-    } catch (_) {
-      // 加载更多失败静默
+    } catch (e, st) {
+      // 加载更多失败静默（避免重置已有列表），但记日志便于排查
+      appLogger.w(
+        'SearchController.loadMore 失败 (keyword=$text page=${_currentPage + 1})',
+        error: e,
+        stackTrace: st,
+      );
     } finally {
       isLoadingMore.value = false;
     }

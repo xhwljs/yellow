@@ -261,71 +261,38 @@ jobs:
 
           [强制更新]
 
+          ### 修复
+          - **DioException [unknown] 未知网络错误**：
+            原因是 RetryInterceptor 之前对 DioExceptionType.unknown 不重试，
+            导致 DNS 解析失败、SocketException、HandshakeException、源站主动
+            断开连接（反爬）等暂态错误直接抛给用户。修复：
+            1. RetryInterceptor 对 GET 请求的 unknown 类型也重试 3 次
+               （排除用户主动 cancel 场景）。
+            2. ErrorInterceptor 对 unknown 类型按错误信息分类给友好提示：
+               - DNS / SocketException → "网络连接失败，请检查网络或切换镜像"
+               - TLS / 证书 → "安全连接失败，请稍后重试"
+               - 连接重置 / 断开 → "连接被重置，请稍后重试"
+               - 其他 → "网络异常，请稍后重试"
+
           ### 改进
-          - **播放页加载动画内嵌化**：
-            旧版进入播放页时是单独的全屏 LoadingView（黑色背景 + 居中 loading 圈），
-            视觉跳变明显，且与详情页封面无衔接。改为始终展示 SliverAppBar
-            （含列表页传入的封面占位 + 返回按钮 + 收藏按钮），下方用
-            SliverFillRemaining 居中显示轻量 loading 圈 + "加载中..." 文案。
-            详情加载完成后平滑切换为详情主体，加载/错误状态都在 SliverAppBar
-            下方呈现，避免页面跳变，提升用户体验。
+          - **完善分类页/搜索页下拉加载下一页**：
+            1. CategoryPage._onScroll 加显式 UI 层锁（isLoadingMore /
+               isLoading / !hasMore 提前 return），避免冗余调用。
+            2. SearchPage._buildResults 的 NotificationListener 之前仅在
+               ScrollEndNotification 触发，惯性滑动可能错过；现在加上
+               OverscrollNotification 触发，且加显式 UI 层锁。
+            3. CategoryController.loadMore / SearchController.loadMore 加
+               appLogger 日志，加载更多失败便于排查。
+            4. 418 反爬 + unknown 暂态错误由 RetryInterceptor 自动重试，
+               重试 3 次仍失败才会触发加载更多失败。
 
-          - **播放页显示播放量/收藏数/发布时间等元信息**：
-            VideoDetailParser 之前把 playCount/likeCount/updateTime 写死为
-            0/0/''，导致从详情页解析出来的 Video 缺失元信息，UI 上无法显示。
-            改进：
-            1. VideoDetailParser 新增 _extractPlayCount/_extractLikeCount/
-               _extractUpdateTime 方法，尝试从详情页 HTML 提取
-               （多 selector 兜底：.stui-content__detail / .stui-content /
-               .module-info-content / body，匹配 fa-eye/fa-heart 图标
-               所在父元素的数字，以及带"更新时间/发布时间"标签的日期）。
-            2. VideoRepository.cacheVideo 改为返回合并后的 Video
-               （之前返回 void），调用方可直接拿到含完整元信息的数据。
-            3. VideoDetailController.loadDetail 用 cacheVideo 返回的
-               merged Video 回填 detail.value.video，让 UI 立即显示
-               播放量/收藏数/发布时间等信息。
-            4. 当详情页 HTML 无法提取元信息时（如站点结构变化），
-               cacheVideo 合并策略会用 VideoDao 中列表页缓存的正确数据补全，
-               确保 UI 始终有元信息可显示。
-
-          - **播放器稳定性优化**：
-            1. App 切后台自动暂停播放，切回前台按需恢复，避免后台继续
-               播放音频被系统判定为异常占用资源（详情页内联播放器 + 全屏
-               播放页都加 WidgetsBindingObserver）。
-            2. ChewieController 提升到 StatefulWidget 的 State 中，
-               不再每次 Obx 重建都 new/dispose Chewie，避免黑屏、卡顿、
-               内存抖动。
-            3. 历史记录保存从 1s 节流改为 5s（与文档对齐），HistoryController
-               列表刷新做 2s 节流，避免长时间播放时 DB 写放大 + RxList
-               全量重建导致卡顿。
-
-          - **性能与缓存优化**：
-            1. 收藏/历史列表从 VideoDao 补全 @ignore 详情字段，旧实现
-               是 N+1 查询（每条记录都 findById），改为一次 IN 查询批量
-               补全，列表加载速度显著提升。
-            2. VideoRepository 缓存 TTL 真正生效（旧实现只判断「缓存是否存在」
-               永不过期），30 分钟过期后自动走网络拉取最新数据。
-            3. 历史记录 trimOld 仅在条数超过阈值 1.2 倍时才触发，避免
-               每次 upsert 都跑 DELETE（5s 保存周期下 DB 写放大明显）。
-
-          - **代码整洁度**：
-            1. 删除死代码：VideoDetailController.goToPlayer /
-               VideoListParser.parseTotalPages（全工程无调用）。
-            2. DioClient.ensureInitialized 与 rebuildWithBaseUrl 抽取
-               _buildDio 私有方法去重（~70 行重复代码合并）。
-            3. ApiServerSwitcher 3 处 Dio 装配抽取 _buildProbeDio，
-               UA 改走 UserAgentUtils.random() 与正式请求保持一致。
-            4. 路由名字面量集中到 AppPages 常量，所有 Get.toNamed
-               调用方改为引用常量，避免重命名遗漏。
-
-          - **工程规范**：
-            1. 修复 smoke_test 断言错误（ThemePreset 实际 6 个枚举值
-               而非 5，custom 占位色与 pink 相同导致 primaryColor 唯一性
-               断言失败），CI 之前必然失败的测试现已通过。
-            2. analysis_options.yaml 的 avoid_print 改为 true，
-               统一走 appLogger，避免生产代码漏出调试输出。
-            3. 启动异常不再静默吞掉，Splash 展示错误信息 + 重试按钮，
-               用户能看到失败原因并主动重试。
+          - **分类切换从第一页开始显示**：
+            CategoryBinding / SearchBinding 之前用 Get.lazyPut 是 lazy 单例，
+            第二次从卷帘菜单切换到不同 categoryId 时会复用旧实例（categoryId
+            不变），导致显示的还是旧分类内容。改为：
+            1. Get.lazyPut → Get.put（每次 push 路由都创建新实例）。
+            2. binding 中先 Get.delete 清掉旧实例（路由 pop 时可能未释放）。
+            3. 保证每次进入分类页都从该分类的第 1 页开始加载。
 
           NOTES_EOF
           # 移除 heredoc 导致的每行前导空格（保持 markdown 结构）

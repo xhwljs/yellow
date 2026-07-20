@@ -50,8 +50,27 @@ class ErrorInterceptor extends Interceptor {
       case DioExceptionType.badCertificate:
         return const NetworkException('证书校验失败');
       case DioExceptionType.unknown:
+        // unknown 类型常见原因：DNS 解析失败、SocketException、
+        // HandshakeException、源站主动断开连接（反爬）。
+        // 给用户更友好的提示而非"未知网络错误"。
+        final msg = err.error?.toString() ?? err.message ?? '';
+        if (msg.contains('Failed host lookup') ||
+            msg.contains('SocketException') ||
+            msg.contains('DNS')) {
+          return const NetworkException('网络连接失败，请检查网络或切换镜像');
+        }
+        if (msg.contains('HandshakeException') ||
+            msg.contains('TLS') ||
+            msg.contains('certificate')) {
+          return const NetworkException('安全连接失败，请稍后重试');
+        }
+        if (msg.contains('Connection reset') ||
+            msg.contains('Broken pipe') ||
+            msg.contains('Connection closed')) {
+          return const NetworkException('连接被重置，请稍后重试');
+        }
         return NetworkException(
-          err.message ?? '未知网络错误',
+          msg.isNotEmpty ? msg : '网络异常，请稍后重试',
           cause: err,
         );
     }

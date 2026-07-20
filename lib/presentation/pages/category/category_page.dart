@@ -36,11 +36,15 @@ class _CategoryPageState extends State<CategoryPage> {
   void _onScroll() {
     if (!_scrollController.hasClients) return;
     final pos = _scrollController.position;
-    if (pos.pixels >= pos.maxScrollExtent - 100) {
-      if (!_controller.isLoadingMore.value && _controller.hasMore.value) {
-        _controller.loadMore();
-      }
+    if (pos.pixels < pos.maxScrollExtent - 100) return;
+    // 显式锁：isLoadingMore / isLoading / !hasMore 都跳过
+    // controller.loadMore 内部也有锁，这里提前 return 避免冗余调用
+    if (_controller.isLoadingMore.value ||
+        _controller.isLoading.value ||
+        !_controller.hasMore.value) {
+      return;
     }
+    _controller.loadMore();
   }
 
   @override

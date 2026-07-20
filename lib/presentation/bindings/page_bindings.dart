@@ -9,25 +9,43 @@ import 'package:yellow_depot/presentation/controllers/video_detail_controller.da
 import 'package:yellow_depot/presentation/controllers/video_player_controller.dart';
 
 /// 分类页 Binding
+///
+/// **每次 push 都重建 CategoryController**：
+/// 旧版用 `Get.lazyPut` 是 lazy 单例，第二次从卷帘菜单切换到不同 categoryId
+/// 时会复用旧实例（categoryId 不变），导致显示的还是旧分类内容。
+/// 现在改为：先 `Get.delete` 清掉旧实例（如存在），再 `Get.put` 创建新实例，
+/// 保证每次进入分类页都从该分类的第一页开始加载。
 class CategoryBinding extends Bindings {
   @override
   void dependencies() {
     final categoryId = int.tryParse(Get.arguments.toString()) ?? 0;
-    Get.lazyPut<CategoryController>(
-      () => CategoryController(
+    // 清掉旧实例（路由 pop 时可能未释放）
+    if (Get.isRegistered<CategoryController>()) {
+      Get.delete<CategoryController>();
+    }
+    Get.put<CategoryController>(
+      CategoryController(
         Get.find<VideoRepository>(),
         categoryId: categoryId,
       ),
+      permanent: false,
     );
   }
 }
 
 /// 搜索页 Binding
+///
+/// 每次进入搜索页都创建新实例，重置搜索关键字与结果列表
+/// （旧版 lazyPut 单例会保留上一次搜索结果，体验不直观）。
 class SearchBinding extends Bindings {
   @override
   void dependencies() {
-    Get.lazyPut<SearchController>(
-      () => SearchController(Get.find<VideoRepository>()),
+    if (Get.isRegistered<SearchController>()) {
+      Get.delete<SearchController>();
+    }
+    Get.put<SearchController>(
+      SearchController(Get.find<VideoRepository>()),
+      permanent: false,
     );
   }
 }

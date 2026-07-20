@@ -65,11 +65,25 @@ class SearchPage extends GetView<SearchController> {
   Widget _buildResults(ThemeColors colors) {
     return NotificationListener<ScrollNotification>(
       onNotification: (notification) {
-        if (notification is ScrollEndNotification &&
-            notification.metrics.pixels >=
-                notification.metrics.maxScrollExtent - 200) {
-          controller.loadMore();
+        // 滚动接近底部时加载下一页
+        // - 仅在 ScrollEndNotification 或 OverscrollNotification 时触发，
+        //   避免滑动过程中频繁调用
+        // - 显式 UI 层锁：isLoadingMore / isLoading / !hasMore 都跳过，
+        //   controller.loadMore 内部也有锁，这里提前 return 避免冗余调用
+        final isEnd = notification is ScrollEndNotification;
+        final isOverScroll = notification is OverscrollNotification &&
+            notification.overscroll > 0;
+        if (!isEnd && !isOverScroll) return false;
+        if (notification.metrics.pixels <
+            notification.metrics.maxScrollExtent - 200) {
+          return false;
         }
+        if (controller.isLoadingMore.value ||
+            controller.isLoading.value ||
+            !controller.hasMore.value) {
+          return false;
+        }
+        controller.loadMore();
         return false;
       },
       child: GridView.builder(
