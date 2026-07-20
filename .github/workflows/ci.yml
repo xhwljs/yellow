@@ -255,19 +255,25 @@ jobs:
           # 1. 本次具体修改内容（让用户知道更新了什么）
           # 2. "[强制更新]" 标记（App 启动时 GitHubReleaseService 解析此标记
           #    设置 forceUpdate=true，UpdateDialog 仅显示"立即更新"按钮）
-          # 本次为非强制更新（不含 [强制更新] 标记），用户可选择是否更新。
+          # 本次为强制更新（含 [强制更新] 标记），用户必须更新到新版本。
           cat > /tmp/release_notes.md <<'NOTES_EOF'
           ## 本次更新内容
 
-          ### 改进
-          - **"两次返回键退出"提示移到底部**：
-            原提示放在屏幕中央视觉奇怪，改为底部对齐（符合"退出应用"
-            的语义习惯），同时通过固定 bottom inset（88dp）避开
-            BottomNavigationBar，不遮挡 tab 页：
-            1. Toast 定位在屏幕底部、tab bar 上方，水平居中。
-            2. SafeArea 处理底部手势条，Padding(bottom: 88) 推过 tab bar。
-            3. 保留倒计时进度环 + signOut 图标 + fade/scale 动画。
-            4. IgnorePointer 不拦截下层手势，仍可操作 tab 页。
+          [强制更新]
+
+          ### 优化
+          - **播放视频时屏幕常亮不锁屏**：
+            进入播放页立即开启屏幕常亮，避免视频播放中、解析阶段屏幕自动
+            锁屏中断播放。
+            1. PlayerPageController.onInit 提前调用 WakelockPlus.enable()，
+               覆盖 decrypting 解析阶段（原实现仅在解析完成后才开启）。
+            2. 维持原有生命周期管理：
+               - App 切后台 paused → WakelockPlus.disable()（省电）
+               - App 切回前台 resumed 且 wasPlaying → WakelockPlus.enable()
+               - 页面退出 onClose / _disposeResources → WakelockPlus.disable()
+            3. wakelock_plus 使用 FLAG_KEEP_SCREEN_ON（WindowManager flag），
+               非 PowerManager WakeLock，**无需 WAKE_LOCK 权限**，无需修改
+               AndroidManifest.xml，无需运行时权限请求。
 
           NOTES_EOF
           # 移除 heredoc 导致的每行前导空格（保持 markdown 结构）

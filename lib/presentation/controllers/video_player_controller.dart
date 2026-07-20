@@ -101,6 +101,11 @@ class PlayerPageController extends GetxController
   void onInit() {
     super.onInit();
     WidgetsBinding.instance.addObserver(this);
+    // 进入播放页立即开启屏幕常亮 — 即使解析阶段（decrypting）耗时数秒
+    // 也保持屏幕常亮，避免锁屏中断播放初始化流程。
+    // wakelock_plus 使用 FLAG_KEEP_SCREEN_ON（WindowManager flag），
+    // 不是 PowerManager WakeLock，无需 WAKE_LOCK 权限。
+    WakelockPlus.enable().catchError((_) {});
     _initializeAndPlay();
   }
 
@@ -156,10 +161,8 @@ class PlayerPageController extends GetxController
       _detail = result.detail;
       _currentPlayUrl = result.playUrl;
 
-      // 2. 开启屏幕常亮
-      await WakelockPlus.enable();
-
-      // 3. 记录原始亮度/音量
+      // 2. 记录原始亮度/音量
+      // （屏幕常亮已在 onInit 中开启，此处无需重复调用）
       try {
         // screen_brightness 1.0.1 API：current getter（2.x 改名为 application）
         _originalBrightness = await _screenBrightness.current;
@@ -170,7 +173,7 @@ class PlayerPageController extends GetxController
         volume.value = _originalVolume;
       } catch (_) {}
 
-      // 4. 初始化 video_player
+      // 3. 初始化 video_player
       state.value = PlayerState.loading;
       _videoController = vp.VideoPlayerController.networkUrl(
         Uri.parse(_currentPlayUrl!),
@@ -185,23 +188,23 @@ class PlayerPageController extends GetxController
             onTimeout: () => throw const TimeoutException('视频初始化超时'),
           );
 
-      // 5. 续播
+      // 4. 续播
       if (args.initialPositionMs > 0) {
         await _videoController!.seekTo(
           Duration(milliseconds: args.initialPositionMs),
         );
       }
 
-      // 6. 设置初始时长
+      // 5. 设置初始时长
       durationMs.value = _videoController!.value.duration.inMilliseconds;
 
-      // 7. 监听播放器状态
+      // 6. 监听播放器状态
       _videoController!.addListener(_onVideoUpdate);
 
-      // 8. 设置倍速
+      // 7. 设置倍速
       await _videoController!.setPlaybackSpeed(playbackSpeed.value);
 
-      // 9. 自动播放
+      // 8. 自动播放
       await _videoController!.play();
       state.value = PlayerState.playing;
     } on UrlExpiredException {
