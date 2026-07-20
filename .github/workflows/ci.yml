@@ -195,9 +195,18 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NEXT_TAG: ${{ steps.tag.outputs.next_tag }}
         run: |
+          # release body 包含 "[强制更新]" 标记，
+          # App 启动时 GitHubReleaseService 会解析此标记并设置 forceUpdate=true，
+          # UpdateDialog 仅显示"立即更新"按钮（无"稍后"）。
+          # 如需改为非强制更新，删除 body 中的 [强制更新] 行即可。
+          {
+            echo "Yellow Depot $NEXT_TAG 自动构建发布（由 push 到 main 触发）"
+            echo ""
+            echo "[强制更新]"
+          } > /tmp/release_notes.md
           gh release create "$NEXT_TAG" artifacts/*.apk \
             --title "Release $NEXT_TAG" \
-            --notes "Yellow Depot $NEXT_TAG 自动构建发布（由 push 到 main 触发，强制更新）" \
+            --notes-file /tmp/release_notes.md \
             --latest
 
       - name: Verify release

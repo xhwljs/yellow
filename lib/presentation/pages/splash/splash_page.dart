@@ -22,7 +22,7 @@ const Color _kOnBackgroundMutedColor = Color(0xFF8E8E93);
 
 /// 启动页（Splash Screen）
 ///
-/// 启动流程（强制更新模式）：
+/// 启动流程：
 /// 1. WidgetsFlutterBinding.ensureInitialized（在 main.dart 完成）
 /// 2. runApp(SplashPage()) — 立即显示启动页，避免黑屏
 /// 3. 启动页内部启动后台初始化任务：
@@ -30,9 +30,12 @@ const Color _kOnBackgroundMutedColor = Color(0xFF8E8E93);
 ///    b. GitHubReleaseService.checkForUpdate()（并行检查更新）
 ///    c. 等待 (a) 完成 + 显示至少 2 秒（避免加载太快闪屏）
 /// 4. (a)(b)(c) 全部完成：
-///    - 有新版本 → 弹出 UpdateDialog（强制更新，无"稍后"按钮）
+///    - 有新版本 → 弹出 UpdateDialog
+///      * release.forceUpdate = true（body 含 [强制更新] 标记）：
+///        仅"立即更新"按钮，用户必须更新或退出 App
+///      * release.forceUpdate = false：有"立即更新"和"稍后"两个按钮，
+///        用户可选"稍后"进入 App
 ///    - 无新版本或检查失败 → 直接切换到 MainShell
-/// 5. 用户必须完成更新或退出 App；不会进入旧版本
 ///
 /// 设计要点：
 /// - **背景色**：与 App 主题背景一致 (#F5F5F7)，避免从 native 黑屏到 App 浅色背景的突兀跳变
@@ -93,14 +96,19 @@ class _SplashPageState extends State<SplashPage> {
     if (!mounted) return;
 
     if (update != null) {
-      // 有新版本 → 显示强制更新对话框（无"稍后"按钮）
+      // 有新版本 → 显示更新对话框
+      // - 强制更新（release.body 含 [强制更新] 标记）：仅"立即更新"按钮，
+      //   关闭对话框意味着用户已退出 App 或正在安装新版本，不调用 _enterApp
+      // - 非强制更新：用户可选"稍后"跳过本次更新，调用 _enterApp 进入 App
       setState(() => _loadingText = '发现新版本');
       await UpdateDialog.show(
         context,
         release: update,
+        forceUpdate: update.forceUpdate,
+        onLater: update.forceUpdate ? null : _enterApp,
       );
-      // 强制更新模式下，对话框关闭意味着用户已退出 App 或正在安装新版本。
-      // 不调用 _enterApp，避免用户进入旧版本 App。
+      // 强制更新模式下对话框关闭后不进入旧版本 App（用户已退出或在安装新版本）；
+      // 非强制模式下 onLater 已被调用进入 App。
     } else {
       // 无新版本或检查失败 → 直接进入 App
       _enterApp();
@@ -174,7 +182,7 @@ class _SplashPageState extends State<SplashPage> {
   /// - 外层光晕动画（呼吸效果，让 splash 更有"生命力"）
   Widget _buildLogo() {
     return TweenAnimationBuilder<double>(
-      tween: const Tween(begin: 0.85, end: 1.0),
+      tween: Tween(begin: 0.85, end: 1.0),
       duration: const Duration(milliseconds: 1200),
       curve: Curves.easeInOut,
       builder: (context, scale, child) {

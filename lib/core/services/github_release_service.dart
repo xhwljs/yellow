@@ -26,6 +26,14 @@ class GitHubRelease {
   /// 是否为预发布版本
   final bool prerelease;
 
+  /// 是否为强制更新版本
+  ///
+  /// 解析规则：[GitHubReleaseService._kForceUpdateMarker] 标记出现在
+  /// release body 中即为强制更新（如 "[强制更新]" 或 "[force-update]"）。
+  /// 强制更新 → UpdateDialog 只显示"立即更新"按钮
+  /// 非强制更新 → UpdateDialog 显示"立即更新" + "稍后"按钮
+  final bool forceUpdate;
+
   const GitHubRelease({
     required this.tagName,
     required this.name,
@@ -34,6 +42,7 @@ class GitHubRelease {
     required this.apkFileName,
     required this.publishedAt,
     required this.prerelease,
+    required this.forceUpdate,
   });
 
   /// 比较版本号，返回 true 表示当前版本低于 release 版本（需要更新）
@@ -98,6 +107,26 @@ class GitHubReleaseService {
   /// APK asset 名后缀匹配（CI 构建产物：app-arm64-v8a-debug.apk）
   static const String apkAssetNamePattern = '.apk';
 
+  /// 强制更新标记列表
+  ///
+  /// 写在 release body 中即视为强制更新。
+  /// CI auto-release 默认会在 body 中加入 "[强制更新]" 标记；
+  /// 开发者手动发 release 时可选择是否加入此标记。
+  static const List<String> _kForceUpdateMarkers = [
+    '[强制更新]',
+    '[force-update]',
+    '[FORCE-UPDATE]',
+  ];
+
+  /// 判断 release body 是否包含强制更新标记
+  static bool _hasForceUpdateMarker(String body) {
+    if (body.isEmpty) return false;
+    for (final marker in _kForceUpdateMarkers) {
+      if (body.contains(marker)) return true;
+    }
+    return false;
+  }
+
   /// 获取最新 release（不含预发布版本）
   ///
   /// 调用 GitHub API 的 /releases/latest 端点。
@@ -152,14 +181,18 @@ class GitHubReleaseService {
         publishedAt = DateTime.tryParse(publishedAtStr);
       }
 
+      final body = data['body'] as String? ?? '';
+      final forceUpdate = _hasForceUpdateMarker(body);
+
       return GitHubRelease(
         tagName: tagName,
         name: data['name'] as String? ?? tagName,
-        body: data['body'] as String? ?? '',
+        body: body,
         apkDownloadUrl: apkUrl,
         apkFileName: apkName ?? 'update.apk',
         publishedAt: publishedAt ?? DateTime.now(),
         prerelease: data['prerelease'] as bool? ?? false,
+        forceUpdate: forceUpdate,
       );
     } on DioException catch (e) {
       // 404 表示仓库无 release（GitHub 返回 404）
