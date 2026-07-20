@@ -8,6 +8,7 @@ import 'package:yellow_depot/core/error/exceptions.dart';
 import 'package:yellow_depot/core/player/url_decryptor.dart';
 import 'package:yellow_depot/core/utils/logger.dart';
 import 'package:yellow_depot/data/models/play_history.dart';
+import 'package:yellow_depot/data/models/video.dart';
 import 'package:yellow_depot/data/models/video_detail.dart';
 import 'package:yellow_depot/data/repositories/favorite_repository.dart';
 import 'package:yellow_depot/data/repositories/history_repository.dart';

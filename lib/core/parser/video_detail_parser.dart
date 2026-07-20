@@ -188,7 +188,7 @@ class VideoDetailParser {
   ///
   /// 找到图标后取其父元素的 text，正则匹配数字（支持千分位逗号）。
   static int _extractFaIconNumber(dom.Document doc, String faClass) {
-    final scopes = <dom.Element>[
+    final scopes = <dom.Element?>[
       doc.querySelector('.stui-content__detail'),
       doc.querySelector('.stui-content'),
       doc.querySelector('.module-info-content'),
@@ -221,7 +221,7 @@ class VideoDetailParser {
   /// `<span>更新时间：2024-01-01</span>`
   /// 或 `<li>2024-01-01</li>`
   static String _extractUpdateTime(dom.Document doc) {
-    final scopes = <dom.Element>[
+    final scopes = <dom.Element?>[
       doc.querySelector('.stui-content__detail'),
       doc.querySelector('.stui-content'),
       doc.querySelector('.module-info-content'),
