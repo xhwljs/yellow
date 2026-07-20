@@ -202,12 +202,98 @@ class GitHubReleaseService {
         appLogger.i('GitHub 仓库无 release（404）');
         return null;
       }
-      appLogger.w('GitHub API 请求失败: ${e.message}');
+      appLogger.w('GitHub API 请求失败: ${e.message}，尝试 fallback 解析');
+      // Fallback: api.github.com 不可达时，尝试用 github.com 的
+      // /releases/latest 页面 302 redirect 解析 tag_name
+      final fallback = await _fetchLatestReleaseFromRedirect();
+      if (fallback != null) return fallback;
       rethrow;
     } finally {
       dio.close();
     }
   }
+
+  /// Fallback：通过 GitHub Releases 页面 302 redirect 解析最新 release
+  ///
+  /// 调用场景：api.github.com 不可达（中国大陆常见，DNS 污染或网络问题），
+  /// 但 github.com 仍可访问时使用。
+  ///
+  /// 流程：
+  /// 1. GET https://github.com/xhwljs/yellow/releases/latest （不跟随重定向）
+  /// 2. 拿到 302 Location，形如 /xhwljs/yellow/releases/tag/v2026.0720.6
+  /// 3. 正则提取 tag_name = v2026.0720.6
+  /// 4. 比较 tag_name（去掉 v）与 AppConstants.appVersion
+  /// 5. 若有新版本 → 构造 GitHubRelease（assets URL 用固定路径推断）：
+  ///    - apkDownloadUrl = https://github.com/{owner}/{repo}/releases/download/{tag}/{apkName}
+  ///    - body = ""（无法获取 release body，无法判断是否强制更新）
+  ///    - forceUpdate = true（保守：当 API 不可达时按强制更新处理，避免漏弹）
+  ///
+  /// 返回值：
+  /// - 有新版本 → 返回 GitHubRelease
+  /// - 无新版本 / 网络也失败 → 返回 null
+  static Future<GitHubRelease?> _fetchLatestReleaseFromRedirect() async {
+    final url = 'https://github.com/$repoOwner/$repoName/releases/latest';
+    appLogger.i('Fallback: 通过 GitHub Releases 页面 302 解析 tag: $url');
+
+    final dio = Dio(BaseOptions(
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 10),
+      followRedirects: false, // 不跟随，拿原始 302 Location
+      validateStatus: (s) => s != null,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 '
+            '(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+      },
+    ));
+
+    try {
+      final resp = await dio.get<dynamic>(url);
+      final location = resp.headers.value('location');
+      if (location == null || location.isEmpty) {
+        appLogger.w('Fallback: GitHub 返回无 Location header');
+        return null;
+      }
+      // Location 形如：/xhwljs/yellow/releases/tag/v2026.0720.6
+      // 或完整 URL：https://github.com/xhwljs/yellow/releases/tag/v2026.0720.6
+      final tagMatch = RegExp(r'/releases/tag/(v?[0-9][^/?#]+)').firstMatch(location);
+      if (tagMatch == null) {
+        appLogger.w('Fallback: Location 中未匹配到 tag_name: $location');
+        return null;
+      }
+      final tagName = tagMatch.group(1)!;
+
+      // 比较版本号：若不大于当前版本，不弹对话框
+      final release = GitHubRelease(
+        tagName: tagName,
+        name: 'Release $tagName',
+        body: '', // 无法获取 release body，无法判断是否强制更新
+        // APK URL 用固定路径推断（CI 构建产物固定命名）
+        apkDownloadUrl:
+            'https://github.com/$repoOwner/$repoName/releases/download/$tagName/$apkAssetName',
+        apkFileName: apkAssetName,
+        publishedAt: DateTime.now(),
+        prerelease: false,
+        // 保守：API 不可达时按强制更新处理，避免漏弹
+        // （最坏情况是用户已安装最新版但被强制更新一次，体验可接受）
+        forceUpdate: true,
+      );
+
+      if (!release.isNewerThan(AppConstants.appVersion)) {
+        appLogger.i('Fallback: GitHub 上 tag $tagName 不大于当前版本 ${AppConstants.appVersion}，跳过');
+        return null;
+      }
+      appLogger.i('Fallback: 解析到最新 tag $tagName，构造 release');
+      return release;
+    } catch (e) {
+      appLogger.w('Fallback: GitHub Releases 页面 302 解析失败: $e');
+      return null;
+    } finally {
+      dio.close();
+    }
+  }
+
+  /// CI 构建产物的固定 APK 文件名（与 .github/workflows/ci.yml 一致）
+  static const String apkAssetName = 'app-arm64-v8a-debug.apk';
 
   /// 检查是否有新版本可用
   ///

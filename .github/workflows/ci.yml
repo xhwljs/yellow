@@ -261,28 +261,40 @@ jobs:
           ## 本次更新内容
 
           ### 新增
-          - 跳转壳自动迁移机制：
-            源站域名被封后运营方会换新入口（如 555973.xyz → 555980.xyz），
-            老入口实际是返回 200 + JS 跳转脚本的"跳转壳"（425 字节 HTML
-            含 `var strU = "https://hk234.space:8899/?u=...&p=..."` 模拟
-            点击 hao123 锚点跳转），跳转服务返回 302 Location 指向最新真实地址。
-            本次更新让 App 自动完成整个迁移链路：
-            1) 检测跳转壳特征（< 3KB + hao123 + var strU）
-            2) 正则提取 strU 跳转服务 URL
-            3) 用 followRedirects:false 请求跳转服务，读取 302 Location header
-            4) 用 Location 作为新 baseUrl 重新请求首页
-            5) 新地址通过 macCMS 标志检测后调 switchTo 持久化并切换
+          - 镜像列表自动测试 + 持久化：
+            打开「API 服务器」卷帘菜单时自动批量测试镜像列表中的每个域名，
+            发现跳转壳则自动通过跳转服务（hk234.space:8899）解析到最新真实
+            地址并切换；镜像列表 chip 旁边显示绿色对勾（通过）/红色叉
+            （失败）/小 loading 圈（测试中）状态徽章。测试通过的新地址自动
+            保存到镜像列表，下次启动仍可见。
 
-          - 启动时异步健康检查：
-            App 启动时不再阻塞，用 Future.microtask 异步检测当前 baseUrl
-            是否是跳转壳，是则自动迁移到最新真实地址（Dio 重建 + 刷新首页）。
-            即便用户旧版持久化了已变跳转壳的地址（如 555973.xyz）也能自愈。
+          - GitHubReleaseService fallback 机制：
+            api.github.com 不可达时（中国大陆常见 DNS 污染或网络问题），
+            自动 fallback 到 github.com/releases/latest 页面 302 redirect
+            解析最新 tag_name，构造 release 信息并按强制更新处理，避免
+            网络问题导致 App 不弹更新对话框直接进入软件。
+
+          ### 改进
+          - 跳转壳自动迁移机制完整版：
+            1) ApiServerSwitcher.presetMirrors 改为可变 List + 持久化到 SP
+               （key: api_mirror_list）
+            2) loadFromPrefs 启动时加载用户保存的镜像列表覆盖默认值
+            3) switchTo 切换 baseUrl 时，如果新 URL 不在镜像列表则自动添加
+               到列表头部并持久化
+            4) autoTestMirrors() 批量串行测试所有镜像，避免并发触发反爬
+            5) _ApiServerSheet initState 异步触发自动测试，发现跳转壳
+               自动迁移后立即更新镜像列表显示
 
           ### 修复
-          - http://555973.xyz/ 等跳转壳地址测试连接被误判为无法访问：
-            旧逻辑只匹配 macCMS 标志，跳转壳返回 425 字节 HTML 不含标志
-            就直接判为失败。现在改为检测到跳转壳后自动解析到最新真实地址
-            （如 555980.xyz）并切换，测试结果显示"连接成功，已自动迁移到 xxx"。
+          - 跳转壳还是无法获取到最新地址：
+            之前 testConnectivity 检测到跳转壳后会自动迁移，但镜像列表
+            不会更新显示最新可用域名。现在改为：自动测试时遇到跳转壳
+            自动 switchTo 最新地址 → 新地址自动加入镜像列表并持久化 →
+            UI 立即显示最新可用域名并启用。
+          - 测试连通性是跳转壳则切换镜像列表显示：
+            点击「测试连通性」按钮测试当前 baseUrl，如果是跳转壳则自动
+            获取最新网址 → switchTo 持久化 + 加入镜像列表 → 镜像列表
+            chip 同步显示新地址为已选中状态。
 
           [强制更新]
           NOTES_EOF

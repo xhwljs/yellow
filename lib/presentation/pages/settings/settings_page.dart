@@ -1025,19 +1025,93 @@ class _ApiServerSheet extends StatefulWidget {
 
 class _ApiServerSheetState extends State<_ApiServerSheet> {
   late String _currentBaseUrl;
+
   /// 测试开始时的 baseUrl，用于测试完成后判断是否发生自动迁移
   String? _originalBaseUrlBeforeTest;
+
+  /// "测试连通性"按钮状态
   bool _testingUrl = false;
   String? _testResult;
   bool _hasTested = false;
+
+  /// 镜像列表自动测试状态（打开 sheet 时异步触发）
+  ///
+  /// - true：正在批量测试镜像列表
+  /// - false：测试完成（无论成功失败）
+  bool _autoTestingMirrors = false;
+
+  /// 每个镜像的测试状态（autoTestMirrors 完成后填充）
+  ///
+  /// - true：通过（真实源站 / 已迁移到最新）
+  /// - false：失败（不可访问 / 跳转壳无法迁移）
+  /// - null：未测试
+  final Map<String, bool?> _mirrorStatus = {};
 
   @override
   void initState() {
     super.initState();
     _currentBaseUrl = widget.currentBaseUrl;
+    // 打开 sheet 时自动测试镜像列表（异步触发，不阻塞 UI 渲染）
+    _autoTestMirrors();
   }
 
   ThemeColors get colors => widget.colors;
+
+  /// 批量测试镜像列表中的所有 URL，发现跳转壳则自动迁移到最新地址
+  ///
+  /// 调用 [ApiServerSwitcher.autoTestMirrors]，完成后更新 UI：
+  /// - 标记每个 URL 的状态（通过 / 失败）
+  /// - 如果发生自动迁移，更新 [_currentBaseUrl] 显示最新地址
+  /// - 调 [widget.onSwitched] 通知外层 settings page 同步
+  Future<void> _autoTestMirrors() async {
+    if (!mounted) return;
+    setState(() {
+      _autoTestingMirrors = true;
+      _mirrorStatus.clear();
+    });
+
+    // 串行测试每个镜像（避免并发触发反爬）
+    final mirrors = List<String>.from(ApiServerSwitcher.presetMirrors);
+    String? lastMigratedUrl;
+
+    for (final mirror in mirrors) {
+      if (!mounted) return;
+      final before = ApiServerSwitcher.current;
+      final result = await ApiServerSwitcher.testConnectivity(mirror);
+      final after = ApiServerSwitcher.current;
+
+      // 判断此镜像是否可用：
+      // - testConnectivity 返回 null → 通过（真实源站 或 已自动迁移到最新）
+      // - 比较测试前后 current：若不同则说明触发了迁移，新地址已加入镜像列表
+      final migrated = after != before;
+      if (migrated && lastMigratedUrl == null) {
+        lastMigratedUrl = after;
+      }
+      if (!mounted) return;
+      setState(() {
+        _mirrorStatus[mirror] = (result == null);
+        // 如果发生了迁移，把新地址标记为通过
+        if (migrated) {
+          _mirrorStatus[after] = true;
+        }
+      });
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _autoTestingMirrors = false;
+      // 如果发生迁移，更新当前 URL 显示为最新地址
+      final newCurrent = ApiServerSwitcher.current;
+      if (newCurrent != _currentBaseUrl) {
+        _currentBaseUrl = newCurrent;
+      }
+    });
+
+    // 如果发生自动迁移，通知外层 settings page 同步
+    if (lastMigratedUrl != null) {
+      widget.onSwitched();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1065,6 +1139,27 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
                 children: [
                   // 当前 URL + 状态徽章
                   _buildCurrentRow(),
+                  // 自动测试状态提示
+                  if (_autoTestingMirrors) ...[
+                    const SizedBox(height: DesignTokens.spaceXs),
+                    Row(
+                      children: [
+                        const SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        const SizedBox(width: DesignTokens.spaceXs),
+                        Text(
+                          '正在自动测试镜像列表...',
+                          style: TextStyle(
+                            fontSize: DesignTokens.textCaption,
+                            color: colors.onSurfaceMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   // 测试结果：成功（含自动迁移）/ 失败
                   if (_hasTested && _testResult == null) ...[
                     const SizedBox(height: DesignTokens.spaceXs),
@@ -1091,7 +1186,7 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
                   ],
                   const SizedBox(height: DesignTokens.spaceLg),
 
-                  // 镜像列表
+                  // 镜像列表（含每个 URL 的状态徽章）
                   _buildSubLabel('镜像列表'),
                   const SizedBox(height: DesignTokens.spaceSm),
                   Wrap(
@@ -1099,9 +1194,12 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
                     runSpacing: DesignTokens.spaceSm,
                     children: ApiServerSwitcher.presetMirrors.map((url) {
                       final selected = url == _currentBaseUrl;
+                      final status = _mirrorStatus[url];
                       return _MirrorChip(
                         url: url,
                         selected: selected,
+                        status: status,
+                        autoTesting: _autoTestingMirrors,
                         colors: colors,
                         onTap: () => _switchBaseUrl(url),
                       );
@@ -1293,6 +1391,12 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
         _testResult = result;
       }
       _hasTested = true;
+      // 同步镜像列表的状态：当前 URL 标记为通过 / 失败
+      if (result == null) {
+        _mirrorStatus[newBaseUrl] = true;
+      } else {
+        _mirrorStatus[_originalBaseUrlBeforeTest] = false;
+      }
     });
     // 若发生自动迁移，通知外层 settings page 同步「API 服务器」行的 URL 显示
     if (migrated) {
@@ -1434,9 +1538,19 @@ class _StatusBadge extends StatelessWidget {
 }
 
 /// 镜像 URL chip
+///
+/// 视觉状态：
+/// - **selected**：当前选中的 URL（primary 边框 + 对勾）
+/// - **status**：
+///   - true：通过（绿色对勾小徽章）
+///   - false：失败（红色叉小徽章）
+///   - null：未测试（无徽章）
+/// - **autoTesting**：批量测试进行中，显示小型 loading 圈
 class _MirrorChip extends StatelessWidget {
   final String url;
   final bool selected;
+  final bool? status;
+  final bool autoTesting;
   final ThemeColors colors;
   final VoidCallback onTap;
 
@@ -1445,6 +1559,8 @@ class _MirrorChip extends StatelessWidget {
     required this.selected,
     required this.colors,
     required this.onTap,
+    this.status,
+    this.autoTesting = false,
   });
 
   @override
@@ -1486,11 +1602,42 @@ class _MirrorChip extends StatelessWidget {
                   color: selected ? colors.primary : colors.onSurfaceMuted,
                 ),
               ),
+              // 状态徽章（选中状态时不显示，避免与对勾重复）
+              if (!selected) ...[
+                const SizedBox(width: 4),
+                _buildStatusBadge(),
+              ],
             ],
           ),
         ),
       ),
     );
+  }
+
+  /// 状态徽章：通过 / 失败 / 测试中
+  Widget _buildStatusBadge() {
+    if (autoTesting && status == null) {
+      return const SizedBox(
+        width: 10,
+        height: 10,
+        child: CircularProgressIndicator(strokeWidth: 1.5),
+      );
+    }
+    if (status == true) {
+      return Icon(
+        PhosphorIconsFill.checkCircle,
+        size: 11,
+        color: colors.success,
+      );
+    }
+    if (status == false) {
+      return Icon(
+        PhosphorIconsFill.xCircle,
+        size: 11,
+        color: colors.destructive,
+      );
+    }
+    return const SizedBox.shrink();
   }
 }
 

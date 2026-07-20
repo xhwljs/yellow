@@ -10,18 +10,33 @@ import 'package:yellow_depot/presentation/controllers/home_controller.dart';
 
 /// API 服务器切换工具
 ///
-/// 源站域名可能因反爬频繁更换（如 555973.xyz → 555974.xyz → 555975.xyz ...），
+/// 源站域名可能因反爬频繁更换（如 555973.xyz → 555980.xyz ...），
 /// 提供运行时切换 + 持久化 + Dio 重建 + 数据刷新通知能力，避免每次换域名都要发版。
 ///
-/// **切换后刷新机制**：
-/// - 切换 baseUrl 后，本地 DB 中缓存的 categories / videos 来自旧源站，
-///   其相对路径在新源站下虽可用，但封面图等资源 URL 可能仍是旧域名导致失效。
-///   因此切换时清空本地缓存，并主动调用 HomeController.refresh() 强制刷新首页。
-/// - 历史记录 / 收藏夹不依赖 baseUrl，但切换后也刷新一次让 UI 同步。
+/// **跳转壳自动迁移机制**（2026-07-20）：
+/// 老入口（如 555973.xyz）实际是"跳转壳"——返回 200 + 425 字节 HTML
+/// 含 `var strU = "https://hk234.space:8899/?u=...&p=..."` 模拟点击跳转。
+/// 跳转服务返回 302 Location 指向最新真实地址（如 555980.xyz）。
+/// 运营方每次被封就更新 302 的 Location，相当于"动态域名解析"。
+///
+/// [testConnectivity] 检测到跳转壳后会自动完成迁移链路：
+/// 1) 检测跳转壳特征（< 3KB + hao123 + var strU）
+/// 2) 正则提取 strU URL
+/// 3) 请求 strU 拿 302 Location
+/// 4) 用 Location 作为新 baseUrl 重新请求首页
+/// 5) 新地址通过 macCMS 标志检测 → switchTo 持久化并切换
+///    switchTo 会把新地址自动添加到 [presetMirrors] 并持久化到 SP，
+///    镜像列表 UI 会立即显示最新可用域名。
+///
+/// **镜像列表持久化**：
+/// - [presetMirrors] 是可变 List，初始为内置默认值
+/// - [loadFromPrefs] 启动时从 SP 加载用户保存的镜像列表覆盖
+/// - [switchTo] 时如果新 URL 不在列表则添加到列表头部并持久化
+/// - 这样用户测试出最新地址后会自动保存到镜像列表，下次启动仍可见
 class ApiServerSwitcher {
   ApiServerSwitcher._();
 
-  /// 内置推荐镜像列表（用户可在设置页一键切换）
+  /// 内置推荐镜像列表（初始默认值，运行时可被 SP 覆盖）
   ///
   /// 实测（2026-07-19）：
   /// - 555976.xyz ✅ 当前真实源站
@@ -29,33 +44,39 @@ class ApiServerSwitcher {
   /// - 555975.xyz ❌ 已变跳转壳，列入 [_deadMirrors]
   /// - 555974.xyz ❌ 已变跳转壳，列入 [_deadMirrors]
   /// - 555973.xyz ❌ 已是跳转壳
-  static const List<String> presetMirrors = [
+  ///
+  /// **注意**：此列表是可变的，运行时会从 SP 加载用户保存的镜像列表覆盖。
+  /// 跳转壳自动迁移时新地址会自动追加到列表头部（[switchTo] 内部处理）。
+  static List<String> presetMirrors = <String>[
     'http://555976.xyz',
     'http://555972.xyz',
   ];
 
-  /// 已知失效镜像列表
+  /// 已知失效镜像列表（硬性死链，不参与自动迁移）
   ///
   /// 用于 [loadFromPrefs] 自动迁移：用户旧版 App 持久化过这些 URL，
-  /// 升级后启动时若检测到，自动回退到 [AppConstants.defaultBaseUrl]，
-  /// 避免用户在死链上一直拿不到内容（这是 AK Token 提取失败的最常见根因）。
+  /// 升级后启动时若检测到，自动回退到 [AppConstants.defaultBaseUrl]。
   ///
   /// **注意**：即便用户持久化了跳转壳地址，[testConnectivity] 也能通过
   /// 跳转壳自动迁移机制找到最新真实地址并切换，所以这里只列硬性死链。
-  static const List<String> _deadMirrors = [
+  static const List<String> _deadMirrors = <String>[
     'http://555975.xyz',
     'http://555974.xyz',
     'http://555973.xyz',
   ];
 
+  /// SP key：用户保存的镜像列表（JSON 数组）
+  static const String _keyMirrorList = 'api_mirror_list';
+
   /// 当前生效的 baseUrl
   static String get current => AppConstants.baseUrl;
 
-  /// 从 SharedPreferences 加载用户保存的 baseUrl（应用启动时调用）
+  /// 从 SharedPreferences 加载用户保存的 baseUrl + 镜像列表（应用启动时调用）
   ///
-  /// **自动迁移**：若用户旧版持久化了已知失效镜像（[ _deadMirrors]），
-  /// 自动回退到 [AppConstants.defaultBaseUrl] 并更新持久化值，
-  /// 避免用户在死链上一直拿不到内容（这是 AK Token 提取失败的最常见根因）。
+  /// **加载顺序**：
+  /// 1. 加载用户保存的镜像列表覆盖 [presetMirrors]（如果 SP 中有保存）
+  /// 2. 加载用户保存的 baseUrl，若为已知死链则回退到默认
+  /// 3. 异步触发跳转壳健康检查（不阻塞启动）
   ///
   /// **跳转壳自动迁移**（2026-07-20 新增）：即便用户持久化的不在 [_deadMirrors]
   /// 列表里，启动时也会异步触发健康检查，若发现是跳转壳则自动通过跳转服务
@@ -65,14 +86,20 @@ class ApiServerSwitcher {
   /// **不阻塞启动**：异步触发，App 立即进入主界面，迁移完成后 Dio 重建并刷新首页。
   static Future<void> loadFromPrefs() async {
     final prefs = await SharedPreferences.getInstance();
+
+    // 1. 加载用户保存的镜像列表（覆盖默认值）
+    final savedMirrors = prefs.getStringList(_keyMirrorList);
+    if (savedMirrors != null && savedMirrors.isNotEmpty) {
+      presetMirrors = List<String>.from(savedMirrors);
+    }
+
+    // 2. 加载 baseUrl
     final saved = prefs.getString(AppConstants.keyApiBaseUrl);
     if (saved == null || saved.isEmpty) {
-      // 未保存任何 baseUrl → 异步健康检查默认 baseUrl
       _scheduleStartupHealthCheck();
       return;
     }
 
-    // 自动迁移死链（已知失效镜像）
     if (_deadMirrors.contains(saved)) {
       await prefs.setString(
         AppConstants.keyApiBaseUrl,
@@ -84,8 +111,17 @@ class ApiServerSwitcher {
     }
 
     AppConstants.baseUrl = saved;
-    // 异步触发跳转壳自动迁移（不阻塞启动）
     _scheduleStartupHealthCheck();
+  }
+
+  /// 持久化镜像列表到 SharedPreferences
+  static Future<void> _saveMirrors() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(_keyMirrorList, presetMirrors);
+    } catch (_) {
+      // 持久化失败不阻断流程
+    }
   }
 
   /// 启动时异步健康检查：检测当前 baseUrl 是否是跳转壳，是则自动迁移
@@ -102,12 +138,7 @@ class ApiServerSwitcher {
         final current = AppConstants.baseUrl;
         // 健康检查：如果当前 baseUrl 是跳转壳，testConnectivity 会自动迁移
         // 并持久化新地址 + 重建 Dio + 刷新首页
-        final result = await testConnectivity(current);
-        if (result == null) {
-          // 健康检查通过（可能已迁移，可能本来就是真实源站）
-        } else {
-          // 健康检查失败（非跳转壳，可能是网络错误）— 不主动切换，避免误伤
-        }
+        await testConnectivity(current);
       } catch (_) {
         // 健康检查失败不影响启动流程
       }
@@ -119,32 +150,34 @@ class ApiServerSwitcher {
   /// 完整流程：
   /// 1. 持久化到 SharedPreferences
   /// 2. 更新 AppConstants.baseUrl
-  /// 3. 重建 Dio 实例（保留所有拦截器，仅替换 baseUrl）
-  /// 4. 清空本地 DB 缓存（categories / videos）— 旧数据来自旧源站，避免误用
-  /// 5. 主动调用 HomeController.refresh() — 强制刷新首页
-  ///    （用户切换镜像后通常立即切回首页查看效果，需要新数据立即生效）
+  /// 3. 如果新 URL 不在镜像列表则添加到列表头部并持久化（让用户能在镜像列表看到）
+  /// 4. 重建 Dio 实例（保留所有拦截器，仅替换 baseUrl）
+  /// 5. 清空本地 DB 缓存（categories / videos）— 旧数据来自旧源站，避免误用
+  /// 6. 主动调用 HomeController.refresh() — 强制刷新首页
   ///
   /// 返回旧 baseUrl 供 UI 提示。
   static Future<String> switchTo(String newBaseUrl) async {
     final old = AppConstants.baseUrl;
     if (newBaseUrl == old) return old;
 
-    // 1. 持久化
+    // 1. 持久化 baseUrl
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(AppConstants.keyApiBaseUrl, newBaseUrl);
 
     // 2. 更新全局常量
     AppConstants.baseUrl = newBaseUrl;
 
-    // 3. 重建 Dio
+    // 3. 如果新 URL 不在镜像列表，添加到列表头部并持久化
+    //    （例如：测试 555973.xyz 跳转壳 → 自动迁移到 555980.xyz → 加入列表）
+    if (!presetMirrors.contains(newBaseUrl)) {
+      presetMirrors.insert(0, newBaseUrl);
+      await _saveMirrors();
+    }
+
+    // 4. 重建 Dio
     await DioClient.rebuildWithBaseUrl(newBaseUrl);
 
-    // 4. 清空本地缓存（categories + videos）
-    //
-    // 旧缓存来自旧源站，可能存在以下问题：
-    // - 封面图 data-original 是相对路径（在新源站下可用，但旧源站可能已死）
-    // - 旧源站若已变跳转壳，缓存的分类列表虽仍可用但视频项可能是空列表
-    // - 用户主动切换镜像的诉求通常是"当前源站有问题"，清空更符合直觉
+    // 5. 清空本地缓存（categories + videos）
     try {
       if (Get.isRegistered<AppDatabase>()) {
         final db = Get.find<AppDatabase>();
@@ -155,19 +188,14 @@ class ApiServerSwitcher {
       // 清缓存失败不阻断切换流程
     }
 
-    // 5. 主动刷新首页（异步触发，不阻塞切换流程）
-    //
-    // 使用 Get.isRegistered 防御性检查，避免在启动早期 / 测试环境报错。
-    // 刷新采用 forceRefresh=true，绕过缓存直接拉取新源站数据。
+    // 6. 主动刷新首页（异步触发，不阻塞切换流程）
     try {
       if (Get.isRegistered<HomeController>()) {
         Get.find<HomeController>().refresh();
       }
-      // 收藏夹中的视频项 coverUrl 是绝对路径（来自旧源站），切换后也刷新一下
       if (Get.isRegistered<FavoritesController>()) {
         Get.find<FavoritesController>().loadFavorites();
       }
-      // 历史记录同样
       if (Get.isRegistered<HistoryController>()) {
         Get.find<HistoryController>().loadHistory();
       }
@@ -189,11 +217,34 @@ class ApiServerSwitcher {
     await prefs.remove(AppConstants.keyApiBaseUrl);
   }
 
+  /// 自动测试镜像列表，发现跳转壳则自动迁移
+  ///
+  /// 调用场景：
+  /// - 用户打开 API 服务器 sheet 时自动调用，批量测试所有镜像
+  /// - 测试过程中如果发现某个镜像已是跳转壳，则自动迁移到最新地址并更新列表
+  ///
+  /// 返回值：
+  /// - 成功：最新可用的 baseUrl（testConnectivity 内部已 switchTo）
+  /// - 失败：null（所有镜像都不可用）
+  ///
+  /// 注意：此方法是串行的，避免并发请求过多触发反爬。
+  static Future<String?> autoTestMirrors() async {
+    final mirrors = List<String>.from(presetMirrors);
+    for (final mirror in mirrors) {
+      final result = await testConnectivity(mirror);
+      if (result == null) {
+        // 此镜像可用（可能已发生自动迁移到最新地址，current 已是最新）
+        return current;
+      }
+    }
+    return null;
+  }
+
   /// 简单连通性测试（GET 请求并验证返回内容是真实 macCMS 站点）
   ///
   /// 返回 null 表示成功，否则返回错误信息。
   ///
-  /// **跳转壳自动迁移机制**（2026-07-20 修订）：
+  /// **跳转壳自动迁移机制**：
   /// 源站 555973.xyz 等老入口实际是"跳转壳"——返回 200 + JS 跳转脚本：
   /// ```html
   /// <a href="" id="hao123"></a>
@@ -209,6 +260,7 @@ class ApiServerSwitcher {
   /// 2. 请求 strU → 读取 302 Location header
   /// 3. 用 Location 作为新 baseUrl，重新请求首页
   /// 4. 新地址通过 macCMS 标志检测 → 调用 [switchTo] 持久化并切换 → 返回 null（成功）
+  ///    （switchTo 内部会把新地址自动添加到 [presetMirrors] 并持久化到 SP）
   /// 5. 新地址仍失败 → 返回错误信息
   ///
   /// 调用方应在测试完成后重新读取 [current] 显示当前地址（若发生自动迁移会显示新地址）。
@@ -233,7 +285,7 @@ class ApiServerSwitcher {
         return '跳转服务指向的新地址无法访问：$migratedUrl';
       }
       if (_hasMacCmsMarker(newHtml)) {
-        // 新地址是真实源站 → 持久化并切换
+        // 新地址是真实源站 → 持久化并切换（switchTo 会自动更新镜像列表）
         await switchTo(migratedUrl);
         return null; // 成功（已自动迁移）
       }
