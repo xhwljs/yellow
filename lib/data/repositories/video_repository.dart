@@ -1,3 +1,4 @@
+import 'package:yellow_depot/core/constants/app_constants.dart';
 import 'package:yellow_depot/core/network/api_service.dart';
 import 'package:yellow_depot/core/parser/video_detail_parser.dart';
 import 'package:yellow_depot/core/parser/video_list_parser.dart';

@@ -82,7 +82,7 @@ class HistoryRepository {
 
     // 仅在超阈值 1.2 倍时才裁剪，避免每秒 upsert 都跑 DELETE
     // （详情页 _historySaveInterval = 5s，长时间播放会触发多次 upsert）
-    final count = await _db.historyDao.count();
+    final count = (await _db.historyDao.count()) ?? 0;
     if (count > (AppConstants.historyMaxRecords * 1.2).ceil()) {
       await _db.historyDao.trimOld(AppConstants.historyMaxRecords);
     }
