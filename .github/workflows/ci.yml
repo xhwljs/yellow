@@ -255,44 +255,19 @@ jobs:
           # 1. 本次具体修改内容（让用户知道更新了什么）
           # 2. "[强制更新]" 标记（App 启动时 GitHubReleaseService 解析此标记
           #    设置 forceUpdate=true，UpdateDialog 仅显示"立即更新"按钮）
-          # 本次为强制更新（含 [强制更新] 标记），用户必须更新到新版本。
+          # 本次为非强制更新（不含 [强制更新] 标记），用户可选择是否更新。
           cat > /tmp/release_notes.md <<'NOTES_EOF'
           ## 本次更新内容
 
-          [强制更新]
-
-          ### 修复
-          - **DioException [unknown] 未知网络错误**：
-            原因是 RetryInterceptor 之前对 DioExceptionType.unknown 不重试，
-            导致 DNS 解析失败、SocketException、HandshakeException、源站主动
-            断开连接（反爬）等暂态错误直接抛给用户。修复：
-            1. RetryInterceptor 对 GET 请求的 unknown 类型也重试 3 次
-               （排除用户主动 cancel 场景）。
-            2. ErrorInterceptor 对 unknown 类型按错误信息分类给友好提示：
-               - DNS / SocketException → "网络连接失败，请检查网络或切换镜像"
-               - TLS / 证书 → "安全连接失败，请稍后重试"
-               - 连接重置 / 断开 → "连接被重置，请稍后重试"
-               - 其他 → "网络异常，请稍后重试"
-
-          ### 改进
-          - **完善分类页/搜索页下拉加载下一页**：
-            1. CategoryPage._onScroll 加显式 UI 层锁（isLoadingMore /
-               isLoading / !hasMore 提前 return），避免冗余调用。
-            2. SearchPage._buildResults 的 NotificationListener 之前仅在
-               ScrollEndNotification 触发，惯性滑动可能错过；现在加上
-               OverscrollNotification 触发，且加显式 UI 层锁。
-            3. CategoryController.loadMore / SearchController.loadMore 加
-               appLogger 日志，加载更多失败便于排查。
-            4. 418 反爬 + unknown 暂态错误由 RetryInterceptor 自动重试，
-               重试 3 次仍失败才会触发加载更多失败。
-
-          - **分类切换从第一页开始显示**：
-            CategoryBinding / SearchBinding 之前用 Get.lazyPut 是 lazy 单例，
-            第二次从卷帘菜单切换到不同 categoryId 时会复用旧实例（categoryId
-            不变），导致显示的还是旧分类内容。改为：
-            1. Get.lazyPut → Get.put（每次 push 路由都创建新实例）。
-            2. binding 中先 Get.delete 清掉旧实例（路由 pop 时可能未释放）。
-            3. 保证每次进入分类页都从该分类的第 1 页开始加载。
+          ### 新增
+          - **连续两秒内按两次返回键退出 App**：
+            在首页、收藏页、历史记录页、设置页按系统返回键不直接退出，
+            而是显示"再按一次退出应用"提示，连续两秒内再按一次才退出。
+            1. 新增 BackPressExitWrapper widget（PopScope + 2 秒窗口 +
+               Get.snackbar 提示 + SystemNavigator.pop 退出）。
+            2. 集成到 MainShell._ShellBody，覆盖 4 个 Tab。
+            3. 子路由（detail / category / search / player）在栈顶时由
+               各自处理 pop，不受影响。
 
           NOTES_EOF
           # 移除 heredoc 导致的每行前导空格（保持 markdown 结构）

@@ -11,6 +11,7 @@ import 'package:yellow_depot/presentation/pages/history/history_page.dart';
 import 'package:yellow_depot/presentation/pages/home/home_page.dart';
 import 'package:yellow_depot/presentation/pages/settings/settings_page.dart';
 import 'package:yellow_depot/presentation/routes/app_pages.dart';
+import 'package:yellow_depot/presentation/widgets/back_press_exit_wrapper.dart';
 
 /// 主 Shell — GetMaterialApp 入口 + 底部导航
 ///
@@ -51,51 +52,58 @@ class _ShellBody extends GetView<MainShellController> {
     final colors = AppTheme.colorsOf(context);
     return Obx(() {
       final index = controller.currentIndex.value;
-      return Scaffold(
-        body: IndexedStack(
-          index: index,
-          children: const [
-            HomePage(),
-            FavoritesPage(),
-            HistoryPage(),
-            SettingsPage(),
-          ],
-        ),
-        bottomNavigationBar: BottomNavigationBar(
-          currentIndex: index,
-          onTap: controller.changeTab,
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: colors.surface,
-          selectedItemColor: colors.primary,
-          unselectedItemColor: colors.onSurfaceMuted,
-          showSelectedLabels: true,
-          showUnselectedLabels: true,
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(PhosphorIconsRegular.house),
-              activeIcon: Icon(PhosphorIconsFill.house),
-              label: '首页',
-              tooltip: '首页',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(PhosphorIconsRegular.heart),
-              activeIcon: Icon(PhosphorIconsFill.heart),
-              label: '收藏',
-              tooltip: '收藏',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(PhosphorIconsRegular.clock),
-              activeIcon: Icon(PhosphorIconsFill.clock),
-              label: '历史',
-              tooltip: '历史',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(PhosphorIconsRegular.gear),
-              activeIcon: Icon(PhosphorIconsFill.gear),
-              label: '设置',
-              tooltip: '设置',
-            ),
-          ],
+      // BackPressExitWrapper 拦截系统返回键：
+      // 在 4 个 Tab（首页 / 收藏 / 历史 / 设置）中按返回键不直接退出，
+      // 而是显示"再按一次退出应用"提示，连续两秒内再按一次才退出。
+      // 子路由（detail / category / search / player）在栈顶时由各自处理 pop，
+      // 不会触发此处的 PopScope。
+      return BackPressExitWrapper(
+        child: Scaffold(
+          body: IndexedStack(
+            index: index,
+            children: const [
+              HomePage(),
+              FavoritesPage(),
+              HistoryPage(),
+              SettingsPage(),
+            ],
+          ),
+          bottomNavigationBar: BottomNavigationBar(
+            currentIndex: index,
+            onTap: controller.changeTab,
+            type: BottomNavigationBarType.fixed,
+            backgroundColor: colors.surface,
+            selectedItemColor: colors.primary,
+            unselectedItemColor: colors.onSurfaceMuted,
+            showSelectedLabels: true,
+            showUnselectedLabels: true,
+            items: const [
+              BottomNavigationBarItem(
+                icon: Icon(PhosphorIconsRegular.house),
+                activeIcon: Icon(PhosphorIconsFill.house),
+                label: '首页',
+                tooltip: '首页',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(PhosphorIconsRegular.heart),
+                activeIcon: Icon(PhosphorIconsFill.heart),
+                label: '收藏',
+                tooltip: '收藏',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(PhosphorIconsRegular.clock),
+                activeIcon: Icon(PhosphorIconsFill.clock),
+                label: '历史',
+                tooltip: '历史',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(PhosphorIconsRegular.gear),
+                activeIcon: Icon(PhosphorIconsFill.gear),
+                label: '设置',
+                tooltip: '设置',
+              ),
+            ],
+          ),
         ),
       );
     });
