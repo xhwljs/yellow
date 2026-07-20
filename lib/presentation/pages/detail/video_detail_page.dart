@@ -54,58 +54,65 @@ class VideoDetailPage extends GetView<VideoDetailController> {
   }
 
   Widget _buildContent(BuildContext context, colors, VideoDetail detail) {
-    return CustomScrollView(
-      slivers: [
-        SliverAppBar(
-          expandedHeight: 220,
-          pinned: true,
-          backgroundColor: colors.surface,
-          foregroundColor: colors.onBackground,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          automaticallyImplyLeading: true,
-          flexibleSpace: FlexibleSpaceBar(
-            background: _InlinePlayerArea(
-              controller: controller,
-              colors: colors,
+    // SafeArea 包裹 CustomScrollView，让 SliverAppBar 顶部留出系统状态栏空间
+    // （与 home_page 一致：Scaffold + AppBar 自动留状态栏空间，详情页只有
+    //  SliverAppBar 没有 AppBar，需 SafeArea 显式留出状态栏高度）
+    return SafeArea(
+      top: true,
+      bottom: false,
+      child: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            expandedHeight: 220,
+            pinned: true,
+            backgroundColor: colors.surface,
+            foregroundColor: colors.onBackground,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            automaticallyImplyLeading: true,
+            flexibleSpace: FlexibleSpaceBar(
+              background: _InlinePlayerArea(
+                controller: controller,
+                colors: colors,
+              ),
+            ),
+            actions: [
+              Obx(() {
+                final favorited = controller.isFavorited.value;
+                return IconButton(
+                  icon: Icon(
+                    favorited
+                        ? PhosphorIconsFill.heart
+                        : PhosphorIconsRegular.heart,
+                    color: favorited ? colors.primary : colors.onBackground,
+                    size: 24,
+                  ),
+                  onPressed: controller.toggleFavorite,
+                  tooltip: favorited ? '取消收藏' : '收藏',
+                );
+              }),
+            ],
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(DesignTokens.spaceLg),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildTitle(colors, detail),
+                  const SizedBox(height: DesignTokens.spaceLg),
+                  _buildMetaRow(colors, detail),
+                  const SizedBox(height: DesignTokens.spaceXl),
+                  _buildDescription(colors, detail),
+                  const SizedBox(height: DesignTokens.spaceXl),
+                  if (detail.relatedVideos.isNotEmpty)
+                    _buildRelatedVideos(colors, detail),
+                ],
+              ),
             ),
           ),
-          actions: [
-            Obx(() {
-              final favorited = controller.isFavorited.value;
-              return IconButton(
-                icon: Icon(
-                  favorited
-                      ? PhosphorIconsFill.heart
-                      : PhosphorIconsRegular.heart,
-                  color: favorited ? colors.primary : colors.onBackground,
-                  size: 24,
-                ),
-                onPressed: controller.toggleFavorite,
-                tooltip: favorited ? '取消收藏' : '收藏',
-              );
-            }),
-          ],
-        ),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.all(DesignTokens.spaceLg),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildTitle(colors, detail),
-                const SizedBox(height: DesignTokens.spaceLg),
-                _buildMetaRow(colors, detail),
-                const SizedBox(height: DesignTokens.spaceXl),
-                _buildDescription(colors, detail),
-                const SizedBox(height: DesignTokens.spaceXl),
-                if (detail.relatedVideos.isNotEmpty)
-                  _buildRelatedVideos(colors, detail),
-              ],
-            ),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 

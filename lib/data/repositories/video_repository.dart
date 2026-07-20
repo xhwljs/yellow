@@ -64,9 +64,40 @@ class VideoRepository {
   /// 的 @ignore 字段。详情页加载后调用此方法同步缓存当前视频，
   /// 保证用户收藏或播放后，下次打开收藏/历史列表能立即看到完整详情。
   ///
-  /// 注意：用 OnConflictStrategy.replace，已存在则覆盖（保持最新数据）。
+  /// **重要**：使用合并策略而非覆盖：
+  /// - VideoDetailParser 不提取 playCount/likeCount/updateTime（写死为 0/''）
+  /// - VideoListParser 从 .stui-vodlist__detail .sub 提取这些字段
+  /// - 如果直接 replace，详情页缓存会覆盖列表页缓存的正确数据
+  /// - 修复：先查现有 Video，把 detail.video 中为空/为 0 的字段
+  ///   用现有数据补全，然后再写入
   Future<void> cacheVideo(Video video) async {
-    await _db.videoDao.insert(video);
+    final existing = await _db.videoDao.findById(video.id);
+    final merged = video.copyWith(
+      // 列表页缓存的 playCount/likeCount 大于 0 时保留，不覆盖为 0
+      playCount: (video.playCount > 0)
+          ? video.playCount
+          : (existing?.playCount ?? 0),
+      likeCount: (video.likeCount > 0)
+          ? video.likeCount
+          : (existing?.likeCount ?? 0),
+      // 列表页缓存的 updateTime 非空时保留，不覆盖为空
+      updateTime: video.updateTime.isNotEmpty
+          ? video.updateTime
+          : (existing?.updateTime ?? ''),
+      // 列表页缓存的 duration 非空时保留
+      duration: video.duration.isNotEmpty
+          ? video.duration
+          : (existing?.duration ?? ''),
+      // 列表页缓存的 coverUrl 非空时保留
+      coverUrl: video.coverUrl.isNotEmpty
+          ? video.coverUrl
+          : (existing?.coverUrl ?? ''),
+      // 列表页缓存的 title 非空时保留
+      title: video.title.isNotEmpty
+          ? video.title
+          : (existing?.title ?? video.title),
+    );
+    await _db.videoDao.insert(merged);
   }
 
   /// 通过 ids 批量查询

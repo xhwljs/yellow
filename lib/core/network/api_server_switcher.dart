@@ -283,21 +283,66 @@ class ApiServerSwitcher {
       if (migratedUrl == null) {
         return '跳转壳中未找到跳转服务 URL，无法自动迁移';
       }
-      // 用新地址重新请求首页（不递归触发迁移，避免死循环）
+      // 用新地址重新请求首页验证
       final newHtml = await _fetchHomepage(migratedUrl);
-      if (newHtml == null) {
-        return '跳转服务指向的新地址无法访问：$migratedUrl';
-      }
-      if (_hasMacCmsMarker(newHtml)) {
-        // 新地址是真实源站 → 持久化并切换（switchTo 会自动更新镜像列表）
+      // 验证条件（任一通过即视为迁移成功）：
+      // a) 命中 macCMS 标志 → 真实源站
+      // b) 反爬系统返回 418（空响应）→ 服务器存在但被反爬拦截，仍是有效 baseUrl
+      //    （Quantum 反爬系统会概率性返回 418，App 后续请求会自动重试）
+      if (newHtml != null && _hasMacCmsMarker(newHtml)) {
+        // 新地址是真实源站 → 持久化并切换
         await switchTo(migratedUrl);
         return null; // 成功（已自动迁移）
+      }
+      // 418 或空响应：检查上次响应状态码是否为 418
+      // 若是 418 说明服务器存在但被反爬，仍可切换（App 重试机制会处理）
+      if (newHtml == '' || await _lastFetchWasAntiCrawler(migratedUrl)) {
+        await switchTo(migratedUrl);
+        return null; // 迁移到最新地址（反爬 418 由 RetryInterceptor 处理）
+      }
+      if (newHtml == null) {
+        // 网络错误：仍切换地址（让 RetryInterceptor 在实际请求时重试）
+        await switchTo(migratedUrl);
+        return null;
       }
       return '跳转服务指向的新地址不是 macCMS 站点：$migratedUrl';
     }
 
     // 3) 既无 macCMS 标志也无跳转壳特征 → 视为通过（可能是新模板，不阻断用户）
     return null;
+  }
+
+  /// 检测上次请求该 URL 是否返回 418 反爬状态码
+  ///
+  /// Quantum 反爬系统会概率性返回 418，但服务器实际可用。
+  /// App 后续请求会通过 RetryInterceptor 自动重试 + 切换 UA 绕过。
+  static Future<bool> _lastFetchWasAntiCrawler(String baseUrl) async {
+    final dio = Dio(
+      BaseOptions(
+        baseUrl: baseUrl,
+        connectTimeout: const Duration(seconds: 5),
+        receiveTimeout: const Duration(seconds: 5),
+        followRedirects: true,
+        validateStatus: (s) => s != null,
+        responseType: ResponseType.plain,
+        headers: {
+          'User-Agent':
+              'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 '
+              '(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+        },
+      ),
+    );
+    try {
+      final resp = await dio.get<String>('/');
+      // 418 = Quantum 反爬系统拦截，服务器实际存在
+      return resp.statusCode == 418;
+    } catch (_) {
+      return false;
+    } finally {
+      dio.close();
+    }
   }
 
   /// 请求 baseUrl 首页并返回 HTML 字符串
