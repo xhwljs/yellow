@@ -295,61 +295,11 @@ class _PlayingViewState extends State<_PlayingView> {
       return const _LoadingView(message: '初始化播放器...');
     }
 
-    return Stack(
-      children: [
-        // 视频本体（chewie 自带：播放/暂停/进度/全屏/倍速/横向滑动/双击/自动隐藏）
-        Center(
-          child: AspectRatio(
-            aspectRatio: videoController.value.aspectRatio,
-            child: Chewie(controller: chewieController),
-          ),
-        ),
-        // 亮度 / 音量手势层（仅纵向拖动，不拦截横向拖动/双击/点击）
-        // 让 chewie 自带的手势（横向滑动快进 / 双击暂停 / 点击显示控件）正常工作。
-        Positioned.fill(
-          child: _BrightnessVolumeGesture(controller: c),
-        ),
-      ],
-    );
-  }
-}
-
-/// 亮度 / 音量手势层（仅纵向拖动）
-///
-/// 设计：
-/// - 左半屏纵向拖动：亮度调节
-/// - 右半屏纵向拖动：音量调节
-///
-/// **不处理**横向拖动、双击、点击 — 这些交给 chewie 自带控件处理：
-/// - 横向拖动：chewie 快进快退
-/// - 双击：chewie 播放/暂停
-/// - 单击：chewie 显示/隐藏控件
-///
-/// 使用 HitTestBehavior.translucent + 仅注册 onVerticalDragUpdate，
-/// 让其他手势类型穿透到下层 chewie。
-class _BrightnessVolumeGesture extends StatelessWidget {
-  final PlayerPageController controller;
-  const _BrightnessVolumeGesture({required this.controller});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      // 仅注册纵向拖动 — 横向拖动/双击/点击会被 chewie 处理
-      onVerticalDragUpdate: (details) {
-        final isLeft =
-            details.globalPosition.dx < MediaQuery.of(context).size.width / 2;
-        if (isLeft) {
-          controller.setBrightness(
-            controller.brightness.value - details.delta.dy / 500,
-          );
-        } else {
-          controller.setVolume(
-            controller.volume.value - details.delta.dy / 500,
-          );
-        }
-      },
-      child: const SizedBox.shrink(),
+    return Center(
+      child: AspectRatio(
+        aspectRatio: videoController.value.aspectRatio,
+        child: Chewie(controller: chewieController),
+      ),
     );
   }
 }

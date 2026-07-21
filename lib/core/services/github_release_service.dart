@@ -1,7 +1,4 @@
-import 'dart:convert';
-
 import 'package:dio/dio.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yellow_depot/core/constants/app_constants.dart';
 import 'package:yellow_depot/core/utils/logger.dart';
 
@@ -273,9 +270,9 @@ class GitHubReleaseService {
         apkFileName: apkAssetName,
         publishedAt: DateTime.now(),
         prerelease: false,
-        // 保守：API 不可达时按强制更新处理，避免漏弹
-        // （最坏情况是用户已安装最新版但被强制更新一次，体验可接受）
-        forceUpdate: true,
+        // 无法获取 release body → 无法判断是否强制更新
+        // 改为 false（非强制），让用户可选"稍后"，避免误强制更新
+        forceUpdate: false,
       );
 
       if (!release.isNewerThan(AppConstants.appVersion)) {
@@ -302,15 +299,15 @@ class GitHubReleaseService {
   /// 2. 跳过预发布版本
   /// 3. 比较 release.tagName 与 [AppConstants.appVersion]
   ///    - 相同 → 已是最新版本，返回 null
-  ///    - release.tagName 更大 → 缓存到 SharedPreferences 后返回 release
-  /// 4. 任何步骤失败（网络问题/限流）→ 从 SharedPreferences 读取缓存的 release
+  ///    - release.tagName 更大 → 返回 release
+  /// 4. 任何步骤失败（网络问题/限流）→ 返回 null（不弹更新）
   ///
-  /// **缓存机制（修复"更新中途被强杀后再次启动不弹对话框"问题）**：
-  /// - 之前实现：仅依赖 GitHub API 实时调用，网络失败则 update=null，直接进入 App
-  /// - 用户场景：开始更新下载后强杀 App，重启时网络抖动 / API 限流导致 checkForUpdate
-  ///   抛异常 → update=null → 跳过更新对话框 → 直接进入旧版本 App
-  /// - 现在：发现新版本时持久化到 SP；启动时 API 失败则从 SP 恢复，确保
-  ///   即便网络抖动也能正确弹出更新对话框
+  /// **为什么移除缓存机制**：
+  /// 之前发现新版本时会缓存到 SharedPreferences，API 失败时从缓存恢复。
+  /// 但这导致用户从旧版本（如 5）更新时，可能弹缓存的中间版本（如 6）
+  /// 而不是最新版本（如 8），用户被迫先更新到 6 再到 7 再到 8。
+  /// 现在移除缓存：API 成功时总是用 GitHub 上的最新版本（8），
+  /// API 失败时不弹更新（让用户下次启动时再试），确保用户直接从 5 更新到 8。
   ///
   /// 版本号来源说明：
   /// [AppConstants.appVersion] 由 CI 在构建 APK 时注入：
@@ -322,28 +319,24 @@ class GitHubReleaseService {
   /// - 相同 → 跳过更新；不同（latest 更大）→ 触发更新
   ///
   /// 返回 GitHubRelease 表示有新版本（含 APK 下载链接），否则返回 null。
-  /// 不抛异常（内部捕获，失败时尝试用缓存，再失败返回 null 让调用方静默跳过更新流程）。
+  /// 不抛异常（内部捕获，失败时返回 null 让调用方静默跳过更新流程）。
   static Future<GitHubRelease?> checkForUpdate() async {
     try {
       final release = await getLatestRelease();
       if (release == null) {
-        // GitHub 上无 release（仓库新/被删）→ 尝试用缓存
-        appLogger.i('GitHub API 返回无 release，尝试读取缓存的 release 信息');
-        return _checkCachedRelease();
+        appLogger.i('GitHub API 返回无 release，跳过更新检查');
+        return null;
       }
 
       // 跳过预发布版本
       if (release.prerelease) {
         appLogger.i('最新 release 是预发布版本 ${release.tagName}，跳过');
-        return _checkCachedRelease();
+        return null;
       }
 
       // 版本比较：release.tagName（去掉 v 前缀）vs AppConstants.appVersion
       final hasNewVersion = release.isNewerThan(AppConstants.appVersion);
       if (hasNewVersion) {
-        // 发现新版本 → 缓存到 SharedPreferences
-        // 这样即使下次启动时 GitHub API 失败也能用缓存的 release 触发更新
-        await _cacheRelease(release);
         appLogger.i(
           '发现新版本：${release.tagName}（当前 ${AppConstants.appVersion}，'
           '强制更新: ${release.forceUpdate}）',
@@ -351,103 +344,15 @@ class GitHubReleaseService {
         return release;
       }
 
-      // 当前已是最新版本 → 不需要更新，清空过期缓存（避免下次启动误弹）
+      // 当前已是最新版本 → 不需要更新
       appLogger.i(
         '当前已是最新版本 (app: ${AppConstants.appVersion} ≥ release: ${release.tagName})',
       );
-      await _clearCachedRelease();
       return null;
     } catch (e) {
-      // GitHub API 调用失败 → 尝试用缓存的 release 信息
-      appLogger.w('检查更新失败: $e，尝试读取缓存的 release 信息');
-      return _checkCachedRelease();
-    }
-  }
-
-  /// 把最新 release 信息持久化到 SharedPreferences
-  ///
-  /// 仅在发现新版本（release.tagName > 当前版本）时调用。
-  /// 用户安装新版本后 appVersion 会与 release.tagName 相同或更高，
-  /// [_checkCachedRelease] 中比较返回 false → 不弹对话框。
-  static Future<void> _cacheRelease(GitHubRelease release) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final json = jsonEncode({
-        'tagName': release.tagName,
-        'name': release.name,
-        'body': release.body,
-        'apkDownloadUrl': release.apkDownloadUrl,
-        'apkFileName': release.apkFileName,
-        'publishedAt': release.publishedAt.millisecondsSinceEpoch,
-        'prerelease': release.prerelease,
-        'forceUpdate': release.forceUpdate,
-      });
-      await prefs.setString(AppConstants.keyCachedReleaseInfo, json);
-      appLogger.i('已缓存最新 release 信息: ${release.tagName}');
-    } catch (e) {
-      appLogger.w('缓存 release 失败: $e');
-    }
-  }
-
-  /// 清空过期的缓存 release 信息（当前已是最新版本时调用）
-  static Future<void> _clearCachedRelease() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(AppConstants.keyCachedReleaseInfo);
-      appLogger.i('已清空缓存的 release 信息（当前已是最新版本）');
-    } catch (e) {
-      appLogger.w('清空缓存 release 失败: $e');
-    }
-  }
-
-  /// 从 SharedPreferences 读取缓存的 release，并检查是否仍需更新
-  ///
-  /// 使用场景：GitHub API 调用失败（网络/限流）时，从缓存恢复 release 信息。
-  /// 如果缓存中的 release.tagName 仍然大于当前版本 → 返回缓存 release，
-  /// 让 UpdateDialog 正常弹出。
-  static Future<GitHubRelease?> _checkCachedRelease() async {
-    final cached = await _loadCachedRelease();
-    if (cached == null) {
-      appLogger.i('无缓存的 release 信息，跳过更新检查');
-      return null;
-    }
-
-    final hasNewVersion = cached.isNewerThan(AppConstants.appVersion);
-    if (hasNewVersion) {
-      appLogger.i(
-        '使用缓存的 release 信息: ${cached.tagName}（当前 ${AppConstants.appVersion}）',
-      );
-      return cached;
-    }
-
-    appLogger.i(
-      '缓存的 release 已是旧版本 (app: ${AppConstants.appVersion} ≥ 缓存: ${cached.tagName})',
-    );
-    return null;
-  }
-
-  /// 从 SharedPreferences 读取缓存的 release 信息
-  static Future<GitHubRelease?> _loadCachedRelease() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final json = prefs.getString(AppConstants.keyCachedReleaseInfo);
-      if (json == null || json.isEmpty) return null;
-      final data = jsonDecode(json) as Map<String, dynamic>;
-      return GitHubRelease(
-        tagName: data['tagName'] as String? ?? '',
-        name: data['name'] as String? ?? '',
-        body: data['body'] as String? ?? '',
-        apkDownloadUrl: data['apkDownloadUrl'] as String? ?? '',
-        apkFileName: data['apkFileName'] as String? ?? 'update.apk',
-        publishedAt: DateTime.fromMillisecondsSinceEpoch(
-          data['publishedAt'] as int? ??
-              DateTime.now().millisecondsSinceEpoch,
-        ),
-        prerelease: data['prerelease'] as bool? ?? false,
-        forceUpdate: data['forceUpdate'] as bool? ?? false,
-      );
-    } catch (e) {
-      appLogger.w('解析缓存 release 失败: $e');
+      // GitHub API 调用失败 → 不弹更新（让用户下次启动时再试）
+      // 不再用缓存的旧版本，避免用户被迫更新到中间版本
+      appLogger.w('检查更新失败: $e，跳过本次更新检查');
       return null;
     }
   }

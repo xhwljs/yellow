@@ -8,7 +8,6 @@ import 'package:yellow_depot/core/utils/logger.dart';
 import 'package:yellow_depot/data/models/video_detail.dart';
 import 'package:yellow_depot/data/repositories/history_repository.dart';
 import 'package:volume_controller/volume_controller.dart';
-import 'package:wakelock_plus/wakelock_plus.dart';
 
 /// 播放器状态
 enum PlayerState {
@@ -101,11 +100,8 @@ class PlayerPageController extends GetxController
   void onInit() {
     super.onInit();
     WidgetsBinding.instance.addObserver(this);
-    // 进入播放页立即开启屏幕常亮 — 即使解析阶段（decrypting）耗时数秒
-    // 也保持屏幕常亮，避免锁屏中断播放初始化流程。
-    // wakelock_plus 使用 FLAG_KEEP_SCREEN_ON（WindowManager flag），
-    // 不是 PowerManager WakeLock，无需 WAKE_LOCK 权限。
-    WakelockPlus.enable().catchError((_) {});
+    // 屏幕常亮已在 main() 中全局开启（WakelockPlus.enable()），
+    // App 在前台时一直保持常亮，无需在播放页单独管理。
     _initializeAndPlay();
   }
 
@@ -125,24 +121,19 @@ class PlayerPageController extends GetxController
       case AppLifecycleState.paused:
       case AppLifecycleState.inactive:
         // App 切后台/失焦 → 暂停播放，记录原状态用于恢复
+        // （屏幕常亮由系统自动处理：App 切到后台后 FLAG_KEEP_SCREEN_ON
+        //  失效，系统会自动息屏，无需手动 disable wakelock）
         _wasPlayingBeforePause = vc.value.isPlaying;
         if (_wasPlayingBeforePause) {
           vc.pause();
         }
-        // 关闭屏幕常亮，避免后台未暂停时浪费电
-        try {
-          WakelockPlus.disable();
-        } catch (_) {}
         break;
       case AppLifecycleState.resumed:
         // 切回前台 → 若之前在播放则恢复
+        // （App 回到前台后 FLAG_KEEP_SCREEN_ON 自动生效，无需手动 enable）
         if (_wasPlayingBeforePause) {
           vc.play();
           _wasPlayingBeforePause = false;
-          // 恢复屏幕常亮
-          try {
-            WakelockPlus.enable();
-          } catch (_) {}
         }
         break;
       default:
@@ -372,9 +363,7 @@ class PlayerPageController extends GetxController
       await _videoController?.pause();
       await _videoController?.dispose();
     } catch (_) {}
-    try {
-      await WakelockPlus.disable();
-    } catch (_) {}
+    // 屏幕常亮由 main() 全局管理，此处不再 disable
     try {
       // screen_brightness 1.0.1 API：resetScreenBrightness（2.x 改名为 resetApplicationScreenBrightness）
       await _screenBrightness.resetScreenBrightness();
