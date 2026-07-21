@@ -261,40 +261,24 @@ jobs:
 
           [强制更新]
 
-          ### 改进
-          - **屏幕常亮改为 App 全局常亮**：
-            之前在播放页 onInit 开启 wakelock，但用户反馈还是会息屏（可能
-            因为生命周期管理复杂，切后台再回来时 wakelock 失效）。现在改为
-            App 全局常亮：
-            1. main() 启动时调用 WakelockPlus.enable()，App 在前台时一直
-               保持屏幕常亮。
-            2. 移除 PlayerPageController 中的 wakelock 管理（onInit /
-               didChangeAppLifecycleState / _disposeResources 中的
-               enable/disable 调用全部删除）。
-            3. FLAG_KEEP_SCREEN_ON 只对前台 activity 有效，App 切到后台后
-               系统自动息屏，不会浪费电。
-            4. wakelock_plus 无需 WAKE_LOCK 权限（WindowManager flag）。
-
-          - **播放器手势改用 chewie 默认手势**：
-            移除自定义的 _BrightnessVolumeGesture（纵向拖动调节亮度/音量），
-            改用 video_player + chewie 默认自带的手势：
-            1. 横向拖动 → chewie 快进快退
-            2. 双击 → chewie 播放/暂停
-            3. 单击 → chewie 显示/隐藏控件
-            4. 音量加减 → 用户用物理音量键或 chewie 的 mute 按钮
-
-          - **更新逻辑改为直接更新到最新版**：
-            之前发现新版本时会缓存到 SharedPreferences，API 失败时从缓存
-            恢复。但这导致用户从旧版本（如 5）更新时，可能弹缓存的中间
-            版本（如 6）而不是最新版本（如 8），用户被迫先更新到 6 再到
-            7 再到 8，太麻烦。现在移除缓存机制：
-            1. API 成功时总是用 GitHub 上的最新版本（如 8），用户从 5 直
-               接更新到 8。
-            2. API 失败时不弹更新（让用户下次启动时再试），避免误弹缓存
-               的中间版本。
-            3. fallback（github.com 302 redirect）的 forceUpdate 改为
-               false（无法获取 release body 时让用户可选"稍后"，避免误
-               强制更新）。
+          ### 修复
+          - **实现播放器滑动手势（快进快退 + 音量 + 双击暂停）**：
+            之前以为 chewie 1.10.0 默认提供滑动手势，但通过查看 chewie 源码
+            （lib/src/material/material_controls.dart）确认 MaterialControls 只有
+            onTap（显示/隐藏控件），**没有** onHorizontalDragUpdate /
+            onDoubleTap。所以必须自定义实现：
+            1. 新增 _PlayerGestureLayer widget，用 Listener +
+               HitTestBehavior.translucent 包裹 Chewie。
+            2. **横向拖动** → 快进快退（拖动时暂停 + seek + 拖完恢复播放，
+               拖一屏宽度 ≈ 1/2 视频 duration）。
+            3. **左半屏纵向拖动** → 亮度调节（向上增大，向下减小）。
+            4. **右半屏纵向拖动** → 音量调节（向上增大，向下减小）。
+            5. **双击**（两次 pointerup 间隔 < 300ms）→ 暂停/播放切换。
+            6. 用 Listener（不消费事件）而非 GestureDetector（消费事件），
+               避免与 chewie 的 onTap 在手势竞技场冲突 → chewie 的
+               单击显示/隐藏控件功能仍正常工作。
+            7. 检查确认播放页没有其他自定义组件遮挡导致手势失效
+               （_BrightnessVolumeGesture 在任务 K 已移除，无其他遮挡）。
 
           NOTES_EOF
           # 移除 heredoc 导致的每行前导空格（保持 markdown 结构）

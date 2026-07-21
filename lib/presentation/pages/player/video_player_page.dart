@@ -21,8 +21,9 @@ import 'package:yellow_depot/presentation/controllers/video_player_controller.da
 /// 倒计时直接 POST count.php 获取 m3u8，用 video_player + chewie 原生播放。
 ///
 /// 严格遵循需求：
-/// - 全屏 / 竖屏切换、屏幕常亮（播放中）
-/// - 手势调节亮度、音量、播放进度
+/// - 全屏 / 竖屏切换、屏幕常亮（main.dart 全局常亮）
+/// - 手势：横向拖动快进快退 + 左半屏纵向拖动亮度 + 右半屏纵向拖动音量 + 双击暂停
+///   （chewie 1.10.0 的 MaterialControls 源码确认**没有**这些手势，需要自定义实现）
 /// - 自适应视频比例
 /// - 暂停、播放、快进、快退、倍速（0.5x-2.0x）
 /// - 进度条拖拽、缓冲进度展示
@@ -159,18 +160,26 @@ class _LoadingView extends StatelessWidget {
 
 /// 播放中视图（Chewie 集成）
 ///
-/// Chewie 的 MaterialControls 自带完整功能（无需自定义）：
+/// Chewie 的 MaterialControls 1.10.0 自带功能：
 /// - 播放/暂停按钮（中央 + 底栏）
 /// - 进度条拖拽 + 缓冲进度展示
-/// - 横向滑动快进快退
-/// - 双击播放/暂停切换
 /// - 全屏切换按钮（进入/退出全屏）
 /// - 倍速切换（0.5x - 2.0x）
 /// - 控件自动隐藏（3 秒无操作）+ 点击视频区域显示控件
 ///
-/// 我们通过 [ChewieController] 注入主题色，外层叠加 [_BrightnessVolumeGesture]
-/// 处理**亮度/音量**纵向拖动（chewie 默认不支持亮度/音量手势）。
-/// 横向拖动、双击、点击等手势交给 chewie 处理，避免冲突。
+/// **chewie 1.10.0 源码确认没有的功能**（需要自定义实现）：
+/// - 横向拖动快进快退
+/// - 双击暂停/播放切换
+/// - 纵向拖动亮度/音量调节
+///
+/// 我们用 [_PlayerGestureLayer] 包装 Chewie 实现这些手势：
+/// - `Listener` + `HitTestBehavior.translucent` 不拦截事件向下传递
+///   → chewie 的 onTap 仍能工作（显示/隐藏控件）
+/// - 自己监听 PointerEvent 判断手势类型：
+///   - 横向拖动（|dx| > 10 且 |dx| > |dy|）→ 暂停 + seek + 恢复
+///   - 左半屏纵向拖动 → 亮度调节（复用 controller.setBrightness）
+///   - 右半屏纵向拖动 → 音量调节（复用 controller.setVolume）
+///   - 双击（两次 pointerup 间隔 < 300ms）→ 暂停/播放切换
 ///
 /// **实现为 StatefulWidget**：把 [ChewieController] 提升到 [State]：
 /// - 旧实现在 [build] 内 new ChewieController，每次 [Obx] 重建（播放进度变化）
@@ -295,10 +304,18 @@ class _PlayingViewState extends State<_PlayingView> {
       return const _LoadingView(message: '初始化播放器...');
     }
 
-    return Center(
-      child: AspectRatio(
-        aspectRatio: videoController.value.aspectRatio,
-        child: Chewie(controller: chewieController),
+    // 用 _PlayerGestureLayer 包裹 Chewie，实现横向拖动快进快退 +
+    // 左半屏纵向拖动亮度 + 右半屏纵向拖动音量 + 双击暂停
+    // 用 Listener + HitTestBehavior.translucent 不拦截事件向下传递，
+    // chewie 的 onTap（显示/隐藏控件）仍能正常工作
+    return _PlayerGestureLayer(
+      videoController: videoController,
+      playerController: c,
+      child: Center(
+        child: AspectRatio(
+          aspectRatio: videoController.value.aspectRatio,
+          child: Chewie(controller: chewieController),
+        ),
       ),
     );
   }
@@ -409,6 +426,204 @@ class _PlayerOverlay extends StatelessWidget {
         vertical: DesignTokens.space2xl,
       ),
       child: child,
+    );
+  }
+}
+
+/// 视频手势层 — 监听 PointerEvent 实现以下手势：
+///
+/// 1. **横向拖动**（|dx| > 阈值且 |dx| > |dy|）→ 快进快退
+///    - 进入拖动模式时暂停播放，避免 seek 后视频继续播放造成抖动
+///    - 拖动中根据 dx 实时 seek（拖动 1 倍屏幕宽度 ≈ 1/2 视频 duration）
+///    - 拖动结束恢复播放
+/// 2. **左半屏纵向拖动** → 亮度调节（向上增大，向下减小）
+/// 3. **右半屏纵向拖动** → 音量调节（向上增大，向下减小）
+/// 4. **双击**（两次 pointerup 间隔 < 300ms 且位移 < 阈值）→ 暂停/播放切换
+///
+/// **设计要点**：
+/// - 用 `Listener` + `HitTestBehavior.translucent` 监听 PointerEvent
+///   而不是 `GestureDetector`，因为 GestureDetector 会消费事件并阻止
+///   下层 chewie 的 GestureDetector 接收（chewie 需要 onTap 显示/隐藏控件）。
+/// - `HitTestBehavior.translucent` 让事件同时被本层和下层接收，互不冲突：
+///   - chewie 的 onTap → 显示/隐藏控件（不影响我们的手势判断）
+///   - 本层的 pointer 事件 → 判断手势类型并执行对应操作
+/// - 单击（短距离 pointerup）不做事，让 chewie 自己处理 onTap
+///   → 单击 = 显示/隐藏控件（chewie 行为）
+/// - 双击触发暂停/播放切换（chewie 同时也会 onTap 两次但视觉无影响）
+///
+/// **为什么不用 GestureDetector + HitTestBehavior.translucent**：
+/// Flutter 的手势竞技场中，当本层 GestureDetector 注册了 onHorizontalDragUpdate
+/// 等手势时，会与 chewie 的 onTap 在竞技场中竞争；横向拖动开始时本层会赢，
+/// chewie 的 onTap 不会触发，但单击时 chewie 的 onTap 也可能因竞技场延迟
+/// 而失效。改用 Listener 直接监听原始 PointerEvent 完全避免竞技场冲突。
+class _PlayerGestureLayer extends StatefulWidget {
+  final vp.VideoPlayerController videoController;
+  final PlayerPageController playerController;
+  final Widget child;
+
+  const _PlayerGestureLayer({
+    required this.videoController,
+    required this.playerController,
+    required this.child,
+  });
+
+  @override
+  State<_PlayerGestureLayer> createState() => _PlayerGestureLayerState();
+}
+
+class _PlayerGestureLayerState extends State<_PlayerGestureLayer> {
+  // 手势状态
+  Offset? _downPosition;
+  Duration? _startPosition; // 拖动开始时的播放位置
+  double? _startBrightness; // 纵向拖动开始时的亮度
+  double? _startVolume; // 纵向拖动开始时的音量
+  bool _isSeeking = false; // 是否在横向拖动 seek
+  bool _isVerticalDragging = false; // 是否在纵向拖动（亮度/音量）
+  bool _isLeftHalf = false; // 起手位置是否在左半屏
+  DateTime _lastTapTime = DateTime.fromMillisecondsSinceEpoch(0);
+
+  // 阈值常量
+  static const double _dragThreshold = 10.0; // 进入拖动模式的最小位移
+  static const Duration _doubleTapWindow = Duration(milliseconds: 300);
+  // 横向拖动 1 倍屏幕宽度对应 1/2 视频 duration
+  // （拖一屏宽度 = 半个视频，避免拖动太敏感或太迟钝）
+  static const double _seekSensitivity = 0.5;
+  // 纵向拖动 1 倍屏幕高度对应 0.5 亮度/音量变化
+  // （拖一屏高度 = 0.5 变化，避免拖动太敏感）
+  static const double _verticalSensitivity = 0.5;
+
+  void _onPointerDown(PointerDownEvent event) {
+    _downPosition = event.position;
+    _startPosition = widget.videoController.value.position;
+    _startBrightness = widget.playerController.brightness.value;
+    _startVolume = widget.playerController.volume.value;
+    _isSeeking = false;
+    _isVerticalDragging = false;
+    final screenWidth = MediaQuery.of(context).size.width;
+    _isLeftHalf = event.position.dx < screenWidth / 2;
+  }
+
+  void _onPointerMove(PointerMoveEvent event) {
+    if (_downPosition == null) return;
+    final dx = event.position.dx - _downPosition!.dx;
+    final dy = event.position.dy - _downPosition!.dy;
+
+    // 进入拖动模式（仅当尚未进入任何拖动模式时判断）
+    if (!_isSeeking && !_isVerticalDragging) {
+      if (dx.abs() > _dragThreshold && dx.abs() > dy.abs()) {
+        // 横向拖动 → seek
+        _isSeeking = true;
+        // 拖动开始时暂停播放（避免 seek 后继续播放造成视觉抖动）
+        if (widget.videoController.value.isPlaying) {
+          widget.videoController.pause();
+        }
+      } else if (dy.abs() > _dragThreshold && dy.abs() > dx.abs()) {
+        // 纵向拖动 → 亮度/音量
+        _isVerticalDragging = true;
+      }
+    }
+
+    if (_isSeeking && _startPosition != null) {
+      _applySeek(dx);
+    } else if (_isVerticalDragging &&
+        _startBrightness != null &&
+        _startVolume != null) {
+      _applyVerticalDrag(dy);
+    }
+  }
+
+  void _onPointerUp(PointerUpEvent event) {
+    if (_downPosition == null) {
+      _resetDragState();
+      return;
+    }
+    final dx = event.position.dx - _downPosition!.dx;
+    final dy = event.position.dy - _downPosition!.dy;
+
+    final wasSeeking = _isSeeking;
+    final wasVertical = _isVerticalDragging;
+    _resetDragState();
+
+    if (wasSeeking) {
+      // 拖动结束 → 恢复播放
+      widget.videoController.play();
+      return;
+    }
+    if (wasVertical) {
+      // 纵向拖动结束，不需要额外处理
+      return;
+    }
+
+    // 短距离 pointerup → 判定为 tap，检测双击
+    if (dx.abs() < _dragThreshold && dy.abs() < _dragThreshold) {
+      final now = DateTime.now();
+      if (now.difference(_lastTapTime) < _doubleTapWindow) {
+        // 双击 → 暂停/播放切换
+        if (widget.videoController.value.isPlaying) {
+          widget.videoController.pause();
+        } else {
+          widget.videoController.play();
+        }
+        _lastTapTime = DateTime.fromMillisecondsSinceEpoch(0);
+      } else {
+        _lastTapTime = now;
+      }
+    }
+  }
+
+  /// 应用横向拖动 seek
+  void _applySeek(double dx) {
+    final duration = widget.videoController.value.duration;
+    if (duration.inMilliseconds <= 0 || _startPosition == null) return;
+
+    final screenWidth = MediaQuery.of(context).size.width;
+    if (screenWidth <= 0) return;
+
+    // 拖动 1 倍屏幕宽度对应 _seekSensitivity 倍视频 duration
+    final seekDeltaMs =
+        (dx / screenWidth) * duration.inMilliseconds * _seekSensitivity;
+    final targetMs = _startPosition!.inMilliseconds + seekDeltaMs;
+    final clampedMs =
+        targetMs.clamp(0.0, duration.inMilliseconds.toDouble());
+    widget.videoController.seekTo(
+      Duration(milliseconds: clampedMs.toInt()),
+    );
+  }
+
+  /// 应用纵向拖动（亮度/音量）
+  void _applyVerticalDrag(double dy) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    if (screenHeight <= 0) return;
+
+    // 向上拖动 = 增大（dy 为负），向下 = 减小
+    final delta = -dy / screenHeight * _verticalSensitivity;
+
+    if (_isLeftHalf) {
+      final newBrightness = (_startBrightness! + delta).clamp(0.0, 1.0);
+      widget.playerController.setBrightness(newBrightness);
+    } else {
+      final newVolume = (_startVolume! + delta).clamp(0.0, 1.0);
+      widget.playerController.setVolume(newVolume);
+    }
+  }
+
+  void _resetDragState() {
+    _downPosition = null;
+    _startPosition = null;
+    _startBrightness = null;
+    _startVolume = null;
+    _isSeeking = false;
+    _isVerticalDragging = false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: _onPointerDown,
+      onPointerMove: _onPointerMove,
+      onPointerUp: _onPointerUp,
+      child: widget.child,
     );
   }
 }
