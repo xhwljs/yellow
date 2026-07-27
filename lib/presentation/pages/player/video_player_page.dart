@@ -308,15 +308,25 @@ class _PlayingViewState extends State<_PlayingView> {
     // 左半屏纵向拖动亮度 + 右半屏纵向拖动音量 + 双击暂停
     // 用 Listener + HitTestBehavior.translucent 不拦截事件向下传递，
     // chewie 的 onTap（显示/隐藏控件）仍能正常工作
-    return _PlayerGestureLayer(
-      videoController: videoController,
-      playerController: c,
-      child: Center(
-        child: AspectRatio(
-          aspectRatio: videoController.value.aspectRatio,
-          child: Chewie(controller: chewieController),
+    return Stack(
+      children: [
+        _PlayerGestureLayer(
+          videoController: videoController,
+          playerController: c,
+          child: Center(
+            child: AspectRatio(
+              aspectRatio: videoController.value.aspectRatio,
+              child: Chewie(controller: chewieController),
+            ),
+          ),
         ),
-      ),
+        // 右上角：解密后播放地址 badge（长按复制）
+        Positioned(
+          top: DesignTokens.spaceSm,
+          right: DesignTokens.spaceSm,
+          child: _UrlBadge(url: c.currentPlayUrl ?? ''),
+        ),
+      ],
     );
   }
 }
@@ -427,6 +437,98 @@ class _PlayerOverlay extends StatelessWidget {
       ),
       child: child,
     );
+  }
+}
+
+/// 解密后播放地址 Badge
+///
+/// 设计参考 ui-ux-pro-max UX 建议：
+/// - **位置**：右上角（避开 chewie 底部控件 + 不遮挡视频主体）
+/// - **样式**：半透明黑色背景 + 白色 monospace 文本 + 链接图标
+///   （黑底 + 透明 0.6，避免完全遮挡视频内容）
+/// - **交互**：
+///   - 长按（LongPress）→ 复制完整 URL 到剪贴板 + Get.snackbar 反馈
+///   - 单击 → 不做事（避免误触复制）
+///   - 提示文本"长按复制"（help semantics）
+/// - **可访问性**：Semantics label "播放地址，长按复制"
+///
+/// URL 可能很长（m3u8 链接带参数），用 ConstrainedBox 限制宽度 +
+/// Text overflow.ellipsis 截断显示，但长按复制的是完整 URL。
+class _UrlBadge extends StatelessWidget {
+  final String url;
+  const _UrlBadge({required this.url});
+
+  @override
+  Widget build(BuildContext context) {
+    if (url.isEmpty) return const SizedBox.shrink();
+    final colors = AppTheme.colorsOf(context);
+
+    return Semantics(
+      label: '播放地址，长按复制',
+      button: true,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 220),
+        child: GestureDetector(
+          onLongPress: () => _copyToClipboard(context, url),
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: DesignTokens.spaceSm,
+              vertical: DesignTokens.spaceXs,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.6),
+              borderRadius: BorderRadius.circular(DesignTokens.radiusSm),
+              border: Border.all(
+                color: colors.primary.withOpacity(0.4),
+                width: 0.5,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  PhosphorIconsRegular.linkSimpleHorizontal,
+                  size: 12,
+                  color: colors.primary,
+                ),
+                const SizedBox(width: DesignTokens.spaceXs),
+                Flexible(
+                  child: Text(
+                    url,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.9),
+                      fontSize: 10,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _copyToClipboard(BuildContext context, String text) async {
+    await Clipboard.setData(ClipboardData(text: text));
+    if (context.mounted) {
+      Get.snackbar(
+        '已复制',
+        '播放地址已复制到剪贴板',
+        snackPosition: SnackPosition.TOP,
+        duration: const Duration(seconds: 2),
+        margin: const EdgeInsets.all(DesignTokens.spaceMd),
+        borderRadius: DesignTokens.radiusSm,
+        icon: const Icon(
+          PhosphorIconsFill.checkCircle,
+          color: Colors.white,
+          size: 18,
+        ),
+      );
+    }
   }
 }
 

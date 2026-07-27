@@ -195,9 +195,10 @@ class PlayerPageController extends GetxController
       // 7. 设置倍速
       await _videoController!.setPlaybackSpeed(playbackSpeed.value);
 
-      // 8. 自动播放
-      await _videoController!.play();
-      state.value = PlayerState.playing;
+      // 8. 不自动播放 — 进入页面只解密 + 初始化播放器，等用户点击播放按钮
+      // 才开始播放（chewie autoPlay: false + 不调用 videoController.play()）
+      // 这样"打开页面自动获取解密后的播放地址，点击播放直接开始播放"
+      state.value = PlayerState.ready;
     } on UrlExpiredException {
       state.value = PlayerState.urlExpired;
       errorMessage.value = '播放地址已过期，正在重新获取';
