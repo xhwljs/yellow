@@ -119,7 +119,7 @@ class VideoDetailPage extends GetView<VideoDetailController> {
                   const SizedBox(height: DesignTokens.spaceXl),
                   // 播放地址卡片（替换原"简介"位置）
                   // 用 Obx 响应 inlinePlayUrl 变化（解密完成后自动显示）
-                  Obx(() => _buildPlayUrlCard(colors, controller)),
+                  Obx(() => _buildPlayUrlCard(context, colors, controller)),
                   const SizedBox(height: DesignTokens.spaceXl),
                   if (detail.relatedVideos.isNotEmpty)
                     _buildRelatedVideos(colors, detail),
@@ -186,7 +186,7 @@ class VideoDetailPage extends GetView<VideoDetailController> {
   ///   1. 解密中（url 为空且 inlineLoading）→ 显示"正在解密播放地址..."+ spinner
   ///   2. 解密失败（inlineErrorMessage 非空）→ 显示错误信息 + 重试按钮
   ///   3. 解密成功（url 非空）→ 显示完整 URL + "长按复制"提示
-  Widget _buildPlayUrlCard(ThemeColors colors, VideoDetailController controller) {
+  Widget _buildPlayUrlCard(BuildContext context, ThemeColors colors, VideoDetailController controller) {
     final url = controller.inlinePlayUrl.value;
     final isLoading = controller.inlineLoading.value;
     final errorMessage = controller.inlineErrorMessage.value;
