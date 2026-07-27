@@ -262,23 +262,21 @@ jobs:
           [强制更新]
 
           ### 改进
-          - **详情页进入即自动获取解密播放地址，点击播放直接播放**：
-            原实现详情页内联播放器初始态是"封面 + 中央播放按钮"，用户点击
-            播放按钮才调用 startInlinePlay 解密 + 初始化 + 自动播放。现在改为：
-            1. loadDetail 成功后自动触发 startInlinePlay（解密 + 初始化播放器）。
-            2. startInlinePlay 内部 autoPlay 改为 false，等用户点击 chewie
-               播放按钮才开始播放。
-            3. 用户进入详情页 → 自动看到 loading（解密中）→ chewie 就绪
-               （等点击播放）→ 点击 chewie 播放按钮 → 直接播放。
-            4. 续播 seek、进度记录、地址失效重试等逻辑保持不变。
-
-          - **详情页内联播放器添加显示解密后播放地址 + 长按复制功能**：
-            新增 _UrlBadge widget，设计参考 ui-ux-pro-max UX 建议：
-            1. 内联播放器右上角显示解密后的播放地址（避开 chewie 底部控件）。
-            2. 半透明黑色背景（0.6）+ primary 色边框 + 链接图标 + monospace。
-            3. ConstrainedBox(maxWidth: 220) + ellipsis 截断显示长 URL。
-            4. 长按 → Clipboard.setData 复制完整 URL + Get.snackbar TOP 反馈。
-            5. Semantics label "播放地址，长按复制" 无障碍支持。
+          - **播放地址显示位置改为详情页"简介"位置，用播放地址替换简介**：
+            将原 _InlinePlayerArea 右上角的 _UrlBadge 移除，改为在详情页
+            "简介" section 位置用播放地址卡片替换简介。设计参考
+            ui-ux-pro-max 技能 + 项目其他页面风格：
+            1. 标题"播放地址"用 textH2 + w600 + onBackground（与"相关推荐"
+               风格完全一致）。
+            2. 内容卡片用 Material + surface 背景 + radiusLg + border 0.5
+               （与 settings_page / home_page 的 _SectionCard 视觉语言统一）。
+            3. 三种状态自适应显示：
+               - 解密中（url 空 + loading）→ spinner + "正在解密播放地址..."
+               - 解密失败（errorMessage 非空）→ 红色警告图标 + 错误信息 + 重试按钮
+               - 解密成功（url 非空）→ 链接图标 + 完整 URL（可换行，不截断）+ "长按复制"提示
+            4. 长按卡片 → Clipboard.setData 复制完整 URL + Get.snackbar TOP 反馈。
+            5. "长按复制"提示用 handTap 图标 + textLabel 字号，右对齐。
+            6. URL 用 monospace 字体 + textCaption 字号 + onSurface 色 + height 1.5。
 
           NOTES_EOF
           # 移除 heredoc 导致的每行前导空格（保持 markdown 结构）

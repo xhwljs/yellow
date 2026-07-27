@@ -117,7 +117,9 @@ class VideoDetailPage extends GetView<VideoDetailController> {
                   const SizedBox(height: DesignTokens.spaceLg),
                   _buildMetaRow(colors, detail),
                   const SizedBox(height: DesignTokens.spaceXl),
-                  _buildDescription(colors, detail),
+                  // 播放地址卡片（替换原"简介"位置）
+                  // 用 Obx 响应 inlinePlayUrl 变化（解密完成后自动显示）
+                  Obx(() => _buildPlayUrlCard(colors, controller)),
                   const SizedBox(height: DesignTokens.spaceXl),
                   if (detail.relatedVideos.isNotEmpty)
                     _buildRelatedVideos(colors, detail),
@@ -172,12 +174,29 @@ class VideoDetailPage extends GetView<VideoDetailController> {
     );
   }
 
-  Widget _buildDescription(colors, VideoDetail detail) {
+  /// 播放地址卡片（替换原"简介"位置）
+  ///
+  /// 设计参考 ui-ux-pro-max UX 建议 + 项目其他页面风格：
+  /// - 标题"播放地址"用 textH2 + w600 + onBackground（与"简介"、"相关推荐"一致）
+  /// - 内容区用 _SectionCard 风格（surface 背景 + radiusLg + border）：
+  ///   与 settings_page / home_page 的卡片视觉语言统一
+  /// - 内容：链接图标 + URL 文本（可换行显示完整 URL，不截断）
+  /// - 交互：长按 → 复制完整 URL + Get.snackbar TOP 反馈
+  /// - 三种状态：
+  ///   1. 解密中（url 为空且 inlineLoading）→ 显示"正在解密播放地址..."+ spinner
+  ///   2. 解密失败（inlineErrorMessage 非空）→ 显示错误信息 + 重试按钮
+  ///   3. 解密成功（url 非空）→ 显示完整 URL + "长按复制"提示
+  Widget _buildPlayUrlCard(ThemeColors colors, VideoDetailController controller) {
+    final url = controller.inlinePlayUrl.value;
+    final isLoading = controller.inlineLoading.value;
+    final errorMessage = controller.inlineErrorMessage.value;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // 标题"播放地址"（与"简介"、"相关推荐"风格一致）
         Text(
-          '简介',
+          '播放地址',
           style: TextStyle(
             fontSize: DesignTokens.textH2,
             fontWeight: FontWeight.w600,
@@ -185,16 +204,195 @@ class VideoDetailPage extends GetView<VideoDetailController> {
           ),
         ),
         const SizedBox(height: DesignTokens.spaceSm),
-        Text(
-          detail.description.isEmpty ? '暂无简介' : detail.description,
-          style: TextStyle(
-            fontSize: DesignTokens.textBody,
-            color: colors.onSurfaceMuted,
-            height: 1.7,
+        // 内容卡片（surface 背景 + radiusLg + border，与项目其他 _SectionCard 一致）
+        Material(
+          color: colors.surface,
+          borderRadius: BorderRadius.circular(DesignTokens.radiusLg),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onLongPress: url.isNotEmpty
+                ? () => _copyUrlToClipboard(context, url)
+                : null,
+            borderRadius: BorderRadius.circular(DesignTokens.radiusLg),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(DesignTokens.spaceMd),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(DesignTokens.radiusLg),
+                border: Border.all(color: colors.border, width: 0.5),
+              ),
+              child: _buildPlayUrlContent(
+                colors: colors,
+                url: url,
+                isLoading: isLoading,
+                errorMessage: errorMessage,
+                onRetry: controller.retryInlinePlay,
+              ),
+            ),
           ),
         ),
       ],
     );
+  }
+
+  /// 播放地址内容（根据状态显示不同 UI）
+  Widget _buildPlayUrlContent({
+    required ThemeColors colors,
+    required String url,
+    required bool isLoading,
+    required String errorMessage,
+    required VoidCallback onRetry,
+  }) {
+    // 错误态
+    if (errorMessage.isNotEmpty) {
+      return Row(
+        children: [
+          Icon(
+            PhosphorIconsRegular.warningCircle,
+            size: 16,
+            color: colors.destructive,
+          ),
+          const SizedBox(width: DesignTokens.spaceXs),
+          Expanded(
+            child: Text(
+              '解密失败：$errorMessage',
+              style: TextStyle(
+                fontSize: DesignTokens.textCaption,
+                color: colors.destructive,
+              ),
+            ),
+          ),
+          InkWell(
+            onTap: onRetry,
+            child: Padding(
+              padding: const EdgeInsets.only(left: DesignTokens.spaceXs),
+              child: Icon(
+                PhosphorIconsRegular.arrowClockwise,
+                size: 16,
+                color: colors.primary,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // 加载态
+    if (url.isEmpty && isLoading) {
+      return Row(
+        children: [
+          SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: colors.primary,
+            ),
+          ),
+          const SizedBox(width: DesignTokens.spaceXs),
+          Text(
+            '正在解密播放地址...',
+            style: TextStyle(
+              fontSize: DesignTokens.textCaption,
+              color: colors.onSurfaceMuted,
+            ),
+          ),
+        ],
+      );
+    }
+
+    // 空态（未开始解密）
+    if (url.isEmpty) {
+      return Row(
+        children: [
+          Icon(
+            PhosphorIconsRegular.linkSimpleHorizontalBreak,
+            size: 16,
+            color: colors.onSurfaceMuted,
+          ),
+          const SizedBox(width: DesignTokens.spaceXs),
+          Text(
+            '等待解密播放地址',
+            style: TextStyle(
+              fontSize: DesignTokens.textCaption,
+              color: colors.onSurfaceMuted,
+            ),
+          ),
+        ],
+      );
+    }
+
+    // 成功态：显示完整 URL + "长按复制"提示
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              PhosphorIconsRegular.linkSimpleHorizontal,
+              size: 16,
+              color: colors.primary,
+            ),
+            const SizedBox(width: DesignTokens.spaceXs),
+            Expanded(
+              child: Text(
+                url,
+                style: TextStyle(
+                  fontSize: DesignTokens.textCaption,
+                  color: colors.onSurface,
+                  fontFamily: 'monospace',
+                  height: 1.5,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: DesignTokens.spaceXs),
+        // "长按复制"提示（右对齐，onSurfaceMuted 色）
+        Align(
+          alignment: Alignment.centerRight,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                PhosphorIconsRegular.handTap,
+                size: 11,
+                color: colors.onSurfaceMuted,
+              ),
+              const SizedBox(width: 2),
+              Text(
+                '长按复制',
+                style: TextStyle(
+                  fontSize: DesignTokens.textLabel,
+                  color: colors.onSurfaceMuted,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 复制 URL 到剪贴板 + snackbar 反馈
+  void _copyUrlToClipboard(BuildContext context, String text) async {
+    await Clipboard.setData(ClipboardData(text: text));
+    if (context.mounted) {
+      Get.snackbar(
+        '已复制',
+        '播放地址已复制到剪贴板',
+        snackPosition: SnackPosition.TOP,
+        duration: const Duration(seconds: 2),
+        margin: const EdgeInsets.all(DesignTokens.spaceMd),
+        borderRadius: DesignTokens.radiusSm,
+        icon: const Icon(
+          PhosphorIconsFill.checkCircle,
+          color: Colors.white,
+          size: 18,
+        ),
+      );
+    }
   }
 
   Widget _buildRelatedVideos(colors, VideoDetail detail) {
@@ -410,23 +608,14 @@ class _InlinePlayerArea extends StatelessWidget {
         );
       }
 
-      // 播放态：chewie 播放器 + 右上角播放地址 badge（长按复制）
+      // 播放态：chewie 播放器
+      // （播放地址 badge 已移到详情页"简介"位置替换简介，见 _buildPlayUrlCard）
       if (videoController != null &&
           chewieController != null &&
           videoController.value.isInitialized) {
-        return Stack(
-          children: [
-            Container(
-              color: Colors.black,
-              child: Chewie(controller: chewieController),
-            ),
-            // 右上角：解密后播放地址 badge（长按复制）
-            Positioned(
-              top: DesignTokens.spaceSm,
-              right: DesignTokens.spaceSm,
-              child: _UrlBadge(url: controller.inlinePlayUrl.value),
-            ),
-          ],
+        return Container(
+          color: Colors.black,
+          child: Chewie(controller: chewieController),
         );
       }
 
@@ -645,90 +834,3 @@ class _ErrorOverlay extends StatelessWidget {
   }
 }
 
-/// 解密后播放地址 Badge（详情页内联播放器右上角）
-///
-/// 设计参考 ui-ux-pro-max UX 建议：
-/// - **位置**：右上角（避开 chewie 底部控件 + 不遮挡视频主体）
-/// - **样式**：半透明黑色背景 + primary 色边框 + 链接图标 + monospace 文本
-/// - **交互**：长按（LongPress）→ 复制完整 URL 到剪贴板 + Get.snackbar 反馈
-/// - **可访问性**：Semantics label "播放地址，长按复制"
-///
-/// URL 可能很长（m3u8 链接带参数），用 ConstrainedBox 限制宽度 +
-/// Text overflow.ellipsis 截断显示，但长按复制的是完整 URL。
-class _UrlBadge extends StatelessWidget {
-  final String url;
-  const _UrlBadge({required this.url});
-
-  @override
-  Widget build(BuildContext context) {
-    if (url.isEmpty) return const SizedBox.shrink();
-    final colors = AppTheme.colorsOf(context);
-
-    return Semantics(
-      label: '播放地址，长按复制',
-      button: true,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 220),
-        child: GestureDetector(
-          onLongPress: () => _copyToClipboard(context, url),
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: DesignTokens.spaceSm,
-              vertical: DesignTokens.spaceXs,
-            ),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.6),
-              borderRadius: BorderRadius.circular(DesignTokens.radiusSm),
-              border: Border.all(
-                color: colors.primary.withOpacity(0.4),
-                width: 0.5,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  PhosphorIconsRegular.linkSimpleHorizontal,
-                  size: 12,
-                  color: colors.primary,
-                ),
-                const SizedBox(width: DesignTokens.spaceXs),
-                Flexible(
-                  child: Text(
-                    url,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.9),
-                      fontSize: 10,
-                      fontFamily: 'monospace',
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _copyToClipboard(BuildContext context, String text) async {
-    await Clipboard.setData(ClipboardData(text: text));
-    if (context.mounted) {
-      Get.snackbar(
-        '已复制',
-        '播放地址已复制到剪贴板',
-        snackPosition: SnackPosition.TOP,
-        duration: const Duration(seconds: 2),
-        margin: const EdgeInsets.all(DesignTokens.spaceMd),
-        borderRadius: DesignTokens.radiusSm,
-        icon: const Icon(
-          PhosphorIconsFill.checkCircle,
-          color: Colors.white,
-          size: 18,
-        ),
-      );
-    }
-  }
-}
