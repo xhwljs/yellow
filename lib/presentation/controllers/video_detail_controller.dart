@@ -73,6 +73,8 @@ class VideoDetailController extends GetxController
       Rx<ChewieController?>(null);
   final RxBool inlineLoading = false.obs;
   final RxString inlineErrorMessage = ''.obs;
+  /// 解密后的播放地址（供 UI 显示 + 长按复制）
+  final RxString inlinePlayUrl = ''.obs;
   bool _inlineStarted = false;
 
   // 历史记录实时保存
@@ -206,6 +208,14 @@ class VideoDetailController extends GetxController
       if (history != null && !history.isCompleted) {
         initialPositionMs.value = history.positionMs;
       }
+
+      // 详情加载完成后自动预解密播放地址 + 初始化播放器（不自动播放）
+      //
+      // 用户需求："打开页面自动获取解密后的播放地址，点击播放直接开始播放"
+      // 所以在 loadDetail 成功后立即触发 startInlinePlay（解密 + 初始化），
+      // 但 startInlinePlay 内部 autoPlay=false，等用户点击 chewie 播放按钮。
+      // 不 await — 让详情页 UI 先渲染，播放器后台初始化。
+      unawaited(startInlinePlay());
     } catch (e) {
       errorMessage.value = e.toString();
     } finally {
@@ -254,6 +264,9 @@ class VideoDetailController extends GetxController
         existingDetail: existingDetail,
       );
 
+      // 存储解密后的播放地址（供 UI 显示 + 长按复制）
+      inlinePlayUrl.value = result.playUrl;
+
       // 同步更新 detail（若 url_decryptor 重新拉取过详情）
       if (d == null || d.token == null || d.token!.isEmpty || d.aid == null) {
         detail.value = result.detail;
@@ -282,9 +295,9 @@ class VideoDetailController extends GetxController
         }
       }
 
-      // 获取当前主题色（chewie 控件需在 build 时拿到主题色才能跟随切换）
-      // 这里取默认 primary，实际颜色通过 Obx 在 UI 层重建 Chewie 时注入
-      final chewie = _buildChewieController(videoController, autoPlay: true);
+      // autoPlay=false — 进入页面只解密 + 初始化播放器，等用户点击播放按钮
+      // 才开始播放（用户需求："点击播放直接开始播放"）
+      final chewie = _buildChewieController(videoController, autoPlay: false);
       inlineVideoController.value = videoController;
       inlineChewieController.value = chewie;
       inlineLoading.value = false;

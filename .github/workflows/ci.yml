@@ -262,26 +262,23 @@ jobs:
           [强制更新]
 
           ### 改进
-          - **进入播放页自动获取解密地址，点击播放直接播放**：
-            原实现进入播放页后会自动解密 + 自动 play()，但用户希望"打开页面
-            自动获取解密后的播放地址，点击播放直接开始播放"。现在改为：
-            1. onInit 仍然自动调用 _initializeAndPlay（解密 + 初始化播放器）。
-            2. 初始化完成后不再调用 videoController.play()，状态设为 ready
-               （已就绪，等用户点击播放按钮）。
-            3. chewie autoPlay 保持 false，用户点击 chewie 播放按钮 → 开始播放。
+          - **详情页进入即自动获取解密播放地址，点击播放直接播放**：
+            原实现详情页内联播放器初始态是"封面 + 中央播放按钮"，用户点击
+            播放按钮才调用 startInlinePlay 解密 + 初始化 + 自动播放。现在改为：
+            1. loadDetail 成功后自动触发 startInlinePlay（解密 + 初始化播放器）。
+            2. startInlinePlay 内部 autoPlay 改为 false，等用户点击 chewie
+               播放按钮才开始播放。
+            3. 用户进入详情页 → 自动看到 loading（解密中）→ chewie 就绪
+               （等点击播放）→ 点击 chewie 播放按钮 → 直接播放。
             4. 续播 seek、进度记录、地址失效重试等逻辑保持不变。
 
-          - **播放页添加显示解密后播放地址 + 长按复制功能**：
+          - **详情页内联播放器添加显示解密后播放地址 + 长按复制功能**：
             新增 _UrlBadge widget，设计参考 ui-ux-pro-max UX 建议：
-            1. 右上角显示解密后的播放地址（避开 chewie 底部控件，不遮挡视频主体）。
-            2. 半透明黑色背景（0.6 透明度）+ primary 色边框 + 链接图标 +
-               monospace 字体显示 URL。
-            3. URL 可能很长（m3u8 链接带参数），用 ConstrainedBox(maxWidth: 220)
-               + Text overflow.ellipsis 截断显示。
-            4. 长按（LongPress）→ Clipboard.setData 复制完整 URL 到剪贴板 +
-               Get.snackbar TOP 显示"已复制 · 播放地址已复制到剪贴板"反馈。
-            5. 单击不做事（避免误触复制）。
-            6. Semantics label "播放地址，长按复制" 提供无障碍支持。
+            1. 内联播放器右上角显示解密后的播放地址（避开 chewie 底部控件）。
+            2. 半透明黑色背景（0.6）+ primary 色边框 + 链接图标 + monospace。
+            3. ConstrainedBox(maxWidth: 220) + ellipsis 截断显示长 URL。
+            4. 长按 → Clipboard.setData 复制完整 URL + Get.snackbar TOP 反馈。
+            5. Semantics label "播放地址，长按复制" 无障碍支持。
 
           NOTES_EOF
           # 移除 heredoc 导致的每行前导空格（保持 markdown 结构）
