@@ -263,38 +263,24 @@ jobs:
 
           本次为强制更新，请立即更新到新版本后使用。
 
-          ### 优化（代码质量 + 性能 + 工程规范）
+          ### 回退说明
 
-          #### 1. 抽取重复的数字格式化方法
-          - video_card / home_page / history_page 三处各有一份 `_formatCount`，
-            且实现不一致（"万" vs "w" 单位）
-          - 统一抽取到 `lib/core/utils/number_formatter.dart`，支持"万/亿"中文单位
-          - 消除行为不一致 + 代码冗余
+          本次版本回退到 `26bb7ac`（修复 ThemePreset 枚举属性在 const 上下文
+          无法访问导致编译失败的版本），撤销了后续引入问题的多次重构提交：
 
-          #### 2. 收藏/历史控制器错误状态处理
-          - FavoritesController / HistoryController 缺少错误状态，加载失败静默
-          - 新增 `errorMessage` 字段，catch 块捕获异常并记录日志
-          - favorites_page / history_page 增加 ErrorView + 重试按钮
-          - 与既有 CategoryController 错误处理模式统一
+          - 撤销 "抽取 MetaRow/TimeFormatter 公共组件" 提交（导致 TimeFormatter
+            无法实例化的编译错误）
+          - 撤销 "将 UI 硬编码像素值统一纳入 DesignTokens" 提交（导致页面
+            采集地址异常、UI 显示问题）
+          - 撤销相关的 revert 与修复提交
 
-          #### 3. 移除硬编码主题色
-          - splash_page / update_dialog 硬编码 4-9 个颜色常量，
-            与 ThemePreset / DesignTokens 重复且脱节
-          - 改为引用 ThemePreset.pink 与 DesignTokens 常量
-          - 主题色统一管理，符合设计系统"不得硬编码 hex"规范
+          ### 修复
 
-          #### 4. 清理未使用代码
-          - 删除 logger.dart 中未被引用的 `prodLogger` 全局变量
-          - 减小代码冗余与维护成本
-
-          #### 5. 抽取字节格式化方法
-          - app_update_service / update_dialog 各有一份 `_formatBytes` 重复实现
-          - 统一抽取到 `NumberFormatter.formatBytes`，消除冗余
-
-          #### 6. 修复更新检查 fallback 文档矛盾
-          - _fetchLatestReleaseFromRedirect 文档注释称 `forceUpdate = true`，
-            但代码实际为 `false`，注释与实现矛盾
-          - 修正文档与代码一致，避免误导维护者
+          #### 1. 修复 ThemePreset 枚举属性在 const 上下文无法访问
+          - SplashPage 和 UpdateDialog 中使用 `ThemePreset.pink.primaryColor`
+            作为 const 颜色值，Dart 不允许在 const 表达式中访问枚举实例属性
+          - 在 ThemePreset 枚举中新增 `static const` 字段（如
+            `defaultPrimaryColor`）引用其值，解决编译失败
 
           NOTES_EOF
           # 移除 heredoc 导致的每行前导空格（保持 markdown 结构）
