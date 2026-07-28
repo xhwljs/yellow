@@ -69,7 +69,7 @@ class VideoCard extends StatelessWidget {
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: DesignTokens.spaceSm,
-                          vertical: 2,
+                          vertical: DesignTokens.space3xs,
                         ),
                         decoration: BoxDecoration(
                           color: DesignTokens.colorVideoOverlay,
@@ -100,7 +100,7 @@ class VideoCard extends StatelessWidget {
                         child: Icon(
                           PhosphorIconsFill.heart,
                           color: colors.onPrimary,
-                          size: 14,
+                          size: DesignTokens.iconSizeSm,
                         ),
                       ),
                     ),
@@ -112,7 +112,7 @@ class VideoCard extends StatelessWidget {
                       bottom: 0,
                       child: LinearProgressIndicator(
                         value: progress,
-                        minHeight: 3,
+                        minHeight: DesignTokens.progressBarHeight,
                         backgroundColor: Colors.transparent,
                         valueColor: AlwaysStoppedAnimation(colors.primary),
                       ),
@@ -211,7 +211,7 @@ class _CoverPlaceholder extends StatelessWidget {
       child: Center(
         child: Icon(
           icon,
-          size: 32,
+          size: DesignTokens.iconSize2xl,
           color: DesignTokens.colorOnSurfaceMuted,
         ),
       ),
@@ -242,14 +242,14 @@ class VideoCardSkeleton extends StatelessWidget {
           ),
           const SizedBox(height: DesignTokens.spaceSm),
           Container(
-            height: 12,
+            height: DesignTokens.skeletonBarHeight,
             width: double.infinity,
             color: DesignTokens.colorSkeleton,
           ),
           const SizedBox(height: DesignTokens.spaceXs),
           Container(
-            height: 12,
-            width: 100,
+            height: DesignTokens.skeletonBarHeight,
+            width: DesignTokens.skeletonBarShortWidth,
             color: DesignTokens.colorSkeleton,
           ),
         ],
@@ -315,7 +315,7 @@ class EmptyView extends StatelessWidget {
           children: [
             Icon(
               icon,
-              size: 64,
+              size: DesignTokens.iconSize5xl,
               color: colors.onSurfaceMuted,
             ),
             const SizedBox(height: DesignTokens.spaceLg),
@@ -375,7 +375,7 @@ class ErrorView extends StatelessWidget {
           children: [
             Icon(
               PhosphorIconsRegular.warningCircle,
-              size: 64,
+              size: DesignTokens.iconSize5xl,
               color: colors.destructive,
             ),
             const SizedBox(height: DesignTokens.spaceLg),

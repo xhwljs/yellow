@@ -153,11 +153,12 @@ class HomePage extends GetView<HomeController> {
                 child: Padding(
                   padding: const EdgeInsets.only(top: DesignTokens.spaceSm),
                   child: Container(
-                    width: 36,
-                    height: 4,
+                    width: DesignTokens.bottomSheetHandleWidth,
+                    height: DesignTokens.bottomSheetHandleHeight,
                     decoration: BoxDecoration(
                       color: colors.border,
-                      borderRadius: BorderRadius.circular(2),
+                      borderRadius:
+                          BorderRadius.circular(DesignTokens.radiusPill),
                     ),
                   ),
                 ),
@@ -174,7 +175,7 @@ class HomePage extends GetView<HomeController> {
                   children: [
                     Icon(
                       PhosphorIconsRegular.squaresFour,
-                      size: 20,
+                      size: DesignTokens.iconSizeAction,
                       color: colors.primary,
                     ),
                     const SizedBox(width: DesignTokens.spaceSm),
@@ -197,7 +198,7 @@ class HomePage extends GetView<HomeController> {
                         ),
                         child: Icon(
                           PhosphorIconsRegular.x,
-                          size: 20,
+                          size: DesignTokens.iconSizeAction,
                           color: colors.onSurfaceMuted,
                         ),
                       ),
@@ -206,8 +207,8 @@ class HomePage extends GetView<HomeController> {
                 ),
               ),
               Divider(
-                height: 1,
-                thickness: 1,
+                height: DesignTokens.dividerThickness,
+                thickness: DesignTokens.dividerThickness,
                 color: colors.border,
               ),
               // 分类列表（含 count 视频数量）
@@ -238,7 +239,7 @@ class HomePage extends GetView<HomeController> {
                     ),
                     itemCount: cats.length,
                     separatorBuilder: (_, __) => Divider(
-                      height: 1,
+                      height: DesignTokens.dividerThickness,
                       indent: DesignTokens.spaceLg,
                       endIndent: DesignTokens.spaceLg,
                       color: colors.border.withOpacity(0.5),
@@ -292,7 +293,7 @@ class HomePage extends GetView<HomeController> {
             children: [
               Icon(
                 PhosphorIconsRegular.magnifyingGlass,
-                size: 20,
+                size: DesignTokens.iconSizeAction,
                 color: colors.primary,
               ),
               const SizedBox(width: DesignTokens.spaceSm),
@@ -307,7 +308,7 @@ class HomePage extends GetView<HomeController> {
               ),
               Icon(
                 PhosphorIconsRegular.slidersHorizontal,
-                size: 18,
+                size: DesignTokens.iconSizeLg,
                 color: colors.onSurfaceMuted,
               ),
             ],
@@ -331,7 +332,7 @@ class HomePage extends GetView<HomeController> {
   /// 目录分类通过右下角卷帘菜单访问。
   Widget _buildCategoryTabs(colors) {
     return SizedBox(
-      height: 40,
+      height: DesignTokens.tabBarHeight,
       child: Obx(() {
         final selectedId = controller.selectedCategoryId.value;
         // Tab 列表：推荐 + nav 分类（不含目录区块分类）
@@ -458,7 +459,7 @@ class HomePage extends GetView<HomeController> {
             // 16:9 封面 + 2 行标题 + 单行元信息行
             // 1.0 在小屏（320-360dp）会让元信息行溢出 33px
             // 0.88 给元信息行充足高度余量，避免溢出
-            childAspectRatio: 0.88,
+            childAspectRatio: DesignTokens.videoGridChildAspectRatio,
           ),
           itemCount: controller.selectedCategoryVideos.length +
               (controller.selectedLoadingMore.value ? 1 : 0),
@@ -493,7 +494,7 @@ class HomePage extends GetView<HomeController> {
         crossAxisCount: DesignTokens.videoGridCrossAxisCount,
         mainAxisSpacing: DesignTokens.videoGridMainAxisSpacing,
         crossAxisSpacing: DesignTokens.videoGridSpacing,
-        childAspectRatio: 0.88,
+        childAspectRatio: DesignTokens.videoGridChildAspectRatio,
       ),
       itemCount: 6,
       itemBuilder: (_, __) => const VideoCardSkeleton(),
@@ -553,7 +554,7 @@ class HomePage extends GetView<HomeController> {
                         const SizedBox(width: DesignTokens.spaceXs),
                         Icon(
                           PhosphorIconsRegular.caretRight,
-                          size: 14,
+                          size: DesignTokens.iconSizeSm,
                           color: colors.onSurfaceMuted,
                         ),
                       ],
@@ -579,7 +580,7 @@ class HomePage extends GetView<HomeController> {
             )
           else
             SizedBox(
-              height: 200,
+              height: DesignTokens.mediaInlineHeight,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(
@@ -591,7 +592,7 @@ class HomePage extends GetView<HomeController> {
                 itemBuilder: (_, i) {
                   final v = videos[i];
                   return SizedBox(
-                    width: 160,
+                    width: DesignTokens.mediaCardWidth,
                     child: VideoCard(
                       video: v,
                       onTap: () => Get.toNamed(
@@ -670,7 +671,7 @@ class _CatalogListItem extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: DesignTokens.spaceSm,
-                  vertical: 2,
+                  vertical: DesignTokens.space3xs,
                 ),
                 decoration: BoxDecoration(
                   color: colors.surfaceVariant,
@@ -689,7 +690,7 @@ class _CatalogListItem extends StatelessWidget {
             const SizedBox(width: DesignTokens.spaceXs),
             Icon(
               PhosphorIconsRegular.caretRight,
-              size: 16,
+              size: DesignTokens.iconSizeMd,
               color: colors.onSurfaceMuted,
             ),
           ],

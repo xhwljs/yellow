@@ -61,7 +61,7 @@ class VideoDetailPage extends GetView<VideoDetailController> {
     return CustomScrollView(
       slivers: [
         SliverAppBar(
-          expandedHeight: 220,
+          expandedHeight: DesignTokens.appBarExpandedHeight,
           pinned: true,
           backgroundColor: colors.surface,
           foregroundColor: colors.onBackground,
@@ -84,7 +84,7 @@ class VideoDetailPage extends GetView<VideoDetailController> {
                       ? PhosphorIconsFill.heart
                       : PhosphorIconsRegular.heart,
                   color: favorited ? colors.primary : colors.onBackground,
-                  size: 24,
+                  size: DesignTokens.iconSizeXl,
                 ),
                 onPressed: canToggle ? controller.toggleFavorite : null,
                 tooltip: favorited ? '取消收藏' : '收藏',
@@ -219,7 +219,8 @@ class VideoDetailPage extends GetView<VideoDetailController> {
               padding: const EdgeInsets.all(DesignTokens.spaceMd),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(DesignTokens.radiusLg),
-                border: Border.all(color: colors.border, width: 0.5),
+                border: Border.all(
+                    color: colors.border, width: DesignTokens.borderWidthThin),
               ),
               child: _buildPlayUrlContent(
                 colors: colors,
@@ -249,7 +250,7 @@ class VideoDetailPage extends GetView<VideoDetailController> {
         children: [
           Icon(
             PhosphorIconsRegular.warningCircle,
-            size: 16,
+            size: DesignTokens.iconSizeMd,
             color: colors.destructive,
           ),
           const SizedBox(width: DesignTokens.spaceXs),
@@ -268,7 +269,7 @@ class VideoDetailPage extends GetView<VideoDetailController> {
               padding: const EdgeInsets.only(left: DesignTokens.spaceXs),
               child: Icon(
                 PhosphorIconsRegular.arrowClockwise,
-                size: 16,
+                size: DesignTokens.iconSizeMd,
                 color: colors.primary,
               ),
             ),
@@ -282,10 +283,10 @@ class VideoDetailPage extends GetView<VideoDetailController> {
       return Row(
         children: [
           SizedBox(
-            width: 14,
-            height: 14,
+            width: DesignTokens.iconSizeSm,
+            height: DesignTokens.iconSizeSm,
             child: CircularProgressIndicator(
-              strokeWidth: 2,
+              strokeWidth: DesignTokens.progressStrokeMedium,
               color: colors.primary,
             ),
           ),
@@ -307,7 +308,7 @@ class VideoDetailPage extends GetView<VideoDetailController> {
         children: [
           Icon(
             PhosphorIconsRegular.linkSimpleHorizontalBreak,
-            size: 16,
+            size: DesignTokens.iconSizeMd,
             color: colors.onSurfaceMuted,
           ),
           const SizedBox(width: DesignTokens.spaceXs),
@@ -331,7 +332,7 @@ class VideoDetailPage extends GetView<VideoDetailController> {
           children: [
             Icon(
               PhosphorIconsRegular.linkSimpleHorizontal,
-              size: 16,
+              size: DesignTokens.iconSizeMd,
               color: colors.primary,
             ),
             const SizedBox(width: DesignTokens.spaceXs),
@@ -357,10 +358,10 @@ class VideoDetailPage extends GetView<VideoDetailController> {
             children: [
               Icon(
                 PhosphorIconsRegular.handTap,
-                size: 11,
+                size: DesignTokens.iconSize2xs,
                 color: colors.onSurfaceMuted,
               ),
-              const SizedBox(width: 2),
+              const SizedBox(width: DesignTokens.space3xs),
               Text(
                 '长按复制',
                 style: TextStyle(
@@ -389,7 +390,7 @@ class VideoDetailPage extends GetView<VideoDetailController> {
         icon: const Icon(
           PhosphorIconsFill.checkCircle,
           color: Colors.white,
-          size: 18,
+          size: DesignTokens.iconSizeLg,
         ),
       );
     }
@@ -409,7 +410,7 @@ class VideoDetailPage extends GetView<VideoDetailController> {
         ),
         const SizedBox(height: DesignTokens.spaceMd),
         SizedBox(
-          height: 200,
+          height: DesignTokens.mediaInlineHeight,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: detail.relatedVideos.length,
@@ -418,7 +419,7 @@ class VideoDetailPage extends GetView<VideoDetailController> {
             itemBuilder: (_, i) {
               final v = detail.relatedVideos[i];
               return SizedBox(
-                width: 160,
+                width: DesignTokens.mediaCardWidth,
                 child: VideoCard(
                   video: v,
                   onTap: () => Get.toNamed(
@@ -454,11 +455,11 @@ class _InlineLoadingView extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           SizedBox(
-            width: 32,
-            height: 32,
+            width: DesignTokens.iconSize2xl,
+            height: DesignTokens.iconSize2xl,
             child: CircularProgressIndicator(
               color: colors.primary,
-              strokeWidth: 2.5,
+              strokeWidth: DesignTokens.progressStrokeThick,
             ),
           ),
           const SizedBox(height: DesignTokens.spaceMd),
@@ -501,7 +502,7 @@ class _InlineErrorView extends StatelessWidget {
             Icon(
               PhosphorIconsRegular.warningCircle,
               color: colors.destructive,
-              size: 40,
+              size: DesignTokens.iconSize3xl,
             ),
             const SizedBox(height: DesignTokens.spaceMd),
             Text(
@@ -517,7 +518,7 @@ class _InlineErrorView extends StatelessWidget {
             const SizedBox(height: DesignTokens.spaceLg),
             FilledButton.icon(
               onPressed: onRetry,
-              icon: const Icon(Icons.refresh, size: 18),
+              icon: const Icon(Icons.refresh, size: DesignTokens.iconSizeLg),
               label: const Text('重试'),
             ),
           ],
@@ -544,7 +545,7 @@ class _MetaChip extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 14, color: colors.onSurfaceMuted),
+        Icon(icon, size: DesignTokens.iconSizeSm, color: colors.onSurfaceMuted),
         const SizedBox(width: DesignTokens.spaceXs),
         Text(
           text,
@@ -655,7 +656,7 @@ class _InlinePlayerArea extends StatelessWidget {
               child: Center(
                 child: Icon(
                   PhosphorIconsRegular.filmSlate,
-                  size: 48,
+                  size: DesignTokens.iconSize4xl,
                   color: colors.onSurfaceMuted,
                 ),
               ),
@@ -667,7 +668,7 @@ class _InlinePlayerArea extends StatelessWidget {
             child: Center(
               child: Icon(
                 PhosphorIconsRegular.filmSlate,
-                size: 48,
+                size: DesignTokens.iconSize4xl,
                 color: colors.onSurfaceMuted,
               ),
             ),
@@ -714,25 +715,20 @@ class _PlayButtonOverlay extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(36),
+          borderRadius: BorderRadius.circular(DesignTokens.mediaPlayButtonSize / 2),
           child: Container(
-            width: 72,
-            height: 72,
+            width: DesignTokens.mediaPlayButtonSize,
+            height: DesignTokens.mediaPlayButtonSize,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: colors.primary.withOpacity(0.9),
-              border: Border.all(color: Colors.white, width: 2),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+              border: Border.all(
+                  color: Colors.white, width: DesignTokens.borderWidthThick),
+              boxShadow: DesignTokens.elevation2,
             ),
             child: const Icon(
               PhosphorIconsFill.play,
-              size: 36,
+              size: DesignTokens.iconSize3xl - 4,
               color: Colors.white,
             ),
           ),
@@ -756,11 +752,11 @@ class _LoadingOverlay extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           SizedBox(
-            width: 44,
-            height: 44,
+            width: DesignTokens.overlayLoadingSize,
+            height: DesignTokens.overlayLoadingSize,
             child: CircularProgressIndicator(
               color: colors.primary,
-              strokeWidth: 3,
+              strokeWidth: DesignTokens.progressStrokeXl,
             ),
           ),
           const SizedBox(height: DesignTokens.spaceSm),
@@ -801,7 +797,7 @@ class _ErrorOverlay extends StatelessWidget {
           Icon(
             PhosphorIconsRegular.warningCircle,
             color: colors.destructive,
-            size: 40,
+            size: DesignTokens.iconSize3xl,
           ),
           const SizedBox(height: DesignTokens.spaceSm),
           Text(
@@ -820,12 +816,12 @@ class _ErrorOverlay extends StatelessWidget {
             style: FilledButton.styleFrom(
               backgroundColor: colors.primary,
               foregroundColor: colors.onPrimary,
-              minimumSize: const Size(0, 36),
+              minimumSize: const Size(0, DesignTokens.iconChipSize),
               padding: const EdgeInsets.symmetric(
                 horizontal: DesignTokens.spaceMd,
               ),
             ),
-            icon: const Icon(Icons.refresh, size: 18),
+            icon: const Icon(Icons.refresh, size: DesignTokens.iconSizeLg),
             label: const Text('重试'),
           ),
         ],

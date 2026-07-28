@@ -167,7 +167,8 @@ class _ExitToastState extends State<_ExitToast>
   /// 在 root Overlay 层级（全屏），SafeArea 处理手势条后，
   /// 再加 80dp 把 Toast 推到 BottomNavigationBar 上方，
   /// + 8dp margin 让 Toast 不紧贴 tab bar 顶部。
-  static const double _bottomInset = 88;
+  static const double _bottomInset =
+      DesignTokens.bottomNavHeight + DesignTokens.spaceSm;
 
   @override
   void initState() {
@@ -261,8 +262,8 @@ class _ExitToastState extends State<_ExitToast>
                       boxShadow: [
                         BoxShadow(
                           color: colors.onSurface.withOpacity(0.18),
-                          blurRadius: 24,
-                          offset: const Offset(0, 8),
+                          blurRadius: DesignTokens.elevation3BlurRadius,
+                          offset: DesignTokens.elevationOffsetLg,
                           spreadRadius: 0,
                         ),
                       ],
@@ -272,14 +273,14 @@ class _ExitToastState extends State<_ExitToast>
                       children: [
                         // 倒计时进度环 + 中心退出图标
                         SizedBox(
-                          width: 28,
-                          height: 28,
+                          width: DesignTokens.toastRingSize,
+                          height: DesignTokens.toastRingSize,
                           child: Stack(
                             alignment: Alignment.center,
                             children: [
                               CircularProgressIndicator(
                                 value: progressAnim.value.clamp(0.0, 1.0),
-                                strokeWidth: 2.5,
+                                strokeWidth: DesignTokens.progressStrokeThick,
                                 backgroundColor: colors.border,
                                 valueColor: AlwaysStoppedAnimation(
                                   colors.primary,
@@ -287,7 +288,7 @@ class _ExitToastState extends State<_ExitToast>
                               ),
                               Icon(
                                 PhosphorIconsFill.signOut,
-                                size: 14,
+                                size: DesignTokens.iconSizeSm,
                                 color: colors.primary,
                               ),
                             ],
