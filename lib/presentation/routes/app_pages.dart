@@ -2,7 +2,6 @@ import 'package:get/get.dart';
 import 'package:yellow_depot/presentation/bindings/page_bindings.dart';
 import 'package:yellow_depot/presentation/pages/category/category_page.dart';
 import 'package:yellow_depot/presentation/pages/detail/video_detail_page.dart';
-import 'package:yellow_depot/presentation/pages/player/video_player_page.dart';
 import 'package:yellow_depot/presentation/pages/search/search_page.dart';
 
 /// 路由配置
@@ -12,7 +11,6 @@ class AppPages {
   static const String initial = '/';
   static const String category = '/category';
   static const String detail = '/detail';
-  static const String player = '/player';
   static const String search = '/search';
 
   static final List<GetPage> routes = [
@@ -36,14 +34,6 @@ class AppPages {
       binding: VideoDetailBinding(),
       transition: Transition.downToUp,
       transitionDuration: const Duration(milliseconds: 250),
-    ),
-    GetPage(
-      name: player,
-      page: () => const VideoPlayerPage(),
-      binding: PlayerBinding(),
-      transition: Transition.fadeIn,
-      transitionDuration: const Duration(milliseconds: 300),
-      fullscreenDialog: true,
     ),
   ];
 }

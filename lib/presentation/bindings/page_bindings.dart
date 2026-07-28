@@ -6,7 +6,6 @@ import 'package:yellow_depot/core/player/url_decryptor.dart';
 import 'package:yellow_depot/presentation/controllers/category_controller.dart';
 import 'package:yellow_depot/presentation/controllers/search_controller.dart';
 import 'package:yellow_depot/presentation/controllers/video_detail_controller.dart';
-import 'package:yellow_depot/presentation/controllers/video_player_controller.dart';
 
 /// 分类页 Binding
 ///
@@ -81,31 +80,6 @@ class VideoDetailBinding extends Bindings {
         videoId: videoId,
         initialCoverUrl: initialCoverUrl,
         initialTitle: initialTitle,
-      ),
-    );
-  }
-}
-
-/// 播放器页 Binding
-class PlayerBinding extends Bindings {
-  @override
-  void dependencies() {
-    final args =
-        Get.arguments is Map ? Get.arguments as Map : <String, dynamic>{};
-
-    Get.lazyPut<PlayerPageController>(
-      () => PlayerPageController(
-        args: PlayerArgs(
-          videoId: args['videoId'] as String? ?? '',
-          title: args['title'] as String? ?? '',
-          coverUrl: args['coverUrl'] as String? ?? '',
-          categoryId: args['categoryId'] as int? ?? 0,
-          initialPositionMs: args['initialPositionMs'] as int? ?? 0,
-          durationMs: args['durationMs'] as int?,
-          existingDetail: args['existingDetail'],
-        ),
-        decryptor: Get.find<UrlDecryptor>(),
-        historyRepo: Get.find<HistoryRepository>(),
       ),
     );
   }

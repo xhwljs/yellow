@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import 'package:yellow_depot/core/utils/logger.dart';
 import 'package:yellow_depot/data/models/category.dart';
 import 'package:yellow_depot/data/repositories/category_repository.dart';
 import 'package:yellow_depot/data/repositories/video_repository.dart';
@@ -96,7 +97,10 @@ class HomeController extends GetxController {
     try {
       final videos = await _videoRepo.getCategoryVideos(categoryId);
       categoryVideos[categoryId] = videos;
-    } catch (_) {}
+    } catch (e, st) {
+      appLogger.w('loadCategoryVideos 失败: categoryId=$categoryId',
+          error: e, stackTrace: st);
+    }
   }
 
   /// 切换选中的分类 Tab
@@ -154,8 +158,9 @@ class HomeController extends GetxController {
         selectedCategoryVideos.addAll(videos);
         _selectedPage = next;
       }
-    } catch (_) {
-      // 静默失败
+    } catch (e, st) {
+      appLogger.w('loadMoreSelectedCategory 失败: categoryId=$categoryId',
+          error: e, stackTrace: st);
     } finally {
       selectedLoadingMore.value = false;
     }

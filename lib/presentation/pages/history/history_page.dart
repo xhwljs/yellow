@@ -93,14 +93,23 @@ class HistoryPage extends GetView<HistoryController> {
                   size: 24,
                 ),
               ),
-              onDismissed: (_) {
-                controller.deleteHistory(h.videoId);
-                Get.snackbar(
-                  '已删除',
-                  '「${h.title}」的历史记录已移除',
-                  snackPosition: SnackPosition.BOTTOM,
-                  duration: const Duration(seconds: 2),
-                );
+              onDismissed: (_) async {
+                try {
+                  await controller.deleteHistory(h.videoId);
+                  Get.snackbar(
+                    '已删除',
+                    '「${h.title}」的历史记录已移除',
+                    snackPosition: SnackPosition.BOTTOM,
+                    duration: const Duration(seconds: 2),
+                  );
+                } catch (e) {
+                  Get.snackbar(
+                    '删除失败',
+                    e.toString(),
+                    snackPosition: SnackPosition.BOTTOM,
+                    duration: const Duration(seconds: 2),
+                  );
+                }
               },
               child: _HistoryItem(
                 history: h,
@@ -149,9 +158,18 @@ class HistoryPage extends GetView<HistoryController> {
             child: const Text('取消'),
           ),
           FilledButton(
-            onPressed: () {
+            onPressed: () async {
               Get.back();
-              controller.clearAll();
+              try {
+                await controller.clearAll();
+              } catch (e) {
+                Get.snackbar(
+                  '清空失败',
+                  e.toString(),
+                  snackPosition: SnackPosition.BOTTOM,
+                  duration: const Duration(seconds: 2),
+                );
+              }
             },
             style: FilledButton.styleFrom(
               backgroundColor: colors.destructive,

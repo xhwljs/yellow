@@ -118,7 +118,7 @@ class _CategoryPageState extends State<CategoryPage> {
               crossAxisCount: DesignTokens.videoGridCrossAxisCount,
               mainAxisSpacing: DesignTokens.videoGridMainAxisSpacing,
               crossAxisSpacing: DesignTokens.videoGridSpacing,
-              childAspectRatio: 0.88,
+              childAspectRatio: DesignTokens.videoGridChildAspectRatio,
             ),
             itemCount: _controller.videos.length +
                 (_controller.isLoadingMore.value ? 1 : 0),
@@ -158,7 +158,7 @@ class _CategoryPageState extends State<CategoryPage> {
         crossAxisCount: DesignTokens.videoGridCrossAxisCount,
         mainAxisSpacing: DesignTokens.videoGridMainAxisSpacing,
         crossAxisSpacing: DesignTokens.videoGridSpacing,
-        childAspectRatio: 0.65,
+        childAspectRatio: DesignTokens.videoGridChildAspectRatio,
       ),
       itemCount: 8,
       itemBuilder: (_, __) => const VideoCardSkeleton(),

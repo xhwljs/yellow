@@ -259,19 +259,37 @@ jobs:
           cat > /tmp/release_notes.md <<'NOTES_EOF'
           ## 本次更新内容
 
-          [强制更新]
+          ### 优化（代码质量 + 性能 + 工程规范）
 
-          ### 改进
-          - **播放历史显示观看进度百分比**：
-            播放历史列表项除了"已看完"标签外，未看完的视频现在显示
-            "已观看##%"标签：
-            1. 已看完（isCompleted）→ 绿色 success 色标签"已看完"（保持不变）
-            2. 未看完且进度 > 0 → primary 色标签"已观看##%"
-               （百分比 = (progress * 100).clamp(0, 100).round()）
-            3. 进度为 0 → 不显示标签（避免显示"已观看0%"无意义信息）
-            4. 标签样式与"已看完"完全一致（pill 圆角 + 12% 透明背景 +
-               textLabel 字号 + w600），仅颜色不同（primary vs success）
-               以区分"进行中"与"已完成"两种状态。
+          #### 1. 删除死代码（约 1100 行）
+          - 删除独立的 VideoPlayerPage + PlayerPageController + PlayerBinding + player 路由
+          - 详情页已改用内联播放器，独立播放页无任何入口引用，属于死代码
+          - 同步删除随死代码失效的 screen_brightness / volume_controller 依赖
+
+          #### 2. 修复 category_page 骨架屏 aspectRatio BUG
+          - 骨架屏用 0.65 但实际数据网格用 0.88，切换时卡片高度跳变
+          - 新增 DesignTokens.videoGridChildAspectRatio = 0.88
+          - 骨架屏和实际网格统一引用同一常量，消除不一致
+
+          #### 3. HomeController 静默吞错修复
+          - loadCategoryVideos / loadMoreSelectedCategory 两处 catch(_) {}
+          - 改为 catch(e, st) + appLogger.w 记录错误 + stackTrace
+          - 与 CategoryController 错误处理方式统一
+
+          #### 4. 删除 6 个未使用依赖
+          - flutter_staggered_grid_view / pull_to_refresh_flutter3 /
+            easy_refresh / intl / screen_brightness / volume_controller
+          - 减小 pub get 时间 + APK 体积 + 版本解析复杂度
+
+          #### 5. SearchPage TextField Obx 收窄（性能优化）
+          - 原 Obx 包裹整个 TextField，每次输入按键 → keyword 变化 → TextField 重建
+          - 收窄到只包裹 suffixIcon（清空按钮显隐）
+          - 避免光标抖动 + 输入法状态丢失 + 不必要的 rebuild
+
+          #### 6. history_page 删除/清空操作 await + 错误反馈
+          - deleteHistory / clearAll 是 Future，原代码未 await 就立即弹"已删除"
+          - DB 操作失败时 UI 已移除条目但数据库没改，体验混乱
+          - 改为 async + await + try-catch，失败时弹"删除失败"提示
 
           NOTES_EOF
           # 移除 heredoc 导致的每行前导空格（保持 markdown 结构）

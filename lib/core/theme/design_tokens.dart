@@ -85,4 +85,5 @@ class DesignTokens {
   static const int videoGridCrossAxisCount = 2;
   static const double videoGridSpacing = 12;
   static const double videoGridMainAxisSpacing = 12;
+  static const double videoGridChildAspectRatio = 0.88;
 }
