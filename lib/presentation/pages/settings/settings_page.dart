@@ -211,8 +211,8 @@ class _SettingsPageState extends State<SettingsPage> {
               children: [
                 // 左侧 icon chip
                 Container(
-                  width: DesignTokens.mediaAvatarSize,
-                  height: DesignTokens.mediaAvatarSize,
+                  width: 48,
+                  height: 48,
                   decoration: BoxDecoration(
                     color: colors.primary.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(DesignTokens.radiusMd),
@@ -220,7 +220,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   child: Center(
                     child: Icon(
                       PhosphorIconsFill.filmSlate,
-                      size: DesignTokens.iconSizeXl,
+                      size: 24,
                       color: colors.primary,
                     ),
                   ),
@@ -241,7 +241,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           letterSpacing: 0.3,
                         ),
                       ),
-                      const SizedBox(height: DesignTokens.space3xs),
+                      const SizedBox(height: 2),
                       Text(
                         '视频聚合 · 随心播放',
                         style: TextStyle(
@@ -249,7 +249,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           color: colors.onSurfaceMuted,
                         ),
                       ),
-                      const SizedBox(height: DesignTokens.space3xs),
+                      const SizedBox(height: 2),
                       Text(
                         'v${AppConstants.appVersion}',
                         style: TextStyle(
@@ -282,14 +282,14 @@ class _SettingsPageState extends State<SettingsPage> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Container(
-                          width: DesignTokens.iconSizeXs,
-                          height: DesignTokens.iconSizeXs,
+                          width: 12,
+                          height: 12,
                           decoration: BoxDecoration(
                             color: dotColor,
                             shape: BoxShape.circle,
                             border: Border.all(
                               color: colors.surface,
-                              width: DesignTokens.borderWidthMedium,
+                              width: 1.5,
                             ),
                           ),
                         ),
@@ -305,7 +305,7 @@ class _SettingsPageState extends State<SettingsPage> {
                         const SizedBox(width: DesignTokens.spaceXs),
                         Icon(
                           PhosphorIconsRegular.caretRight,
-                          size: DesignTokens.iconSizeSm,
+                          size: 14,
                           color: colors.onSurfaceMuted,
                         ),
                       ],
@@ -357,10 +357,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 colors: colors,
                 onClose: () => Navigator.of(sheetContext).pop(),
               ),
-              Divider(
-                  height: DesignTokens.dividerThickness,
-                  thickness: DesignTokens.dividerThickness,
-                  color: colors.border),
+              Divider(height: 1, thickness: 1, color: colors.border),
               // 预设色块列表（5 个预设 + 1 个自定义入口，共 6 项）
               Obx(() {
                 final current = themeController.presetRx.value;
@@ -373,7 +370,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                   itemCount: ThemePreset.values.length,
                   separatorBuilder: (_, __) => Divider(
-                    height: DesignTokens.dividerThickness,
+                    height: 1,
                     indent: DesignTokens.spaceLg,
                     endIndent: DesignTokens.spaceLg,
                     color: colors.border.withOpacity(0.5),
@@ -452,10 +449,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   colors: colors,
                   onClose: () => Navigator.of(sheetContext).pop(),
                 ),
-                Divider(
-                  height: DesignTokens.dividerThickness,
-                  thickness: DesignTokens.dividerThickness,
-                  color: colors.border),
+                Divider(height: 1, thickness: 1, color: colors.border),
                 // HSV 选色盘（_CustomColorSection 从当前 colors.primary 初始化）
                 Flexible(
                   child: SingleChildScrollView(
@@ -533,10 +527,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 colors: colors,
                 onClose: () => Navigator.of(sheetContext).pop(),
               ),
-              Divider(
-                  height: DesignTokens.dividerThickness,
-                  thickness: DesignTokens.dividerThickness,
-                  color: colors.border),
+              Divider(height: 1, thickness: 1, color: colors.border),
               Padding(
                 padding: const EdgeInsets.symmetric(
                   vertical: DesignTokens.spaceSm,
@@ -700,8 +691,8 @@ class _SettingsListTile extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                width: DesignTokens.iconChipSize,
-                height: DesignTokens.iconChipSize,
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(
                   color: iconBg,
                   borderRadius: BorderRadius.circular(DesignTokens.radiusMd),
@@ -709,7 +700,7 @@ class _SettingsListTile extends StatelessWidget {
                 child: Center(
                   child: Icon(
                     icon,
-                    size: DesignTokens.iconSizeLg,
+                    size: 18,
                     color: iconFg,
                   ),
                 ),
@@ -729,7 +720,7 @@ class _SettingsListTile extends StatelessWidget {
                       ),
                     ),
                     if (subtitle != null && subtitle!.isNotEmpty) ...[
-                      const SizedBox(height: DesignTokens.space3xs),
+                      const SizedBox(height: 2),
                       Text(
                         subtitle!,
                         maxLines: subtitleMaxLines,
@@ -748,7 +739,7 @@ class _SettingsListTile extends StatelessWidget {
                 const SizedBox(width: DesignTokens.spaceSm),
                 Icon(
                   PhosphorIconsRegular.caretRight,
-                  size: DesignTokens.iconSizeMd,
+                  size: 16,
                   color: colors.onSurfaceMuted,
                 ),
               ],
@@ -768,11 +759,9 @@ class _ListDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Divider(
-      height: DesignTokens.dividerThickness,
-      thickness: DesignTokens.dividerThickness,
-      indent: DesignTokens.spaceLg +
-          DesignTokens.iconChipSize +
-          DesignTokens.spaceMd,
+      height: 1,
+      thickness: 1,
+      indent: DesignTokens.spaceLg + 36 + DesignTokens.spaceMd,
       endIndent: DesignTokens.spaceLg,
       color: colors.border.withOpacity(0.6),
     );
@@ -794,11 +783,11 @@ class _SheetDragHandle extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.only(top: DesignTokens.spaceSm),
         child: Container(
-          width: DesignTokens.bottomSheetHandleWidth,
-          height: DesignTokens.bottomSheetHandleHeight,
+          width: 36,
+          height: 4,
           decoration: BoxDecoration(
             color: colors.border,
-            borderRadius: BorderRadius.circular(DesignTokens.radiusPill),
+            borderRadius: BorderRadius.circular(2),
           ),
         ),
       ),
@@ -833,7 +822,7 @@ class _SheetHeader extends StatelessWidget {
         children: [
           Icon(
             icon,
-            size: DesignTokens.iconSizeAction,
+            size: 20,
             color: colors.primary,
           ),
           const SizedBox(width: DesignTokens.spaceSm),
@@ -856,7 +845,7 @@ class _SheetHeader extends StatelessWidget {
               ),
               child: Icon(
                 PhosphorIconsRegular.x,
-                size: DesignTokens.iconSizeAction,
+                size: 20,
                 color: colors.onSurfaceMuted,
               ),
             ),
@@ -955,8 +944,8 @@ class _ThemeSheetItem extends StatelessWidget {
             children: [
               // 色块圆点（custom 预设显示用户保存的实际颜色）
               Container(
-                width: DesignTokens.colorSwatchSize,
-                height: DesignTokens.colorSwatchSize,
+                width: 32,
+                height: 32,
                 decoration: BoxDecoration(
                   color: displayColor,
                   shape: BoxShape.circle,
@@ -967,7 +956,7 @@ class _ThemeSheetItem extends StatelessWidget {
                         child: Icon(
                           PhosphorIconsFill.check,
                           color: Colors.white,
-                          size: DesignTokens.iconSizeMd,
+                          size: 16,
                         ),
                       )
                     : null,
@@ -987,7 +976,7 @@ class _ThemeSheetItem extends StatelessWidget {
                         color: colors.onSurface,
                       ),
                     ),
-                    const SizedBox(height: DesignTokens.space3xs),
+                    const SizedBox(height: 2),
                     Text(
                       preset.description,
                       style: TextStyle(
@@ -1142,10 +1131,7 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
               colors: colors,
               onClose: widget.onClose,
             ),
-            Divider(
-                height: DesignTokens.dividerThickness,
-                thickness: DesignTokens.dividerThickness,
-                color: colors.border),
+            Divider(height: 1, thickness: 1, color: colors.border),
             Flexible(
               child: ListView(
                 shrinkWrap: true,
@@ -1159,10 +1145,9 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
                     Row(
                       children: [
                         const SizedBox(
-                          width: DesignTokens.iconSizeXs,
-                          height: DesignTokens.iconSizeXs,
-                          child: CircularProgressIndicator(
-                              strokeWidth: DesignTokens.progressStrokeMedium),
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(strokeWidth: 2),
                         ),
                         const SizedBox(width: DesignTokens.spaceXs),
                         Text(
@@ -1232,9 +1217,7 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
                       style: FilledButton.styleFrom(
                         backgroundColor: colors.primary,
                         foregroundColor: colors.onPrimary,
-                        minimumSize: const Size(
-                            DesignTokens.mediaAvatarSize,
-                            DesignTokens.mediaAvatarSize),
+                        minimumSize: const Size(48, 48),
                         padding: const EdgeInsets.symmetric(
                           horizontal: DesignTokens.spaceLg,
                           vertical: DesignTokens.spaceMd,
@@ -1264,9 +1247,7 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
                       style: OutlinedButton.styleFrom(
                         foregroundColor: colors.onSurface,
                         side: BorderSide(color: colors.border),
-                        minimumSize: const Size(
-                            DesignTokens.mediaAvatarSize,
-                            DesignTokens.mediaAvatarSize),
+                        minimumSize: const Size(48, 48),
                         padding: const EdgeInsets.symmetric(
                           horizontal: DesignTokens.spaceLg,
                           vertical: DesignTokens.spaceMd,
@@ -1287,9 +1268,7 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
                       label: const Text('重置为默认'),
                       style: TextButton.styleFrom(
                         foregroundColor: colors.onSurfaceMuted,
-                        minimumSize: const Size(
-                            DesignTokens.mediaAvatarSize,
-                            DesignTokens.mediaAvatarSize),
+                        minimumSize: const Size(48, 48),
                       ),
                     ),
                   ),
@@ -1307,7 +1286,7 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
       children: [
         Icon(
           PhosphorIconsRegular.link,
-          size: DesignTokens.iconSizeSm,
+          size: 14,
           color: colors.onSurfaceMuted,
         ),
         const SizedBox(width: DesignTokens.spaceXs),
@@ -1325,10 +1304,9 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
         ),
         if (_testingUrl)
           const SizedBox(
-            width: DesignTokens.iconSizeSm,
-            height: DesignTokens.iconSizeSm,
-            child: CircularProgressIndicator(
-                strokeWidth: DesignTokens.progressStrokeMedium),
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(strokeWidth: 2),
           )
         else if (_testResult != null)
           _StatusBadge(
@@ -1467,8 +1445,7 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
               borderSide: BorderSide(color: colors.border),
             ),
             focusedBorder: UnderlineInputBorder(
-              borderSide: BorderSide(
-                  color: colors.primary, width: DesignTokens.borderWidthThick),
+              borderSide: BorderSide(color: colors.primary, width: 2),
             ),
           ),
         ),
@@ -1528,7 +1505,7 @@ class _StatusBadge extends StatelessWidget {
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: compact ? DesignTokens.spaceSm : DesignTokens.spaceMd,
-        vertical: compact ? DesignTokens.space3xs : DesignTokens.spaceSm,
+        vertical: compact ? 2 : DesignTokens.spaceSm,
       ),
       decoration: BoxDecoration(
         color: bg,
@@ -1538,13 +1515,8 @@ class _StatusBadge extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Icon(
-              icon,
-              size: compact
-                  ? DesignTokens.iconSize2xs
-                  : DesignTokens.iconSizeSm - 1,
-              color: fg),
-          const SizedBox(width: DesignTokens.spaceXs),
+          Icon(icon, size: compact ? 11 : 13, color: fg),
+          const SizedBox(width: 4),
           Flexible(
             child: Text(
               text,
@@ -1608,9 +1580,7 @@ class _MirrorChip extends StatelessWidget {
             borderRadius: BorderRadius.circular(DesignTokens.radiusPill),
             border: Border.all(
               color: selected ? colors.primary : colors.border,
-              width: selected
-                  ? DesignTokens.borderWidthMedium
-                  : DesignTokens.borderWidthHairline,
+              width: selected ? 1.5 : 1,
             ),
           ),
           child: Row(
@@ -1619,10 +1589,10 @@ class _MirrorChip extends StatelessWidget {
               if (selected) ...[
                 Icon(
                   PhosphorIconsFill.checkCircle,
-                  size: DesignTokens.iconSizeXs,
+                  size: 12,
                   color: colors.primary,
                 ),
-                const SizedBox(width: DesignTokens.spaceXs),
+                const SizedBox(width: 4),
               ],
               Text(
                 url,
@@ -1634,7 +1604,7 @@ class _MirrorChip extends StatelessWidget {
               ),
               // 状态徽章（选中状态时不显示，避免与对勾重复）
               if (!selected) ...[
-                const SizedBox(width: DesignTokens.spaceXs),
+                const SizedBox(width: 4),
                 _buildStatusBadge(),
               ],
             ],
@@ -1648,23 +1618,22 @@ class _MirrorChip extends StatelessWidget {
   Widget _buildStatusBadge() {
     if (autoTesting && status == null) {
       return const SizedBox(
-        width: DesignTokens.chipProgressSize,
-        height: DesignTokens.chipProgressSize,
-        child: CircularProgressIndicator(
-            strokeWidth: DesignTokens.progressStrokeThin),
+        width: 10,
+        height: 10,
+        child: CircularProgressIndicator(strokeWidth: 1.5),
       );
     }
     if (status == true) {
       return Icon(
         PhosphorIconsFill.checkCircle,
-        size: DesignTokens.iconSize2xs,
+        size: 11,
         color: colors.success,
       );
     }
     if (status == false) {
       return Icon(
         PhosphorIconsFill.xCircle,
-        size: DesignTokens.iconSize2xs,
+        size: 11,
         color: colors.destructive,
       );
     }
@@ -1753,9 +1722,8 @@ class _CustomColorSectionState extends State<_CustomColorSection> {
     return LayoutBuilder(
       builder: (context, constraints) {
         // 固定高度 180，宽度填满
-        const height = DesignTokens.colorPickerSvHeight;
+        const height = 180.0;
         final width = constraints.maxWidth;
-        final indicator = DesignTokens.colorPickerIndicatorLg;
         return GestureDetector(
           onPanDown: (details) =>
               _updateFromSv(details.localPosition, width, height),
@@ -1767,9 +1735,7 @@ class _CustomColorSectionState extends State<_CustomColorSection> {
             clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(DesignTokens.radiusMd),
-              border: Border.all(
-                  color: colors.border,
-                  width: DesignTokens.borderWidthHairline),
+              border: Border.all(color: colors.border, width: 1),
             ),
             child: Stack(
               children: [
@@ -1805,21 +1771,21 @@ class _CustomColorSectionState extends State<_CustomColorSection> {
                 ),
                 // 当前位置指示器（圆环）
                 Positioned(
-                  left: (_hsv.saturation * width)
-                          .clamp(0.0, width - indicator) -
-                      indicator / 2,
-                  top: ((1 - _hsv.value) * height)
-                          .clamp(0.0, height - indicator) -
-                      indicator / 2,
+                  left: (_hsv.saturation * width).clamp(0.0, width - 24) - 12,
+                  top: ((1 - _hsv.value) * height).clamp(0.0, height - 24) - 12,
                   child: Container(
-                    width: indicator,
-                    height: indicator,
+                    width: 24,
+                    height: 24,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(
-                          color: Colors.white,
-                          width: DesignTokens.borderWidthIndicator),
-                      boxShadow: DesignTokens.colorPickerIndicatorShadow,
+                      border: Border.all(color: Colors.white, width: 3),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.3),
+                          blurRadius: 4,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -1836,8 +1802,7 @@ class _CustomColorSectionState extends State<_CustomColorSection> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        const height = DesignTokens.colorPickerSliderHeight;
-        final indicator = DesignTokens.colorPickerIndicatorSm;
+        const height = 28.0;
         return GestureDetector(
           onPanDown: (details) =>
               _updateFromHue(details.localPosition.dx, width),
@@ -1849,9 +1814,7 @@ class _CustomColorSectionState extends State<_CustomColorSection> {
             clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(DesignTokens.radiusPill),
-              border: Border.all(
-                  color: colors.border,
-                  width: DesignTokens.borderWidthHairline),
+              border: Border.all(color: colors.border, width: 1),
             ),
             child: Stack(
               children: [
@@ -1877,20 +1840,22 @@ class _CustomColorSectionState extends State<_CustomColorSection> {
                 ),
                 // 当前色相指示器（白色圆环）
                 Positioned(
-                  left: (_hsv.hue / 360 * width)
-                          .clamp(0.0, width - indicator) -
-                      indicator / 2,
-                  top: DesignTokens.spaceXs,
+                  left: (_hsv.hue / 360 * width).clamp(0.0, width - 20) - 10,
+                  top: 4,
                   child: Container(
-                    width: indicator,
-                    height: indicator,
+                    width: 20,
+                    height: 20,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: _hsv.withSaturation(1).withValue(1).toColor(),
-                      border: Border.all(
-                          color: Colors.white,
-                          width: DesignTokens.borderWidthIndicator),
-                      boxShadow: DesignTokens.colorPickerIndicatorShadow,
+                      border: Border.all(color: Colors.white, width: 3),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.3),
+                          blurRadius: 4,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -1909,13 +1874,12 @@ class _CustomColorSectionState extends State<_CustomColorSection> {
       children: [
         // 预览圆点
         Container(
-          width: DesignTokens.mediaAvatarSize,
-          height: DesignTokens.mediaAvatarSize,
+          width: 48,
+          height: 48,
           decoration: BoxDecoration(
             color: currentColor,
             shape: BoxShape.circle,
-            border: Border.all(
-                color: colors.border, width: DesignTokens.borderWidthMedium),
+            border: Border.all(color: colors.border, width: 1.5),
             boxShadow: DesignTokens.elevation1,
           ),
         ),
@@ -1933,7 +1897,7 @@ class _CustomColorSectionState extends State<_CustomColorSection> {
                   color: colors.onSurfaceMuted,
                 ),
               ),
-              const SizedBox(height: DesignTokens.space3xs),
+              const SizedBox(height: 2),
               Text(
                 hex,
                 style: TextStyle(
@@ -1949,14 +1913,12 @@ class _CustomColorSectionState extends State<_CustomColorSection> {
         // 应用按钮
         FilledButton.icon(
           onPressed: () => widget.onApply(currentColor),
-          icon: const Icon(PhosphorIconsFill.check, size: DesignTokens.iconSizeMd),
+          icon: const Icon(PhosphorIconsFill.check, size: 16),
           label: const Text('应用'),
           style: FilledButton.styleFrom(
             backgroundColor: currentColor,
             foregroundColor: _isLight(currentColor) ? Colors.black : Colors.white,
-            minimumSize: const Size(
-                DesignTokens.space3xl + DesignTokens.spaceSm,
-                DesignTokens.mediaAvatarSize),
+            minimumSize: const Size(56, 48),
             padding: const EdgeInsets.symmetric(
               horizontal: DesignTokens.spaceMd,
             ),
