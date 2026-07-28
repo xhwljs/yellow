@@ -262,21 +262,16 @@ jobs:
           [强制更新]
 
           ### 改进
-          - **播放地址显示位置改为详情页"简介"位置，用播放地址替换简介**：
-            将原 _InlinePlayerArea 右上角的 _UrlBadge 移除，改为在详情页
-            "简介" section 位置用播放地址卡片替换简介。设计参考
-            ui-ux-pro-max 技能 + 项目其他页面风格：
-            1. 标题"播放地址"用 textH2 + w600 + onBackground（与"相关推荐"
-               风格完全一致）。
-            2. 内容卡片用 Material + surface 背景 + radiusLg + border 0.5
-               （与 settings_page / home_page 的 _SectionCard 视觉语言统一）。
-            3. 三种状态自适应显示：
-               - 解密中（url 空 + loading）→ spinner + "正在解密播放地址..."
-               - 解密失败（errorMessage 非空）→ 红色警告图标 + 错误信息 + 重试按钮
-               - 解密成功（url 非空）→ 链接图标 + 完整 URL（可换行，不截断）+ "长按复制"提示
-            4. 长按卡片 → Clipboard.setData 复制完整 URL + Get.snackbar TOP 反馈。
-            5. "长按复制"提示用 handTap 图标 + textLabel 字号，右对齐。
-            6. URL 用 monospace 字体 + textCaption 字号 + onSurface 色 + height 1.5。
+          - **播放历史显示观看进度百分比**：
+            播放历史列表项除了"已看完"标签外，未看完的视频现在显示
+            "已观看##%"标签：
+            1. 已看完（isCompleted）→ 绿色 success 色标签"已看完"（保持不变）
+            2. 未看完且进度 > 0 → primary 色标签"已观看##%"
+               （百分比 = (progress * 100).clamp(0, 100).round()）
+            3. 进度为 0 → 不显示标签（避免显示"已观看0%"无意义信息）
+            4. 标签样式与"已看完"完全一致（pill 圆角 + 12% 透明背景 +
+               textLabel 字号 + w600），仅颜色不同（primary vs success）
+               以区分"进行中"与"已完成"两种状态。
 
           NOTES_EOF
           # 移除 heredoc 导致的每行前导空格（保持 markdown 结构）

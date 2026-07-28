@@ -265,6 +265,27 @@ class _HistoryItem extends StatelessWidget {
                                 color: colors.success,
                               ),
                             ),
+                          )
+                        else if (history.progress > 0)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: DesignTokens.spaceSm,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: colors.primary.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(
+                                DesignTokens.radiusPill,
+                              ),
+                            ),
+                            child: Text(
+                              '已观看${(history.progress * 100).clamp(0, 100).round()}%',
+                              style: TextStyle(
+                                fontSize: DesignTokens.textLabel,
+                                fontWeight: FontWeight.w600,
+                                color: colors.primary,
+                              ),
+                            ),
                           ),
                       ],
                     ),
