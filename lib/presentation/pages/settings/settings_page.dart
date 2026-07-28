@@ -4,10 +4,13 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:yellow_depot/core/constants/app_constants.dart';
 import 'package:yellow_depot/core/network/api_server_switcher.dart';
 import 'package:yellow_depot/core/network/dio_client.dart';
+import 'package:yellow_depot/core/services/data_export_service.dart';
 import 'package:yellow_depot/core/theme/app_theme.dart';
 import 'package:yellow_depot/core/theme/design_tokens.dart';
 import 'package:yellow_depot/core/theme/theme_controller.dart';
 import 'package:yellow_depot/core/theme/theme_presets.dart';
+import 'package:yellow_depot/data/repositories/favorite_repository.dart';
+import 'package:yellow_depot/data/repositories/history_repository.dart';
 
 /// 设置页（列表 + 卷帘菜单版）
 ///
@@ -155,14 +158,28 @@ class _SettingsPageState extends State<SettingsPage> {
           const SizedBox(height: DesignTokens.spaceSm),
           _SectionCard(
             colors: colors,
-            child: _SettingsListTile(
-              icon: PhosphorIconsRegular.trash,
-              iconTone: _IconTone.destructive,
-              title: '清除缓存',
-              subtitle: '清理 Cookie / Session 缓存数据',
-              colors: colors,
-              showTrailingArrow: false,
-              onTap: _clearCache,
+            child: Column(
+              children: [
+                _SettingsListTile(
+                  icon: PhosphorIconsRegular.uploadSimple,
+                  iconTone: _IconTone.primary,
+                  title: '导出收藏与历史',
+                  subtitle: '备份为 JSON 文件，便于卸载重装 / 换机迁移',
+                  colors: colors,
+                  showTrailingArrow: false,
+                  onTap: _exportData,
+                ),
+                _ListDivider(colors: colors),
+                _SettingsListTile(
+                  icon: PhosphorIconsRegular.trash,
+                  iconTone: _IconTone.destructive,
+                  title: '清除缓存',
+                  subtitle: '清理 Cookie / Session 缓存数据',
+                  colors: colors,
+                  showTrailingArrow: false,
+                  onTap: _clearCache,
+                ),
+              ],
             ),
           ),
 
@@ -584,6 +601,90 @@ class _SettingsPageState extends State<SettingsPage> {
         backgroundColor: colors.destructive,
         colorText: colors.surface,
         duration: const Duration(seconds: 2),
+      );
+    }
+  }
+
+  /// 导出收藏 + 播放历史为 JSON 文件，弹出系统分享面板。
+  ///
+  /// 卸载重装 / 换机前用：导出后保存到文件或发到聊天，
+  /// 重装后可用"导入"功能恢复（导入功能后续版本提供）。
+  Future<void> _exportData() async {
+    final colors = AppTheme.colorsOf(Get.context!);
+    final ctx = context;
+
+    // 先弹确认对话框，告知用户导出内容与用途
+    final confirmed = await showDialog<bool>(
+      context: ctx,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: colors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(DesignTokens.radiusLg),
+        ),
+        title: Text(
+          '导出收藏与历史',
+          style: TextStyle(
+            fontSize: DesignTokens.textH2,
+            fontWeight: FontWeight.w700,
+            color: colors.onSurface,
+          ),
+        ),
+        content: Text(
+          '将导出全部收藏与播放历史为 JSON 备份文件，'
+          '随后弹出系统分享面板，可保存到文件或发送到聊天。\n\n'
+          '适用于卸载重装 / 换机前的数据迁移。',
+          style: TextStyle(
+            fontSize: DesignTokens.textBody,
+            color: colors.onSurfaceMuted,
+            height: 1.5,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(
+              '取消',
+              style: TextStyle(color: colors.onSurfaceMuted),
+            ),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: colors.primary,
+              foregroundColor: colors.onPrimary,
+            ),
+            child: const Text('导出'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    // 执行导出
+    final ok = await DataExportService.exportAll(
+      favoriteRepo: Get.find<FavoriteRepository>(),
+      historyRepo: Get.find<HistoryRepository>(),
+    );
+
+    if (!mounted) return;
+    if (ok) {
+      Get.snackbar(
+        '导出成功',
+        '已弹出分享面板，请选择保存位置',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: colors.surface,
+        colorText: colors.onSurface,
+        duration: const Duration(seconds: 3),
+      );
+    } else {
+      Get.snackbar(
+        '导出失败',
+        '导出过程发生错误，请重试',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: colors.destructive,
+        colorText: colors.surface,
+        duration: const Duration(seconds: 3),
       );
     }
   }
