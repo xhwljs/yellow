@@ -100,4 +100,24 @@ class FavoriteRepository {
   Future<int> count() async {
     return (await _db.favoriteDao.count()) ?? 0;
   }
+
+  /// 批量导入收藏（用于从备份 JSON 恢复）
+  ///
+  /// 采用 merge 策略：同 videoId 已存在则覆盖（replace），不存在则插入。
+  /// 不清空现有数据，避免误删。
+  ///
+  /// 返回成功导入的条数。已存在的记录也算成功（覆盖）。
+  Future<int> importFavorites(List<Favorite> favorites) async {
+    var imported = 0;
+    for (final f in favorites) {
+      try {
+        await _db.favoriteDao.insert(f);
+        imported++;
+      } catch (e, st) {
+        appLogger.w('导入收藏失败 videoId=${f.videoId}', error: e, stackTrace: st);
+      }
+    }
+    appLogger.i('批量导入收藏完成：$imported / ${favorites.length} 条成功');
+    return imported;
+  }
 }

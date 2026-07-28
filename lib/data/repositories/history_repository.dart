@@ -100,4 +100,25 @@ class HistoryRepository {
   Future<void> clearAll() async {
     await _db.historyDao.deleteAll();
   }
+
+  /// 批量导入历史（用于从备份 JSON 恢复）
+  ///
+  /// 采用 merge 策略：同 videoId 已存在则覆盖（replace），不存在则插入。
+  /// 不清空现有数据，避免误删。
+  /// 不触发 trimOld（导入数据不应被裁剪），导入完成后由调用方决定是否裁剪。
+  ///
+  /// 返回成功导入的条数。
+  Future<int> importHistories(List<PlayHistory> histories) async {
+    var imported = 0;
+    for (final h in histories) {
+      try {
+        await _db.historyDao.upsert(h);
+        imported++;
+      } catch (e, st) {
+        appLogger.w('导入历史失败 videoId=${h.videoId}', error: e, stackTrace: st);
+      }
+    }
+    appLogger.i('批量导入历史完成：$imported / ${histories.length} 条成功');
+    return imported;
+  }
 }

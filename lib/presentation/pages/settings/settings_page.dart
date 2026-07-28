@@ -171,6 +171,16 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 _ListDivider(colors: colors),
                 _SettingsListTile(
+                  icon: PhosphorIconsRegular.downloadSimple,
+                  iconTone: _IconTone.primary,
+                  title: '导入收藏与历史',
+                  subtitle: '从 JSON 备份文件恢复（merge，不覆盖现有数据）',
+                  colors: colors,
+                  showTrailingArrow: false,
+                  onTap: _importData,
+                ),
+                _ListDivider(colors: colors),
+                _SettingsListTile(
                   icon: PhosphorIconsRegular.trash,
                   iconTone: _IconTone.destructive,
                   title: '清除缓存',
@@ -687,6 +697,97 @@ class _SettingsPageState extends State<SettingsPage> {
         duration: const Duration(seconds: 3),
       );
     }
+  }
+
+  /// 从 JSON 备份文件导入收藏 + 历史。
+  ///
+  /// 采用 merge 策略：同 videoId 已存在则覆盖，不存在则插入，
+  /// 不清空现有数据。重装后用它恢复之前导出的备份。
+  Future<void> _importData() async {
+    final colors = AppTheme.colorsOf(Get.context!);
+    final ctx = context;
+
+    // 先弹确认对话框，告知用户导入策略
+    final confirmed = await showDialog<bool>(
+      context: ctx,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: colors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(DesignTokens.radiusLg),
+        ),
+        title: Text(
+          '导入收藏与历史',
+          style: TextStyle(
+            fontSize: DesignTokens.textH2,
+            fontWeight: FontWeight.w700,
+            color: colors.onSurface,
+          ),
+        ),
+        content: Text(
+          '从之前导出的 JSON 备份文件恢复数据。\n\n'
+          '采用合并策略：相同视频已存在则覆盖，'
+          '不存在则新增，不会清空当前数据。',
+          style: TextStyle(
+            fontSize: DesignTokens.textBody,
+            color: colors.onSurfaceMuted,
+            height: 1.5,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(
+              '取消',
+              style: TextStyle(color: colors.onSurfaceMuted),
+            ),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: colors.primary,
+              foregroundColor: colors.onPrimary,
+            ),
+            child: const Text('选择文件'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    // 执行导入（系统文件选择器）
+    final result = await DataExportService.importAll(
+      favoriteRepo: Get.find<FavoriteRepository>(),
+      historyRepo: Get.find<HistoryRepository>(),
+    );
+
+    if (!mounted) return;
+
+    final String title;
+    final String message;
+    final Color bg;
+    final Color fg;
+
+    if (result.ok) {
+      title = '导入成功';
+      message = result.reason; // "收藏 +N / 历史 +M"
+      bg = colors.surface;
+      fg = colors.onSurface;
+    } else {
+      title = '导入失败';
+      message = result.reason;
+      bg = colors.destructive;
+      fg = colors.surface;
+    }
+
+    Get.snackbar(
+      title,
+      message,
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: bg,
+      colorText: fg,
+      duration: const Duration(seconds: 3),
+    );
   }
 }
 
