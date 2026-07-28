@@ -15,10 +15,11 @@ import 'package:yellow_depot/presentation/widgets/update_dialog.dart';
 
 /// 默认主题色（pink）— 引用设计系统单一真理源
 ///
-/// 启动时 ThemeController 尚未就绪，这里只引用 [ThemePreset.pink] 与
-/// [DesignTokens] 中的 const 常量（不依赖 GetX），加载完成后切换到
+/// 启动时 ThemeController 尚未就绪，这里引用 [ThemePreset.defaultPrimaryColor]
+/// 等 static const 常量（Dart 限制枚举实例属性无法在 const 上下文访问），
+/// 与 [DesignTokens] 的 const 常量（不依赖 GetX）。加载完成后切换到
 /// MainShell 时会读取用户保存的主题。
-const Color _kPrimaryColor = ThemePreset.pink.primaryColor;
+const Color _kPrimaryColor = ThemePreset.defaultPrimaryColor;
 const Color _kBackgroundColor = DesignTokens.colorBackground;
 const Color _kOnBackgroundColor = DesignTokens.colorOnBackground;
 const Color _kOnBackgroundMutedColor = DesignTokens.colorOnSurfaceMuted;
@@ -312,8 +313,8 @@ class _SplashPageState extends State<SplashPage> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              ThemePreset.pink.primaryColor,
-              ThemePreset.pink.secondaryColor,
+              ThemePreset.defaultPrimaryColor,
+              ThemePreset.defaultSecondaryColor,
             ],
           ),
           boxShadow: [

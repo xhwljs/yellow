@@ -89,6 +89,15 @@ enum ThemePreset {
 
   /// 是否为自定义色预设
   bool get isCustom => this == ThemePreset.custom;
+
+  /// 默认主题（pink）的 const 色值，供启动阶段 const 上下文使用
+  ///
+  /// Dart 限制：枚举实例属性（如 `ThemePreset.pink.primaryColor`）无法在
+  /// const 表达式中访问。这里把 pink 主题的关键色值额外声明为 static const，
+  /// 作为 [SplashPage] / [UpdateDialog] 等 const 上下文的入口。
+  /// 色值与 [pink] 枚举实例保持一致，修改时需同步更新。
+  static const Color defaultPrimaryColor = Color(0xFFEC4899);
+  static const Color defaultSecondaryColor = Color(0xFFDB2777);
 }
 
 /// 主题颜色语义令牌（运行时根据 ThemePreset 计算）

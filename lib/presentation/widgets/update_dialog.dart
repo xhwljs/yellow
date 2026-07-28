@@ -10,11 +10,11 @@ import 'package:yellow_depot/core/utils/number_formatter.dart';
 
 /// 更新对话框主题色（顶层定义，便于 [_InfoLine] 等内部类访问）
 ///
-/// 启动阶段 ThemeController 尚未就绪，这里引用 [ThemePreset.pink]（默认主题）
-/// 与 [DesignTokens] 的 const 常量，不依赖 GetX。加载完成后切换到 MainShell
-/// 时会读取用户保存的主题。与 [SplashPage] 保持同一真理源。
+/// 启动阶段 ThemeController 尚未就绪，这里引用 [ThemePreset.defaultPrimaryColor]
+/// 等 static const（Dart 限制枚举实例属性无法在 const 上下文访问）与
+/// [DesignTokens] 的 const 常量，不依赖 GetX。与 [SplashPage] 保持同一真理源。
 class _UpdateColors {
-  static const Color primary = ThemePreset.pink.primaryColor;
+  static const Color primary = ThemePreset.defaultPrimaryColor;
   static const Color onSurface = DesignTokens.colorOnSurface;
   static const Color onSurfaceMuted = DesignTokens.colorOnSurfaceMuted;
   static const Color surface = DesignTokens.colorSurface;
