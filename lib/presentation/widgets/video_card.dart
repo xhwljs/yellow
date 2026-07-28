@@ -4,9 +4,9 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:yellow_depot/core/theme/app_theme.dart';
 import 'package:yellow_depot/core/theme/design_tokens.dart';
-import 'package:yellow_depot/core/theme/theme_presets.dart';
 import 'package:yellow_depot/core/utils/number_formatter.dart';
 import 'package:yellow_depot/data/models/video.dart';
+import 'package:yellow_depot/presentation/widgets/meta_row.dart';
 
 /// 视频卡片（Bento Grid 风格）
 ///
@@ -143,7 +143,10 @@ class VideoCard extends StatelessWidget {
                       height: 1.3,
                     ),
                   ),
-                  _buildMetaRow(colors),
+                  Padding(
+                    padding: const EdgeInsets.only(top: DesignTokens.spaceXs),
+                    child: MetaRow(items: _buildMetaItems()),
+                  ),
                 ],
               ),
             ),
@@ -153,108 +156,30 @@ class VideoCard extends StatelessWidget {
     );
   }
 
-  /// 元信息行：播放次数 · 收藏次数 · 更新时间
+  /// 元信息项列表：播放次数 · 收藏次数 · 更新时间
   ///
-  /// 设计：
-  /// - **强制单行**（用 Row 替代 Wrap），避免换行导致卡片高度溢出
-  /// - 三项以分隔点 "·" 连接，缺失项自动跳过
-  /// - 图标 + 数字紧凑展示（间距 2px），使用 onSurfaceMuted 颜色
-  /// - 最后一项用 Expanded + ellipsis 兜底，极端长内容也不会溢出
-  /// - 全部缺失时不渲染（返回 SizedBox.shrink），节省卡片高度
-  Widget _buildMetaRow(ThemeColors colors) {
-    final items = <Widget>[];
-
+  /// 缺失字段不加入列表，[MetaRow] 会自动跳过空列表并返回 SizedBox.shrink()。
+  List<MetaItem> _buildMetaItems() {
+    final items = <MetaItem>[];
     if (video.playCount > 0) {
-      items.add(_MetaItem(
+      items.add(MetaItem(
         icon: PhosphorIconsRegular.eye,
         text: NumberFormatter.formatCount(video.playCount),
       ));
     }
     if (video.likeCount > 0) {
-      items.add(_MetaItem(
+      items.add(MetaItem(
         icon: PhosphorIconsFill.heart,
         text: NumberFormatter.formatCount(video.likeCount),
       ));
     }
     if (video.updateTime.isNotEmpty) {
-      items.add(_MetaItem(
+      items.add(MetaItem(
         icon: PhosphorIconsRegular.calendar,
         text: video.updateTime,
       ));
     }
-
-    if (items.isEmpty) return const SizedBox.shrink();
-
-    // 构建单行：item0 · item1 · item2 ...
-    // 最后一项包 Expanded+ellipsis 兜底（理论上数据很短不会触发）
-    final children = <Widget>[];
-    for (var i = 0; i < items.length; i++) {
-      if (i > 0) {
-        children.add(Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 3),
-          child: Text(
-            '·',
-            style: TextStyle(
-              fontSize: DesignTokens.textCaption,
-              color: colors.onSurfaceMuted,
-            ),
-          ),
-        ));
-      }
-      if (i == items.length - 1) {
-        // 最后一项 Expanded 兜底防止极端溢出
-        children.add(Expanded(child: items[i]));
-      } else {
-        children.add(items[i]);
-      }
-    }
-
-    return Padding(
-      padding: const EdgeInsets.only(top: DesignTokens.spaceXs),
-      child: Row(
-        mainAxisSize: MainAxisSize.max,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: children,
-      ),
-    );
-  }
-}
-
-/// 元信息单项（图标 + 文本）
-///
-/// 强制单行：Text overflow ellipsis 防止极端长内容溢出 Row
-class _MetaItem extends StatelessWidget {
-  final IconData icon;
-  final String text;
-
-  const _MetaItem({required this.icon, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = AppTheme.colorsOf(context);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Icon(
-          icon,
-          size: 11,
-          color: colors.onSurfaceMuted,
-        ),
-        const SizedBox(width: 2),
-        Flexible(
-          child: Text(
-            text,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: DesignTokens.textCaption,
-              color: colors.onSurfaceMuted,
-            ),
-          ),
-        ),
-      ],
-    );
+    return items;
   }
 }
 

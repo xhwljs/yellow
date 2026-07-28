@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:yellow_depot/core/theme/app_theme.dart';
 import 'package:yellow_depot/core/theme/design_tokens.dart';
+import 'package:yellow_depot/core/utils/logger.dart';
 import 'package:yellow_depot/presentation/controllers/category_controller.dart';
 import 'package:yellow_depot/presentation/controllers/home_controller.dart';
 import 'package:yellow_depot/presentation/routes/app_pages.dart';
@@ -56,12 +57,16 @@ class _CategoryPageState extends State<CategoryPage> {
 
   String _resolveCategoryName() {
     final categoryId = _controller.categoryId;
+    if (!Get.isRegistered<HomeController>()) return '分类';
     try {
       final homeController = Get.find<HomeController>();
       for (final c in homeController.categories) {
         if (c.id == categoryId) return c.name;
       }
-    } catch (_) {}
+    } catch (e, st) {
+      appLogger.w('resolveCategoryName failed: categoryId=$categoryId',
+          error: e, stackTrace: st);
+    }
     return '分类';
   }
 

@@ -370,10 +370,14 @@ class VideoDetailController extends GetxController
   void _disposeInlinePlayer() {
     try {
       inlineChewieController.value?.dispose();
-    } catch (_) {}
+    } catch (e, st) {
+      appLogger.w('dispose chewie failed', error: e, stackTrace: st);
+    }
     try {
       inlineVideoController.value?.dispose();
-    } catch (_) {}
+    } catch (e, st) {
+      appLogger.w('dispose video controller failed', error: e, stackTrace: st);
+    }
     inlineChewieController.value = null;
     inlineVideoController.value = null;
     _inlineStarted = false;

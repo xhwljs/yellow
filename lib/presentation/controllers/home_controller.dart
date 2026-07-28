@@ -71,7 +71,8 @@ class HomeController extends GetxController {
         categoryVideos[c.id] = videos;
       });
       await Future.wait(futures);
-    } catch (e) {
+    } catch (e, st) {
+      appLogger.e('loadData 失败', error: e, stackTrace: st);
       error.value = e.toString();
     } finally {
       isLoading.value = false;
@@ -133,7 +134,9 @@ class HomeController extends GetxController {
       if (videos.isEmpty) {
         selectedHasMore.value = false;
       }
-    } catch (e) {
+    } catch (e, st) {
+      appLogger.e('loadSelectedCategoryFirstPage 失败: categoryId=$categoryId',
+          error: e, stackTrace: st);
       error.value = e.toString();
     } finally {
       selectedLoading.value = false;

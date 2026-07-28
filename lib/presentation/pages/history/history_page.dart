@@ -4,11 +4,12 @@ import 'package:get/get.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:yellow_depot/core/theme/app_theme.dart';
 import 'package:yellow_depot/core/theme/design_tokens.dart';
-import 'package:yellow_depot/core/theme/theme_presets.dart';
 import 'package:yellow_depot/core/utils/number_formatter.dart';
+import 'package:yellow_depot/core/utils/time_formatter.dart';
 import 'package:yellow_depot/data/models/play_history.dart';
 import 'package:yellow_depot/presentation/controllers/history_controller.dart';
 import 'package:yellow_depot/presentation/routes/app_pages.dart';
+import 'package:yellow_depot/presentation/widgets/meta_row.dart';
 import 'package:yellow_depot/presentation/widgets/video_card.dart';
 
 /// 播放历史页
@@ -261,7 +262,7 @@ class _HistoryItem extends StatelessWidget {
                         const SizedBox(width: DesignTokens.spaceXs),
                         Expanded(
                           child: Text(
-                            _formatTime(history.updatedAt),
+                            const TimeFormatter().formatRelativeTime(history.updatedAt),
                             style: TextStyle(
                               fontSize: DesignTokens.textCaption,
                               color: colors.onSurfaceMuted,
@@ -316,7 +317,7 @@ class _HistoryItem extends StatelessWidget {
                     // 字段为空时自动跳过，全部为空时不渲染
                     if (_hasMetaInfo(history)) ...[
                       const SizedBox(height: DesignTokens.spaceXs),
-                      _buildMetaRow(history, colors),
+                      MetaRow(items: _buildMetaItems(history)),
                     ],
                     const SizedBox(height: DesignTokens.spaceXs),
                     ClipRRect(
@@ -340,21 +341,6 @@ class _HistoryItem extends StatelessWidget {
     );
   }
 
-  String _formatTime(int timestamp) {
-    if (timestamp <= 0) return '未知时间';
-    // 兼容秒级 / 毫秒级时间戳
-    final ms = timestamp > 1000000000000 ? timestamp : timestamp * 1000;
-    final dt = DateTime.fromMillisecondsSinceEpoch(ms);
-    final now = DateTime.now();
-    final diff = now.difference(dt);
-    if (diff.inMinutes < 1) return '刚刚';
-    if (diff.inMinutes < 60) return '${diff.inMinutes} 分钟前';
-    if (diff.inHours < 24) return '${diff.inHours} 小时前';
-    if (diff.inDays < 7) return '${diff.inDays} 天前';
-    return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-'
-        '${dt.day.toString().padLeft(2, '0')}';
-  }
-
   /// 是否有任何详情元信息可展示
   bool _hasMetaInfo(PlayHistory h) {
     return h.durationText.isNotEmpty ||
@@ -363,99 +349,36 @@ class _HistoryItem extends StatelessWidget {
         h.updateTime.isNotEmpty;
   }
 
-  /// 详情元信息行：时长 · 播放次数 · 收藏次数 · 更新时间
+  /// 详情元信息项列表：时长 · 播放次数 · 收藏次数 · 更新时间
   ///
-  /// 设计：
-  /// - **强制单行**（用 Row 替代 Wrap），避免换行导致列表项高度抖动
-  /// - 各项以分隔点 "·" 连接，缺失项自动跳过
-  /// - 图标 + 文本紧凑展示，使用 onSurfaceMuted 颜色
-  /// - 字段从 VideoDao 补全（@ignore），未命中时为空 → 自动跳过
-  /// - 最后一项 Expanded+ellipsis 兜底防止极端长内容溢出
-  Widget _buildMetaRow(PlayHistory h, ThemeColors colors) {
-    final items = <Widget>[];
-
+  /// 字段从 VideoDao 补全（@ignore），未命中时为空 → 不加入列表，
+  /// [MetaRow] 会自动跳过空列表并返回 SizedBox.shrink()。
+  List<MetaItem> _buildMetaItems(PlayHistory h) {
+    final items = <MetaItem>[];
     if (h.durationText.isNotEmpty) {
-      items.add(_metaItem(
-        PhosphorIconsRegular.play,
-        h.durationText,
-        colors,
+      items.add(MetaItem(
+        icon: PhosphorIconsRegular.play,
+        text: h.durationText,
       ));
     }
     if (h.playCount > 0) {
-      items.add(_metaItem(
-        PhosphorIconsRegular.eye,
-        NumberFormatter.formatCount(h.playCount),
-        colors,
+      items.add(MetaItem(
+        icon: PhosphorIconsRegular.eye,
+        text: NumberFormatter.formatCount(h.playCount),
       ));
     }
     if (h.likeCount > 0) {
-      items.add(_metaItem(
-        PhosphorIconsFill.heart,
-        NumberFormatter.formatCount(h.likeCount),
-        colors,
+      items.add(MetaItem(
+        icon: PhosphorIconsFill.heart,
+        text: NumberFormatter.formatCount(h.likeCount),
       ));
     }
     if (h.updateTime.isNotEmpty) {
-      items.add(_metaItem(
-        PhosphorIconsRegular.calendar,
-        h.updateTime,
-        colors,
+      items.add(MetaItem(
+        icon: PhosphorIconsRegular.calendar,
+        text: h.updateTime,
       ));
     }
-
-    if (items.isEmpty) return const SizedBox.shrink();
-
-    final children = <Widget>[];
-    for (var i = 0; i < items.length; i++) {
-      if (i > 0) {
-        children.add(Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 3),
-          child: Text(
-            '·',
-            style: TextStyle(
-              fontSize: DesignTokens.textCaption,
-              color: colors.onSurfaceMuted,
-            ),
-          ),
-        ));
-      }
-      if (i == items.length - 1) {
-        children.add(Expanded(child: items[i]));
-      } else {
-        children.add(items[i]);
-      }
-    }
-
-    return Row(
-      mainAxisSize: MainAxisSize.max,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: children,
-    );
-  }
-
-  Widget _metaItem(IconData icon, String text, ThemeColors colors) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Icon(
-          icon,
-          size: 11,
-          color: colors.onSurfaceMuted,
-        ),
-        const SizedBox(width: 2),
-        Flexible(
-          child: Text(
-            text,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: DesignTokens.textCaption,
-              color: colors.onSurfaceMuted,
-            ),
-          ),
-        ),
-      ],
-    );
+    return items;
   }
 }

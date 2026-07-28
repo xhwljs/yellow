@@ -1,6 +1,7 @@
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
 import 'package:yellow_depot/core/error/exceptions.dart';
+import 'package:yellow_depot/core/utils/logger.dart';
 import 'package:yellow_depot/data/models/video.dart';
 
 /// 视频列表解析器
@@ -123,7 +124,10 @@ class VideoListParser {
           return int.tryParse(text) ?? 0;
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      appLogger.w('extractNumber failed: faClass=$faClass',
+          error: e, stackTrace: st);
+    }
     return 0;
   }
 
@@ -136,7 +140,9 @@ class VideoListParser {
       final match =
           RegExp(r'(\d{4}-\d{1,2}-\d{1,2}|\d{1,2}-\d{1,2})').firstMatch(text);
       return match?.group(1) ?? '';
-    } catch (_) {}
+    } catch (e, st) {
+      appLogger.w('extractUpdateTime failed', error: e, stackTrace: st);
+    }
     return '';
   }
 }

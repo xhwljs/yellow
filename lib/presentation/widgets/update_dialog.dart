@@ -7,6 +7,7 @@ import 'package:yellow_depot/core/services/github_release_service.dart';
 import 'package:yellow_depot/core/theme/design_tokens.dart';
 import 'package:yellow_depot/core/theme/theme_presets.dart';
 import 'package:yellow_depot/core/utils/number_formatter.dart';
+import 'package:yellow_depot/core/utils/time_formatter.dart';
 
 /// 更新对话框主题色（顶层定义，便于 [_InfoLine] 等内部类访问）
 ///
@@ -218,7 +219,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
               const SizedBox(height: DesignTokens.spaceXs),
               _InfoLine(
                 label: '发布时间',
-                value: _formatDate(widget.release.publishedAt),
+                value: const TimeFormatter().formatDate(widget.release.publishedAt),
               ),
               const SizedBox(height: DesignTokens.spaceMd),
               // 更新内容标题（固定）
@@ -583,10 +584,6 @@ class _UpdateDialogState extends State<UpdateDialog> {
         child: const Text('立即更新'),
       ),
     ];
-  }
-
-  String _formatDate(DateTime dt) {
-    return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
   }
 }
 
