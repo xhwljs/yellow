@@ -15,7 +15,7 @@ class TimeFormatter {
   /// - 否则：`YYYY-MM-DD`
   ///
   /// [timestamp] 支持秒级或毫秒级时间戳（自动识别）。
-  String formatRelativeTime(int timestamp) {
+  static String formatRelativeTime(int timestamp) {
     if (timestamp <= 0) return '未知时间';
     final dt = _toDateTime(timestamp);
     final diff = DateTime.now().difference(dt);
@@ -27,12 +27,12 @@ class TimeFormatter {
   }
 
   /// 格式化为绝对日期 `YYYY-MM-DD`。
-  String formatDate(DateTime dt) {
+  static String formatDate(DateTime dt) {
     return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
   }
 
   /// 把时间戳转 DateTime，自动兼容秒级 / 毫秒级。
-  DateTime _toDateTime(int timestamp) {
+  static DateTime _toDateTime(int timestamp) {
     // > 1e12 判定为毫秒级（Unix 秒在 2001 年才到 1e9，毫秒在 2001 年到 1e12）
     final ms = timestamp > 1000000000000 ? timestamp : timestamp * 1000;
     return DateTime.fromMillisecondsSinceEpoch(ms);

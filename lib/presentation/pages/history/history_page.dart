@@ -262,7 +262,7 @@ class _HistoryItem extends StatelessWidget {
                         const SizedBox(width: DesignTokens.spaceXs),
                         Expanded(
                           child: Text(
-                            const TimeFormatter().formatRelativeTime(history.updatedAt),
+                            TimeFormatter.formatRelativeTime(history.updatedAt),
                             style: TextStyle(
                               fontSize: DesignTokens.textCaption,
                               color: colors.onSurfaceMuted,

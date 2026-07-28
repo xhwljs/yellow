@@ -219,7 +219,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
               const SizedBox(height: DesignTokens.spaceXs),
               _InfoLine(
                 label: '发布时间',
-                value: const TimeFormatter().formatDate(widget.release.publishedAt),
+                value: TimeFormatter.formatDate(widget.release.publishedAt),
               ),
               const SizedBox(height: DesignTokens.spaceMd),
               // 更新内容标题（固定）
