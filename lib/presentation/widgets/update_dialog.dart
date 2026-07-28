@@ -5,20 +5,23 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:yellow_depot/core/services/app_update_service.dart';
 import 'package:yellow_depot/core/services/github_release_service.dart';
 import 'package:yellow_depot/core/theme/design_tokens.dart';
+import 'package:yellow_depot/core/theme/theme_presets.dart';
+import 'package:yellow_depot/core/utils/number_formatter.dart';
 
 /// 更新对话框主题色（顶层定义，便于 [_InfoLine] 等内部类访问）
 ///
-/// 启动阶段 ThemeController 可能未就绪，硬编码默认主题色避免依赖 GetX。
+/// 启动阶段 ThemeController 尚未就绪，这里引用 [ThemePreset.pink]（默认主题）
+/// 与 [DesignTokens] 的 const 常量，不依赖 GetX。加载完成后切换到 MainShell
+/// 时会读取用户保存的主题。与 [SplashPage] 保持同一真理源。
 class _UpdateColors {
-  static const Color primary = Color(0xFFEC4899);
-  static const Color onSurface = Color(0xFF1A1A1A);
-  static const Color onSurfaceMuted = Color(0xFF8E8E93);
-  static const Color surface = Color(0xFFFFFFFF);
-  static const Color destructive = Color(0xFFEF4444);
-  static const Color successBg = Color(0xFFE8F5E9);
-  static const Color successFg = Color(0xFF2E7D32);
-  static const Color neutralBg = Color(0xFFF5F5F7);
-  static const Color trackBg = Color(0xFFE5E5EA);
+  static const Color primary = ThemePreset.pink.primaryColor;
+  static const Color onSurface = DesignTokens.colorOnSurface;
+  static const Color onSurfaceMuted = DesignTokens.colorOnSurfaceMuted;
+  static const Color surface = DesignTokens.colorSurface;
+  static const Color destructive = DesignTokens.colorDestructive;
+  static const Color successFg = DesignTokens.colorSuccess;
+  static const Color neutralBg = DesignTokens.colorBackground;
+  static const Color trackBg = DesignTokens.colorBorder;
 }
 
 /// 更新对话框
@@ -333,7 +336,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
         vertical: DesignTokens.spaceXs,
       ),
       decoration: BoxDecoration(
-        color: _UpdateColors.successBg,
+        color: DesignTokens.colorSuccess.withOpacity(0.08),
         borderRadius: BorderRadius.circular(DesignTokens.radiusSm),
       ),
       child: Row(
@@ -404,7 +407,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
       margin: const EdgeInsets.only(top: DesignTokens.spaceMd),
       padding: const EdgeInsets.all(DesignTokens.spaceMd),
       decoration: BoxDecoration(
-        color: _UpdateColors.successBg,
+        color: DesignTokens.colorSuccess.withOpacity(0.08),
         borderRadius: BorderRadius.circular(DesignTokens.radiusMd),
       ),
       child: Row(
@@ -495,7 +498,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
               ),
               if (_totalBytes > 0)
                 Text(
-                  '${_formatBytes(_receivedBytes)} / ${_formatBytes(_totalBytes)}',
+                  '${NumberFormatter.formatBytes(_receivedBytes)} / ${NumberFormatter.formatBytes(_totalBytes)}',
                   style: const TextStyle(
                     fontSize: DesignTokens.textCaption,
                     color: _UpdateColors.onSurfaceMuted,
@@ -584,18 +587,6 @@ class _UpdateDialogState extends State<UpdateDialog> {
 
   String _formatDate(DateTime dt) {
     return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
-  }
-
-  static String _formatBytes(int bytes) {
-    if (bytes <= 0) return '0 B';
-    const units = ['B', 'KB', 'MB', 'GB'];
-    var size = bytes.toDouble();
-    var unitIdx = 0;
-    while (size >= 1024 && unitIdx < units.length - 1) {
-      size /= 1024;
-      unitIdx++;
-    }
-    return '${size.toStringAsFixed(1)} ${units[unitIdx]}';
   }
 }
 

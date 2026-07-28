@@ -5,6 +5,7 @@ import 'package:yellow_depot/core/constants/app_constants.dart';
 import 'package:yellow_depot/core/theme/app_theme.dart';
 import 'package:yellow_depot/core/theme/design_tokens.dart';
 import 'package:yellow_depot/core/theme/theme_presets.dart';
+import 'package:yellow_depot/core/utils/number_formatter.dart';
 import 'package:yellow_depot/data/models/category.dart';
 import 'package:yellow_depot/data/models/video.dart';
 import 'package:yellow_depot/presentation/controllers/home_controller.dart';
@@ -676,7 +677,7 @@ class _CatalogListItem extends StatelessWidget {
                   borderRadius: BorderRadius.circular(DesignTokens.radiusPill),
                 ),
                 child: Text(
-                  _formatCount(category.count),
+                  NumberFormatter.formatCount(category.count),
                   style: TextStyle(
                     fontSize: DesignTokens.textCaption,
                     fontWeight: FontWeight.w500,
@@ -695,15 +696,5 @@ class _CatalogListItem extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  /// 格式化视频数量
-  ///
-  /// - < 10000: 原样显示（如 4827）
-  /// - >= 10000: 显示为 7.7w（节省横向空间）
-  static String _formatCount(int count) {
-    if (count < 10000) return count.toString();
-    final w = count / 10000;
-    return '${w.toStringAsFixed(1)}w';
   }
 }

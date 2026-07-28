@@ -45,6 +45,10 @@ class FavoritesPage extends GetView<FavoritesController> {
         if (controller.isLoading.value && controller.favorites.isEmpty) {
           return const LoadingView(message: '加载中...');
         }
+        final errMsg = controller.errorMessage.value;
+        if (errMsg.isNotEmpty && controller.favorites.isEmpty) {
+          return ErrorView(message: errMsg, onRetry: controller.loadFavorites);
+        }
         if (controller.favorites.isEmpty) {
           return const EmptyView(
             icon: PhosphorIconsRegular.heart,

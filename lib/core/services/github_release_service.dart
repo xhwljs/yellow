@@ -223,7 +223,7 @@ class GitHubReleaseService {
   /// 5. 若有新版本 → 构造 GitHubRelease（assets URL 用固定路径推断）：
   ///    - apkDownloadUrl = https://github.com/{owner}/{repo}/releases/download/{tag}/{apkName}
   ///    - body = ""（无法获取 release body，无法判断是否强制更新）
-  ///    - forceUpdate = true（保守：当 API 不可达时按强制更新处理，避免漏弹）
+  ///    - forceUpdate = false（无法解析标记，按非强制处理，让用户可选"稍后"避免误强制更新）
   ///
   /// 返回值：
   /// - 有新版本 → 返回 GitHubRelease
@@ -263,15 +263,14 @@ class GitHubReleaseService {
       final release = GitHubRelease(
         tagName: tagName,
         name: 'Release $tagName',
-        body: '', // 无法获取 release body，无法判断是否强制更新
+        // fallback 无法获取 release body，无法判断强制更新标记 → 按非强制处理
+        body: '',
         // APK URL 用固定路径推断（CI 构建产物固定命名）
         apkDownloadUrl:
             'https://github.com/$repoOwner/$repoName/releases/download/$tagName/$apkAssetName',
         apkFileName: apkAssetName,
         publishedAt: DateTime.now(),
         prerelease: false,
-        // 无法获取 release body → 无法判断是否强制更新
-        // 改为 false（非强制），让用户可选"稍后"，避免误强制更新
         forceUpdate: false,
       );
 

@@ -7,19 +7,21 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:yellow_depot/core/constants/app_constants.dart';
 import 'package:yellow_depot/core/services/github_release_service.dart';
 import 'package:yellow_depot/core/theme/design_tokens.dart';
+import 'package:yellow_depot/core/theme/theme_presets.dart';
 import 'package:yellow_depot/core/utils/logger.dart';
 import 'package:yellow_depot/presentation/bindings/app_binding.dart';
 import 'package:yellow_depot/presentation/pages/main_shell.dart';
 import 'package:yellow_depot/presentation/widgets/update_dialog.dart';
 
-/// 默认主题色（pink）— 与 ThemePreset.pink 一致
+/// 默认主题色（pink）— 引用设计系统单一真理源
 ///
-/// 启动时 ThemeController 尚未就绪，硬编码默认主题色避免依赖 GetX。
-/// 加载完成后切换到 MainShell 时会读取用户保存的主题。
-const Color _kPrimaryColor = Color(0xFFEC4899);
-const Color _kBackgroundColor = Color(0xFFF5F5F7);
-const Color _kOnBackgroundColor = Color(0xFF1A1A1A);
-const Color _kOnBackgroundMutedColor = Color(0xFF8E8E93);
+/// 启动时 ThemeController 尚未就绪，这里只引用 [ThemePreset.pink] 与
+/// [DesignTokens] 中的 const 常量（不依赖 GetX），加载完成后切换到
+/// MainShell 时会读取用户保存的主题。
+const Color _kPrimaryColor = ThemePreset.pink.primaryColor;
+const Color _kBackgroundColor = DesignTokens.colorBackground;
+const Color _kOnBackgroundColor = DesignTokens.colorOnBackground;
+const Color _kOnBackgroundMutedColor = DesignTokens.colorOnSurfaceMuted;
 
 /// 启动页（Splash Screen）
 ///
@@ -237,7 +239,7 @@ class _SplashPageState extends State<SplashPage> {
         children: [
           Icon(
             PhosphorIconsRegular.warningCircle,
-            color: const Color(0xFFDC2626),
+            color: DesignTokens.colorDestructive,
             size: 40,
           ),
           const SizedBox(height: DesignTokens.spaceMd),
@@ -310,8 +312,8 @@ class _SplashPageState extends State<SplashPage> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xFFEC4899), // pink primary
-              Color(0xFFDB2777), // pink secondary
+              ThemePreset.pink.primaryColor,
+              ThemePreset.pink.secondaryColor,
             ],
           ),
           boxShadow: [

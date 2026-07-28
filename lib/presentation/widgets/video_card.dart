@@ -5,6 +5,7 @@ import 'package:shimmer/shimmer.dart';
 import 'package:yellow_depot/core/theme/app_theme.dart';
 import 'package:yellow_depot/core/theme/design_tokens.dart';
 import 'package:yellow_depot/core/theme/theme_presets.dart';
+import 'package:yellow_depot/core/utils/number_formatter.dart';
 import 'package:yellow_depot/data/models/video.dart';
 
 /// 视频卡片（Bento Grid 风格）
@@ -166,13 +167,13 @@ class VideoCard extends StatelessWidget {
     if (video.playCount > 0) {
       items.add(_MetaItem(
         icon: PhosphorIconsRegular.eye,
-        text: _formatCount(video.playCount),
+        text: NumberFormatter.formatCount(video.playCount),
       ));
     }
     if (video.likeCount > 0) {
       items.add(_MetaItem(
         icon: PhosphorIconsFill.heart,
-        text: _formatCount(video.likeCount),
+        text: NumberFormatter.formatCount(video.likeCount),
       ));
     }
     if (video.updateTime.isNotEmpty) {
@@ -216,17 +217,6 @@ class VideoCard extends StatelessWidget {
         children: children,
       ),
     );
-  }
-
-  /// 数字格式化：超过 1万 显示 "1.2万"，超过 1亿 显示 "1.2亿"
-  String _formatCount(int n) {
-    if (n >= 100000000) {
-      return '${(n / 100000000).toStringAsFixed(1)}亿';
-    }
-    if (n >= 10000) {
-      return '${(n / 10000).toStringAsFixed(1)}万';
-    }
-    return n.toString();
   }
 }
 

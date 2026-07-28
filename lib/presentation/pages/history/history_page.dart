@@ -5,6 +5,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:yellow_depot/core/theme/app_theme.dart';
 import 'package:yellow_depot/core/theme/design_tokens.dart';
 import 'package:yellow_depot/core/theme/theme_presets.dart';
+import 'package:yellow_depot/core/utils/number_formatter.dart';
 import 'package:yellow_depot/data/models/play_history.dart';
 import 'package:yellow_depot/presentation/controllers/history_controller.dart';
 import 'package:yellow_depot/presentation/routes/app_pages.dart';
@@ -60,6 +61,10 @@ class HistoryPage extends GetView<HistoryController> {
       body: Obx(() {
         if (controller.isLoading.value && controller.histories.isEmpty) {
           return const LoadingView(message: '加载中...');
+        }
+        final errMsg = controller.errorMessage.value;
+        if (errMsg.isNotEmpty && controller.histories.isEmpty) {
+          return ErrorView(message: errMsg, onRetry: controller.loadHistory);
         }
         if (controller.histories.isEmpty) {
           return const EmptyView(
@@ -379,14 +384,14 @@ class _HistoryItem extends StatelessWidget {
     if (h.playCount > 0) {
       items.add(_metaItem(
         PhosphorIconsRegular.eye,
-        _formatCount(h.playCount),
+        NumberFormatter.formatCount(h.playCount),
         colors,
       ));
     }
     if (h.likeCount > 0) {
       items.add(_metaItem(
         PhosphorIconsFill.heart,
-        _formatCount(h.likeCount),
+        NumberFormatter.formatCount(h.likeCount),
         colors,
       ));
     }
@@ -452,16 +457,5 @@ class _HistoryItem extends StatelessWidget {
         ),
       ],
     );
-  }
-
-  /// 数字格式化：超过 1万 显示 "1.2万"，超过 1亿 显示 "1.2亿"
-  String _formatCount(int n) {
-    if (n >= 100000000) {
-      return '${(n / 100000000).toStringAsFixed(1)}亿';
-    }
-    if (n >= 10000) {
-      return '${(n / 10000).toStringAsFixed(1)}万';
-    }
-    return n.toString();
   }
 }

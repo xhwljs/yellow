@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:yellow_depot/core/services/github_release_service.dart';
 import 'package:yellow_depot/core/utils/logger.dart';
+import 'package:yellow_depot/core/utils/number_formatter.dart';
 
 /// APK 下载进度回调
 ///
@@ -89,7 +90,7 @@ class AppUpdateService {
           }
         },
       );
-      appLogger.i('APK 下载完成: $filePath (大小: ${_formatBytes(_fileSize(filePath))})');
+      appLogger.i('APK 下载完成: $filePath (大小: ${NumberFormatter.formatBytes(_fileSize(filePath))})');
     } on DioException catch (e) {
       appLogger.e('APK 下载失败: ${e.message}');
       rethrow;
@@ -153,17 +154,5 @@ class AppUpdateService {
     } catch (_) {
       return 0;
     }
-  }
-
-  static String _formatBytes(int bytes) {
-    if (bytes <= 0) return '0 B';
-    const units = ['B', 'KB', 'MB', 'GB'];
-    var size = bytes.toDouble();
-    var unitIdx = 0;
-    while (size >= 1024 && unitIdx < units.length - 1) {
-      size /= 1024;
-      unitIdx++;
-    }
-    return '${size.toStringAsFixed(1)} ${units[unitIdx]}';
   }
 }

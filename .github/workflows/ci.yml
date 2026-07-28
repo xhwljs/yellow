@@ -257,39 +257,44 @@ jobs:
           #    设置 forceUpdate=true，UpdateDialog 仅显示"立即更新"按钮）
           # 本次为强制更新（含 [强制更新] 标记），用户必须更新到新版本。
           cat > /tmp/release_notes.md <<'NOTES_EOF'
+          [强制更新]
+
           ## 本次更新内容
+
+          本次为强制更新，请立即更新到新版本后使用。
 
           ### 优化（代码质量 + 性能 + 工程规范）
 
-          #### 1. 删除死代码（约 1100 行）
-          - 删除独立的 VideoPlayerPage + PlayerPageController + PlayerBinding + player 路由
-          - 详情页已改用内联播放器，独立播放页无任何入口引用，属于死代码
-          - 同步删除随死代码失效的 screen_brightness / volume_controller 依赖
+          #### 1. 抽取重复的数字格式化方法
+          - video_card / home_page / history_page 三处各有一份 `_formatCount`，
+            且实现不一致（"万" vs "w" 单位）
+          - 统一抽取到 `lib/core/utils/number_formatter.dart`，支持"万/亿"中文单位
+          - 消除行为不一致 + 代码冗余
 
-          #### 2. 修复 category_page 骨架屏 aspectRatio BUG
-          - 骨架屏用 0.65 但实际数据网格用 0.88，切换时卡片高度跳变
-          - 新增 DesignTokens.videoGridChildAspectRatio = 0.88
-          - 骨架屏和实际网格统一引用同一常量，消除不一致
+          #### 2. 收藏/历史控制器错误状态处理
+          - FavoritesController / HistoryController 缺少错误状态，加载失败静默
+          - 新增 `errorMessage` 字段，catch 块捕获异常并记录日志
+          - favorites_page / history_page 增加 ErrorView + 重试按钮
+          - 与既有 CategoryController 错误处理模式统一
 
-          #### 3. HomeController 静默吞错修复
-          - loadCategoryVideos / loadMoreSelectedCategory 两处 catch(_) {}
-          - 改为 catch(e, st) + appLogger.w 记录错误 + stackTrace
-          - 与 CategoryController 错误处理方式统一
+          #### 3. 移除硬编码主题色
+          - splash_page / update_dialog 硬编码 4-9 个颜色常量，
+            与 ThemePreset / DesignTokens 重复且脱节
+          - 改为引用 ThemePreset.pink 与 DesignTokens 常量
+          - 主题色统一管理，符合设计系统"不得硬编码 hex"规范
 
-          #### 4. 删除 6 个未使用依赖
-          - flutter_staggered_grid_view / pull_to_refresh_flutter3 /
-            easy_refresh / intl / screen_brightness / volume_controller
-          - 减小 pub get 时间 + APK 体积 + 版本解析复杂度
+          #### 4. 清理未使用代码
+          - 删除 logger.dart 中未被引用的 `prodLogger` 全局变量
+          - 减小代码冗余与维护成本
 
-          #### 5. SearchPage TextField Obx 收窄（性能优化）
-          - 原 Obx 包裹整个 TextField，每次输入按键 → keyword 变化 → TextField 重建
-          - 收窄到只包裹 suffixIcon（清空按钮显隐）
-          - 避免光标抖动 + 输入法状态丢失 + 不必要的 rebuild
+          #### 5. 抽取字节格式化方法
+          - app_update_service / update_dialog 各有一份 `_formatBytes` 重复实现
+          - 统一抽取到 `NumberFormatter.formatBytes`，消除冗余
 
-          #### 6. history_page 删除/清空操作 await + 错误反馈
-          - deleteHistory / clearAll 是 Future，原代码未 await 就立即弹"已删除"
-          - DB 操作失败时 UI 已移除条目但数据库没改，体验混乱
-          - 改为 async + await + try-catch，失败时弹"删除失败"提示
+          #### 6. 修复更新检查 fallback 文档矛盾
+          - _fetchLatestReleaseFromRedirect 文档注释称 `forceUpdate = true`，
+            但代码实际为 `false`，注释与实现矛盾
+          - 修正文档与代码一致，避免误导维护者
 
           NOTES_EOF
           # 移除 heredoc 导致的每行前导空格（保持 markdown 结构）
