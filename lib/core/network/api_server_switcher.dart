@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yellow_depot/core/constants/app_constants.dart';
 import 'package:yellow_depot/core/network/dio_client.dart';
+import 'package:yellow_depot/core/utils/logger.dart';
 import 'package:yellow_depot/core/utils/user_agent_utils.dart';
 import 'package:yellow_depot/data/database/app_database.dart';
 import 'package:yellow_depot/presentation/controllers/favorites_controller.dart';
