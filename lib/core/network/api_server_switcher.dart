@@ -125,6 +125,117 @@ class ApiServerSwitcher {
     }
   }
 
+  // ===== 镜像列表手动管理（编辑 / 删除 / 新增）=====
+  //
+  // 用户反馈：源站域名经常换，每次自动迁移都往列表加新地址，
+  // 长期下来过期域名越积越多。提供手动管理能力让用户清理。
+
+  /// 添加一个新镜像到列表头部（不切换 baseUrl）。
+  ///
+  /// - 已存在则不重复添加
+  /// - 立即持久化到 SP
+  /// - 返回 true 表示新增成功，false 表示已存在
+  static Future<bool> addMirror(String url) async {
+    final normalized = _normalizeUrl(url);
+    if (normalized.isEmpty) return false;
+    if (presetMirrors.contains(normalized)) return false;
+    presetMirrors.insert(0, normalized);
+    await _saveMirrors();
+    appLogger.i('手动添加镜像：$normalized（当前共 ${presetMirrors.length} 个）');
+    return true;
+  }
+
+  /// 删除单个镜像。
+  ///
+  /// - **不允许删除当前生效的 baseUrl**（会破坏 App 正常请求），返回 false
+  /// - 删除成功后立即持久化
+  /// - 返回 true 表示删除成功
+  static Future<bool> removeMirror(String url) async {
+    if (url == current) {
+      appLogger.w('拒绝删除当前生效的 baseUrl：$url');
+      return false;
+    }
+    final removed = presetMirrors.remove(url);
+    if (removed) {
+      await _saveMirrors();
+      appLogger.i('已删除镜像：$url（剩余 ${presetMirrors.length} 个）');
+    }
+    return removed;
+  }
+
+  /// 批量删除镜像。
+  ///
+  /// - 自动跳过当前生效的 baseUrl（不删除）
+  /// - 返回实际删除的条数
+  static Future<int> removeMirrors(List<String> urls) async {
+    var removed = 0;
+    final currentUrl = current;
+    for (final url in urls) {
+      if (url == currentUrl) continue; // 不删当前生效的
+      if (presetMirrors.remove(url)) {
+        removed++;
+      }
+    }
+    if (removed > 0) {
+      await _saveMirrors();
+      appLogger.i('批量删除镜像：$removed 个（剩余 ${presetMirrors.length} 个）');
+    }
+    return removed;
+  }
+
+  /// 编辑镜像 URL（替换为新地址）。
+  ///
+  /// - 若 oldUrl 是当前生效的 baseUrl，则同步切换到 newUrl
+  /// - 若 newUrl 已存在（与列表中其他条目重复），返回 false
+  /// - 持久化镜像列表；若发生 baseUrl 切换，也持久化 baseUrl
+  static Future<bool> editMirror(String oldUrl, String newUrl) async {
+    final normalized = _normalizeUrl(newUrl);
+    if (normalized.isEmpty || normalized == oldUrl) return false;
+
+    // 重复检查（排除自身）
+    if (presetMirrors.contains(normalized) && normalized != oldUrl) {
+      appLogger.w('编辑失败：新 URL 已存在于列表中：$normalized');
+      return false;
+    }
+
+    final idx = presetMirrors.indexOf(oldUrl);
+    if (idx < 0) {
+      // oldUrl 不在列表里：相当于 add
+      presetMirrors.insert(0, normalized);
+    } else {
+      presetMirrors[idx] = normalized;
+    }
+    await _saveMirrors();
+
+    // 如果编辑的是当前 baseUrl，同步切换
+    if (oldUrl == current) {
+      await switchTo(normalized);
+      appLogger.i('编辑镜像并切换 baseUrl：$oldUrl → $normalized');
+    } else {
+      appLogger.i('编辑镜像：$oldUrl → $normalized');
+    }
+    return true;
+  }
+
+  /// 重置镜像列表为内置默认值（不清除当前 baseUrl）。
+  static Future<void> resetMirrorsToDefault() async {
+    presetMirrors = <String>[
+      'http://555976.xyz',
+      'http://555972.xyz',
+    ];
+    await _saveMirrors();
+    appLogger.i('已重置镜像列表为默认值（${presetMirrors.length} 个）');
+  }
+
+  /// 规范化 URL：去首尾空白，去末尾斜杠。
+  static String _normalizeUrl(String url) {
+    var s = url.trim();
+    while (s.endsWith('/')) {
+      s = s.substring(0, s.length - 1);
+    }
+    return s;
+  }
+
   /// 启动时异步健康检查：检测当前 baseUrl 是否是跳转壳，是则自动迁移
   ///
   /// **重要**：App 启动时用户可能持久化了已变跳转壳的旧地址（如 555973.xyz），

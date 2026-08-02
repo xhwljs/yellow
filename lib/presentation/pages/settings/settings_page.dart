@@ -1249,6 +1249,20 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
   /// - null：未测试
   final Map<String, bool?> _mirrorStatus = {};
 
+  /// 是否处于「管理模式」（多选删除 / 编辑）
+  ///
+  /// 管理模式下：
+  /// - 每个 chip 左侧出现 checkbox（点击切换选中，不再切换 baseUrl）
+  /// - 镜像列表标题右侧出现「全选 / 取消」
+  /// - 底部出现「删除选中 (N)」按钮 + 「添加域名」按钮
+  /// - chip 长按仍可弹单个编辑菜单
+  bool _manageMode = false;
+
+  /// 管理模式下被勾选的 URL 集合（待删除）
+  ///
+  /// 当前生效的 baseUrl 不允许被选中（chip 上 checkbox 禁用）。
+  final Set<String> _selectedForDelete = <String>{};
+
   @override
   void initState() {
     super.initState();
@@ -1388,92 +1402,224 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
                   ],
                   const SizedBox(height: DesignTokens.spaceLg),
 
-                  // 镜像列表（含每个 URL 的状态徽章）
-                  _buildSubLabel('镜像列表'),
+                  // 镜像列表标题行：左侧 label + 右侧「管理 / 完成」按钮
+                  Row(
+                    children: [
+                      _buildSubLabel('镜像列表'),
+                      const Spacer(),
+                      // 管理模式下显示「全选 / 反选」
+                      if (_manageMode)
+                        GestureDetector(
+                          onTap: _toggleSelectAll,
+                          child: Text(
+                            _isAllSelectableSelected() ? '取消全选' : '全选',
+                            style: TextStyle(
+                              fontSize: DesignTokens.textCaption,
+                              fontWeight: FontWeight.w600,
+                              color: colors.primary,
+                            ),
+                          ),
+                        )
+                      else
+                        GestureDetector(
+                          onTap: () => setState(() => _manageMode = true),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                PhosphorIconsRegular.pencilSimpleLine,
+                                size: 12,
+                                color: colors.primary,
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                '管理',
+                                style: TextStyle(
+                                  fontSize: DesignTokens.textCaption,
+                                  fontWeight: FontWeight.w600,
+                                  color: colors.primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
                   const SizedBox(height: DesignTokens.spaceSm),
+                  // 镜像列表（含每个 URL 的状态徽章 + 管理模式下的 checkbox）
                   Wrap(
                     spacing: DesignTokens.spaceSm,
                     runSpacing: DesignTokens.spaceSm,
                     children: ApiServerSwitcher.presetMirrors.map((url) {
                       final selected = url == _currentBaseUrl;
                       final status = _mirrorStatus[url];
+                      final checked = _selectedForDelete.contains(url);
                       return _MirrorChip(
                         url: url,
                         selected: selected,
                         status: status,
                         autoTesting: _autoTestingMirrors,
                         colors: colors,
-                        onTap: () => _switchBaseUrl(url),
+                        manageMode: _manageMode,
+                        checked: checked,
+                        onTap: _manageMode
+                            ? () => _toggleSelect(url)
+                            : () => _switchBaseUrl(url),
+                        onLongPress: () => _showMirrorActionMenu(url),
                       );
                     }).toList(),
                   ),
+                  // 管理模式提示
+                  if (_manageMode) ...[
+                    const SizedBox(height: DesignTokens.spaceXs),
+                    Text(
+                      '点击勾选要删除的域名（当前生效的域名不可删除），'
+                      '或长按单个域名编辑。',
+                      style: TextStyle(
+                        fontSize: DesignTokens.textLabel,
+                        color: colors.onSurfaceMuted,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: DesignTokens.spaceLg),
 
-                  // 操作按钮 — 按重要性分层
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: _testingUrl ? null : _testConnectivity,
-                      icon: const Icon(PhosphorIconsRegular.plugsConnected),
-                      label: const Text('测试连通性'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: colors.primary,
-                        foregroundColor: colors.onPrimary,
-                        minimumSize: const Size(48, 48),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: DesignTokens.spaceLg,
-                          vertical: DesignTokens.spaceMd,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius:
-                              BorderRadius.circular(DesignTokens.radiusMd),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: DesignTokens.spaceSm),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      // 内部直接弹自定义 URL 输入框，避免 sheet pop + dialog push 竞争闪退
-                      onPressed: () async {
-                        final result = await _showCustomUrlDialog();
-                        if (result != null &&
-                            result.isNotEmpty &&
-                            result != _currentBaseUrl) {
-                          await _switchBaseUrl(result);
-                        }
-                      },
-                      icon: const Icon(PhosphorIconsRegular.pencilSimpleLine),
-                      label: const Text('自定义 URL'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: colors.onSurface,
-                        side: BorderSide(color: colors.border),
-                        minimumSize: const Size(48, 48),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: DesignTokens.spaceLg,
-                          vertical: DesignTokens.spaceMd,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius:
-                              BorderRadius.circular(DesignTokens.radiusMd),
+                  // 操作按钮 — 管理模式 vs 普通模式
+                  if (_manageMode) ...[
+                    // 管理模式：添加域名 + 删除选中 + 退出管理
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _addMirrorDialog,
+                        icon: const Icon(PhosphorIconsRegular.plus),
+                        label: const Text('添加域名'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: colors.primary,
+                          side: BorderSide(color: colors.primary),
+                          minimumSize: const Size(48, 48),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: DesignTokens.spaceLg,
+                            vertical: DesignTokens.spaceMd,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.circular(DesignTokens.radiusMd),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: DesignTokens.spaceXs),
-                  SizedBox(
-                    width: double.infinity,
-                    child: TextButton.icon(
-                      onPressed: () => _switchBaseUrl(AppConstants.defaultBaseUrl),
-                      icon: const Icon(PhosphorIconsRegular.arrowCounterClockwise),
-                      label: const Text('重置为默认'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: colors.onSurfaceMuted,
-                        minimumSize: const Size(48, 48),
+                    const SizedBox(height: DesignTokens.spaceSm),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: _selectedForDelete.isEmpty
+                            ? null
+                            : _deleteSelected,
+                        icon: const Icon(PhosphorIconsRegular.trash),
+                        label: Text(
+                          _selectedForDelete.isEmpty
+                              ? '删除选中'
+                              : '删除选中 (${_selectedForDelete.length})',
+                        ),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: colors.destructive,
+                          foregroundColor: colors.surface,
+                          disabledBackgroundColor:
+                              colors.destructive.withOpacity(0.3),
+                          minimumSize: const Size(48, 48),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: DesignTokens.spaceLg,
+                            vertical: DesignTokens.spaceMd,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.circular(DesignTokens.radiusMd),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                    const SizedBox(height: DesignTokens.spaceXs),
+                    SizedBox(
+                      width: double.infinity,
+                      child: TextButton.icon(
+                        onPressed: _exitManageMode,
+                        icon: const Icon(PhosphorIconsRegular.x),
+                        label: const Text('退出管理'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: colors.onSurfaceMuted,
+                          minimumSize: const Size(48, 48),
+                        ),
+                      ),
+                    ),
+                  ] else ...[
+                    // 普通模式：测试连通性 / 自定义 URL / 重置
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: _testingUrl ? null : _testConnectivity,
+                        icon: const Icon(PhosphorIconsRegular.plugsConnected),
+                        label: const Text('测试连通性'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: colors.primary,
+                          foregroundColor: colors.onPrimary,
+                          minimumSize: const Size(48, 48),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: DesignTokens.spaceLg,
+                            vertical: DesignTokens.spaceMd,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.circular(DesignTokens.radiusMd),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: DesignTokens.spaceSm),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        // 内部直接弹自定义 URL 输入框，避免 sheet pop + dialog push 竞争闪退
+                        onPressed: () async {
+                          final result = await _showCustomUrlDialog();
+                          if (result != null &&
+                              result.isNotEmpty &&
+                              result != _currentBaseUrl) {
+                            await _switchBaseUrl(result);
+                          }
+                        },
+                        icon: const Icon(PhosphorIconsRegular.pencilSimpleLine),
+                        label: const Text('自定义 URL'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: colors.onSurface,
+                          side: BorderSide(color: colors.border),
+                          minimumSize: const Size(48, 48),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: DesignTokens.spaceLg,
+                            vertical: DesignTokens.spaceMd,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.circular(DesignTokens.radiusMd),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: DesignTokens.spaceXs),
+                    SizedBox(
+                      width: double.infinity,
+                      child: TextButton.icon(
+                        onPressed: () =>
+                            _switchBaseUrl(AppConstants.defaultBaseUrl),
+                        icon:
+                            const Icon(PhosphorIconsRegular.arrowCounterClockwise),
+                        label: const Text('重置为默认'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: colors.onSurfaceMuted,
+                          minimumSize: const Size(48, 48),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -1604,6 +1750,414 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
     if (migrated) {
       widget.onSwitched();
     }
+  }
+
+  // ===== 镜像列表管理模式 =====
+
+  /// 切换某个 URL 的选中状态（管理模式下点击 chip 触发）。
+  ///
+  /// 当前生效的 baseUrl 不允许选中（不可删除）。
+  void _toggleSelect(String url) {
+    if (url == _currentBaseUrl) return; // 当前生效的不可选中
+    setState(() {
+      if (_selectedForDelete.contains(url)) {
+        _selectedForDelete.remove(url);
+      } else {
+        _selectedForDelete.add(url);
+      }
+    });
+  }
+
+  /// 是否所有「可删除」的镜像都已被选中。
+  ///
+  /// 可删除 = 不等于当前生效的 baseUrl。
+  bool _isAllSelectableSelected() {
+    final selectable = ApiServerSwitcher.presetMirrors
+        .where((u) => u != _currentBaseUrl)
+        .toList();
+    if (selectable.isEmpty) return false;
+    for (final u in selectable) {
+      if (!_selectedForDelete.contains(u)) return false;
+    }
+    return true;
+  }
+
+  /// 全选 / 取消全选（仅可删除的）。
+  void _toggleSelectAll() {
+    setState(() {
+      if (_isAllSelectableSelected()) {
+        _selectedForDelete.clear();
+      } else {
+        _selectedForDelete
+          ..clear()
+          ..addAll(
+            ApiServerSwitcher.presetMirrors
+                .where((u) => u != _currentBaseUrl),
+          );
+      }
+    });
+  }
+
+  /// 退出管理模式，清空选中集合。
+  void _exitManageMode() {
+    setState(() {
+      _manageMode = false;
+      _selectedForDelete.clear();
+    });
+  }
+
+  /// 删除所有勾选的镜像。
+  ///
+  /// 弹确认对话框，确认后调用 [ApiServerSwitcher.removeMirrors] 批量删除，
+  /// 清空选中集合，刷新 UI（仍然停留在管理模式）。
+  Future<void> _deleteSelected() async {
+    if (_selectedForDelete.isEmpty) return;
+    final count = _selectedForDelete.length;
+    final urlsToDelete = List<String>.from(_selectedForDelete);
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: colors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(DesignTokens.radiusLg),
+        ),
+        title: Text(
+          '确认删除 $count 个域名？',
+          style: TextStyle(
+            fontSize: DesignTokens.textH2,
+            fontWeight: FontWeight.w700,
+            color: colors.onSurface,
+          ),
+        ),
+        content: Text(
+          '将永久删除以下域名：\n\n'
+          '${urlsToDelete.map((u) => '• $u').join('\n')}\n\n'
+          '删除后不可恢复，但可重新通过"添加域名"录入。',
+          style: TextStyle(
+            fontSize: DesignTokens.textBody,
+            color: colors.onSurfaceMuted,
+            height: 1.5,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(
+              '取消',
+              style: TextStyle(color: colors.onSurfaceMuted),
+            ),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: colors.destructive,
+              foregroundColor: colors.surface,
+            ),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final removed = await ApiServerSwitcher.removeMirrors(urlsToDelete);
+    // 清空被删的状态记录，避免 Map 残留
+    for (final u in urlsToDelete) {
+      _mirrorStatus.remove(u);
+    }
+    setState(() {
+      _selectedForDelete.clear();
+    });
+
+    if (!mounted) return;
+    Get.snackbar(
+      removed > 0 ? '删除成功' : '未删除',
+      removed > 0 ? '已删除 $removed 个域名' : '没有可删除的域名',
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: removed > 0 ? colors.surface : colors.destructive,
+      colorText: removed > 0 ? colors.onSurface : colors.surface,
+      duration: const Duration(seconds: 2),
+    );
+  }
+
+  /// 长按单个 chip → 弹底部操作菜单（编辑 / 删除）。
+  ///
+  /// 当前生效的 baseUrl 只允许编辑（不可删除）。
+  Future<void> _showMirrorActionMenu(String url) async {
+    final isCurrent = url == _currentBaseUrl;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: colors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(DesignTokens.radiusLg),
+        ),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(DesignTokens.spaceLg),
+              child: Text(
+                url,
+                style: TextStyle(
+                  fontSize: DesignTokens.textCaption,
+                  color: colors.onSurfaceMuted,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Divider(height: 1, color: colors.border),
+            ListTile(
+              leading: Icon(
+                PhosphorIconsRegular.pencilSimpleLine,
+                color: colors.primary,
+              ),
+              title: const Text('编辑'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _editMirrorDialog(url);
+              },
+            ),
+            ListTile(
+              leading: Icon(
+                PhosphorIconsRegular.trash,
+                color: isCurrent ? colors.onSurfaceMuted : colors.destructive,
+              ),
+              title: Text(
+                '删除',
+                style: TextStyle(
+                  color: isCurrent
+                      ? colors.onSurfaceMuted
+                      : colors.destructive,
+                ),
+              ),
+              subtitle: isCurrent
+                  ? const Text('当前生效的域名不可删除')
+                  : null,
+              enabled: !isCurrent,
+              onTap: isCurrent
+                  ? null
+                  : () {
+                      Navigator.pop(ctx);
+                      _deleteSingle(url);
+                    },
+            ),
+            const SizedBox(height: DesignTokens.spaceSm),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 删除单个镜像（带确认对话框）。
+  Future<void> _deleteSingle(String url) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: colors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(DesignTokens.radiusLg),
+        ),
+        title: Text(
+          '确认删除？',
+          style: TextStyle(
+            fontSize: DesignTokens.textH2,
+            fontWeight: FontWeight.w700,
+            color: colors.onSurface,
+          ),
+        ),
+        content: Text(
+          '将永久删除：$url\n\n删除后不可恢复，但可重新通过"添加域名"录入。',
+          style: TextStyle(
+            fontSize: DesignTokens.textBody,
+            color: colors.onSurfaceMuted,
+            height: 1.5,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('取消', style: TextStyle(color: colors.onSurfaceMuted)),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: colors.destructive,
+              foregroundColor: colors.surface,
+            ),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final ok = await ApiServerSwitcher.removeMirror(url);
+    _mirrorStatus.remove(url);
+    _selectedForDelete.remove(url);
+    if (mounted) setState(() {});
+
+    if (!mounted) return;
+    Get.snackbar(
+      ok ? '删除成功' : '删除失败',
+      ok ? '已删除 $url' : '无法删除（可能正在使用）',
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: ok ? colors.surface : colors.destructive,
+      colorText: ok ? colors.onSurface : colors.surface,
+      duration: const Duration(seconds: 2),
+    );
+  }
+
+  /// 编辑单个镜像 URL 的对话框。
+  Future<void> _editMirrorDialog(String oldUrl) async {
+    final controller = TextEditingController(text: oldUrl);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: colors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(DesignTokens.radiusLg),
+        ),
+        title: Text(
+          '编辑域名',
+          style: TextStyle(
+            color: colors.onSurface,
+            fontSize: DesignTokens.textH2,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: TextInputType.url,
+          autocorrect: false,
+          enableSuggestions: false,
+          decoration: InputDecoration(
+            hintText: 'http://example.com',
+            hintStyle: TextStyle(color: colors.onSurfaceMuted),
+            filled: true,
+            fillColor: colors.surfaceVariant,
+            enabledBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: colors.border),
+            ),
+            focusedBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: colors.primary, width: 2),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text('取消', style: TextStyle(color: colors.onSurfaceMuted)),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(controller.text.trim()),
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+
+    if (result == null || result.isEmpty || result == oldUrl) return;
+
+    final ok = await ApiServerSwitcher.editMirror(oldUrl, result);
+    if (!mounted) return;
+
+    // 编辑当前 baseUrl 会触发 switchTo → 同步 _currentBaseUrl
+    final newCurrent = ApiServerSwitcher.current;
+    setState(() {
+      _currentBaseUrl = newCurrent;
+    });
+
+    Get.snackbar(
+      ok ? '编辑成功' : '编辑失败',
+      ok ? '$oldUrl → $result' : '新地址已存在或无效',
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: ok ? colors.surface : colors.destructive,
+      colorText: ok ? colors.onSurface : colors.surface,
+      duration: const Duration(seconds: 2),
+    );
+
+    // 如果编辑的是当前 baseUrl（触发了 switchTo），通知外层刷新
+    if (ok && oldUrl == widget.currentBaseUrl) {
+      widget.onSwitched();
+    }
+  }
+
+  /// 添加新域名的对话框（不切换 baseUrl，仅加入镜像列表）。
+  Future<void> _addMirrorDialog() async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: colors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(DesignTokens.radiusLg),
+        ),
+        title: Text(
+          '添加域名',
+          style: TextStyle(
+            color: colors.onSurface,
+            fontSize: DesignTokens.textH2,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: TextInputType.url,
+          autocorrect: false,
+          enableSuggestions: false,
+          decoration: InputDecoration(
+            hintText: 'http://example.com',
+            hintStyle: TextStyle(color: colors.onSurfaceMuted),
+            filled: true,
+            fillColor: colors.surfaceVariant,
+            enabledBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: colors.border),
+            ),
+            focusedBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: colors.primary, width: 2),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text('取消', style: TextStyle(color: colors.onSurfaceMuted)),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(controller.text.trim()),
+            child: const Text('添加'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+
+    if (result == null || result.isEmpty) return;
+
+    final ok = await ApiServerSwitcher.addMirror(result);
+    if (!mounted) return;
+    setState(() {}); // 刷新镜像列表
+
+    Get.snackbar(
+      ok ? '添加成功' : '添加失败',
+      ok ? '已添加：$result' : '该域名已存在或无效',
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: ok ? colors.surface : colors.destructive,
+      colorText: ok ? colors.onSurface : colors.surface,
+      duration: const Duration(seconds: 2),
+    );
   }
 
   /// 自定义 URL 输入框（在 sheet 内部使用 sheet 自己的 context）
@@ -1756,6 +2310,15 @@ class _MirrorChip extends StatelessWidget {
   final ThemeColors colors;
   final VoidCallback onTap;
 
+  /// 管理模式：true 时显示 checkbox，点击切换选中（不再切换 baseUrl）
+  final bool manageMode;
+
+  /// 管理模式下是否被勾选
+  final bool checked;
+
+  /// 长按回调（弹单个编辑/删除菜单）
+  final VoidCallback? onLongPress;
+
   const _MirrorChip({
     required this.url,
     required this.selected,
@@ -1763,15 +2326,19 @@ class _MirrorChip extends StatelessWidget {
     required this.onTap,
     this.status,
     this.autoTesting = false,
+    this.manageMode = false,
+    this.checked = false,
+    this.onLongPress,
   });
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: selected ? colors.primary.withOpacity(0.1) : colors.surfaceVariant,
+      color: _bgColor(),
       borderRadius: BorderRadius.circular(DesignTokens.radiusPill),
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
         borderRadius: BorderRadius.circular(DesignTokens.radiusPill),
         child: Container(
           padding: const EdgeInsets.symmetric(
@@ -1781,14 +2348,20 @@ class _MirrorChip extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(DesignTokens.radiusPill),
             border: Border.all(
-              color: selected ? colors.primary : colors.border,
-              width: selected ? 1.5 : 1,
+              color: _borderColor(),
+              width: _borderWidth(),
             ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (selected) ...[
+              // 管理模式：显示 checkbox
+              if (manageMode) ...[
+                _buildCheckbox(),
+                const SizedBox(width: 4),
+              ]
+              // 普通模式 + 选中：显示对勾
+              else if (selected) ...[
                 Icon(
                   PhosphorIconsFill.checkCircle,
                   size: 12,
@@ -1800,12 +2373,12 @@ class _MirrorChip extends StatelessWidget {
                 url,
                 style: TextStyle(
                   fontSize: DesignTokens.textCaption,
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                  color: selected ? colors.primary : colors.onSurfaceMuted,
+                  fontWeight: selected || checked ? FontWeight.w600 : FontWeight.w400,
+                  color: _textColor(),
                 ),
               ),
-              // 状态徽章（选中状态时不显示，避免与对勾重复）
-              if (!selected) ...[
+              // 状态徽章（普通模式下选中时不显示，避免与对勾重复）
+              if (!manageMode && !selected) ...[
                 const SizedBox(width: 4),
                 _buildStatusBadge(),
               ],
@@ -1813,6 +2386,50 @@ class _MirrorChip extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Color _bgColor() {
+    if (manageMode) {
+      return checked
+          ? colors.destructive.withOpacity(0.08)
+          : colors.surfaceVariant;
+    }
+    return selected ? colors.primary.withOpacity(0.1) : colors.surfaceVariant;
+  }
+
+  Color _borderColor() {
+    if (manageMode) {
+      return checked ? colors.destructive : colors.border;
+    }
+    return selected ? colors.primary : colors.border;
+  }
+
+  double _borderWidth() {
+    if (manageMode) return checked ? 1.5 : 1;
+    return selected ? 1.5 : 1;
+  }
+
+  Color _textColor() {
+    if (manageMode) {
+      return checked ? colors.destructive : colors.onSurface;
+    }
+    return selected ? colors.primary : colors.onSurfaceMuted;
+  }
+
+  /// 管理模式下的 checkbox 图标
+  Widget _buildCheckbox() {
+    if (checked) {
+      return Icon(
+        PhosphorIconsFill.checkCircle,
+        size: 14,
+        color: colors.destructive,
+      );
+    }
+    return Icon(
+      PhosphorIconsRegular.circle,
+      size: 14,
+      color: colors.onSurfaceMuted,
     );
   }
 
