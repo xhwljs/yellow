@@ -1280,7 +1280,7 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
   /// - 如果发生自动迁移，更新 [_currentBaseUrl] 显示最新地址
   /// - 调 [widget.onSwitched] 通知外层 settings page 同步
   Future<void> _autoTestMirrors() async {
-    if (!mounted) return;
+    if (!context.mounted) return;
     setState(() {
       _autoTestingMirrors = true;
       _mirrorStatus.clear();
@@ -1291,7 +1291,7 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
     String? lastMigratedUrl;
 
     for (final mirror in mirrors) {
-      if (!mounted) return;
+      if (!context.mounted) return;
       final before = ApiServerSwitcher.current;
       final result = await ApiServerSwitcher.testConnectivity(mirror);
       final after = ApiServerSwitcher.current;
@@ -1303,7 +1303,7 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
       if (migrated && lastMigratedUrl == null) {
         lastMigratedUrl = after;
       }
-      if (!mounted) return;
+      if (!context.mounted) return;
       setState(() {
         _mirrorStatus[mirror] = (result == null);
         // 如果发生了迁移，把新地址标记为通过
@@ -1313,7 +1313,7 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
       });
     }
 
-    if (!mounted) return;
+    if (!context.mounted) return;
     setState(() {
       _autoTestingMirrors = false;
       // 如果发生迁移，更新当前 URL 显示为最新地址
@@ -1691,12 +1691,14 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
   Future<void> _switchBaseUrl(String newUrl) async {
     try {
       await ApiServerSwitcher.switchTo(newUrl);
+      if (!context.mounted) return;
       setState(() {
         _currentBaseUrl = newUrl;
         _testResult = null;
         _hasTested = false;
       });
       widget.onSwitched();
+      if (!context.mounted) return;
       Get.snackbar(
         '已切换',
         '当前 API 服务器：$newUrl',
@@ -1706,6 +1708,7 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
         duration: const Duration(seconds: 2),
       );
     } catch (e) {
+      if (!context.mounted) return;
       Get.snackbar(
         '切换失败',
         e.toString(),
@@ -1723,7 +1726,7 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
       _testResult = null;
     });
     final result = await ApiServerSwitcher.testConnectivity(_currentBaseUrl);
-    if (!mounted) return;
+    if (!context.mounted) return;
     // 测试可能触发跳转壳自动迁移 → 读取 ApiServerSwitcher.current 显示最新地址
     // （如：用户测 http://555973.xyz，跳转壳指向 http://555980.xyz → switchTo 已持久化）
     final newBaseUrl = ApiServerSwitcher.current;
@@ -1867,11 +1870,12 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
     for (final u in urlsToDelete) {
       _mirrorStatus.remove(u);
     }
+    if (!context.mounted) return;
     setState(() {
       _selectedForDelete.clear();
     });
 
-    if (!mounted) return;
+    if (!context.mounted) return;
     Get.snackbar(
       removed > 0 ? '删除成功' : '未删除',
       removed > 0 ? '已删除 $removed 个域名' : '没有可删除的域名',
@@ -2001,9 +2005,9 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
     final ok = await ApiServerSwitcher.removeMirror(url);
     _mirrorStatus.remove(url);
     _selectedForDelete.remove(url);
-    if (mounted) setState(() {});
+    if (context.mounted) setState(() {});
 
-    if (!mounted) return;
+    if (!context.mounted) return;
     Get.snackbar(
       ok ? '删除成功' : '删除失败',
       ok ? '已删除 $url' : '无法删除（可能正在使用）',
@@ -2069,7 +2073,7 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
     if (result == null || result.isEmpty || result == oldUrl) return;
 
     final ok = await ApiServerSwitcher.editMirror(oldUrl, result);
-    if (!mounted) return;
+    if (!context.mounted) return;
 
     // 编辑当前 baseUrl 会触发 switchTo → 同步 _currentBaseUrl
     final newCurrent = ApiServerSwitcher.current;
@@ -2077,6 +2081,7 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
       _currentBaseUrl = newCurrent;
     });
 
+    if (!context.mounted) return;
     Get.snackbar(
       ok ? '编辑成功' : '编辑失败',
       ok ? '$oldUrl → $result' : '新地址已存在或无效',
@@ -2147,9 +2152,14 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
     if (result == null || result.isEmpty) return;
 
     final ok = await ApiServerSwitcher.addMirror(result);
-    if (!mounted) return;
+    // 用 context.mounted（检查 element 是否 active）而非 State.mounted
+    // （仅检查 _element != null），避免 sheet 关闭动画期间 element 已
+    // deactivate 但 mounted 仍为 true，导致 setState 触发
+    // 'dependents.isEmpty' 断言失败。
+    if (!context.mounted) return;
     setState(() {}); // 刷新镜像列表
 
+    if (!context.mounted) return;
     Get.snackbar(
       ok ? '添加成功' : '添加失败',
       ok ? '已添加：$result' : '该域名已存在或无效',
