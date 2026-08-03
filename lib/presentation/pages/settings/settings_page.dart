@@ -1263,6 +1263,19 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
   /// 当前生效的 baseUrl 不允许被选中（chip 上 checkbox 禁用）。
   final Set<String> _selectedForDelete = <String>{};
 
+  /// 延迟到下一帧执行 setState。
+  ///
+  /// dialog pop 时 TextField 的键盘收起会导致 MediaQuery.viewInsets 变化，
+  /// 若同一帧内 setState 触发 rebuild，InheritedElement 的 dependents
+  /// 清理时序冲突 → 'dependents.isEmpty' 断言失败。
+  /// 用 addPostFrameCallback 延迟到下一帧，让 widget tree 稳定后再 rebuild。
+  void _setStateNextFrame(VoidCallback fn) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!context.mounted) return;
+      setState(fn);
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -1692,7 +1705,7 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
     try {
       await ApiServerSwitcher.switchTo(newUrl);
       if (!context.mounted) return;
-      setState(() {
+      _setStateNextFrame(() {
         _currentBaseUrl = newUrl;
         _testResult = null;
         _hasTested = false;
@@ -1871,7 +1884,7 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
       _mirrorStatus.remove(u);
     }
     if (!context.mounted) return;
-    setState(() {
+    _setStateNextFrame(() {
       _selectedForDelete.clear();
     });
 
@@ -2005,7 +2018,7 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
     final ok = await ApiServerSwitcher.removeMirror(url);
     _mirrorStatus.remove(url);
     _selectedForDelete.remove(url);
-    if (context.mounted) setState(() {});
+    if (context.mounted) _setStateNextFrame(() {});
 
     if (!context.mounted) return;
     Get.snackbar(
@@ -2077,7 +2090,7 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
 
     // 编辑当前 baseUrl 会触发 switchTo → 同步 _currentBaseUrl
     final newCurrent = ApiServerSwitcher.current;
-    setState(() {
+    _setStateNextFrame(() {
       _currentBaseUrl = newCurrent;
     });
 
@@ -2152,13 +2165,9 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
     if (result == null || result.isEmpty) return;
 
     final ok = await ApiServerSwitcher.addMirror(result);
-    // 用 context.mounted（检查 element 是否 active）而非 State.mounted
-    // （仅检查 _element != null），避免 sheet 关闭动画期间 element 已
-    // deactivate 但 mounted 仍为 true，导致 setState 触发
-    // 'dependents.isEmpty' 断言失败。
-    if (!context.mounted) return;
-    setState(() {}); // 刷新镜像列表
-
+    // 延迟到下一帧刷新，避免 dialog pop 键盘收起 + setState 同帧触发
+    // 'dependents.isEmpty' 断言
+    _setStateNextFrame(() {});
     if (!context.mounted) return;
     Get.snackbar(
       ok ? '添加成功' : '添加失败',

@@ -263,6 +263,20 @@ jobs:
 
           本次为强制更新，请立即更新到新版本后使用。
 
+          ### Bug 修复
+
+          #### 修复添加域名时闪退（dependents.isEmpty）
+          设置页 → API 服务器 → 管理模式 → 添加域名 时 App 闪退。
+
+          **根因**：添加域名的对话框（含输入框 + 自动聚焦键盘）关闭时，
+          键盘收起导致 MediaQuery 变化，若同一帧内 setState 触发 rebuild，
+          InheritedElement 的 dependents 清理时序冲突，触发
+          'dependents.isEmpty' 断言失败。
+
+          **修复**：所有镜像管理操作（添加 / 编辑 / 删除 / 切换）的
+          setState 延迟到下一帧执行（addPostFrameCallback），让 widget tree
+          完全稳定后再 rebuild。
+
           ### 新功能
 
           #### 域名管理：支持编辑 / 删除 / 添加
