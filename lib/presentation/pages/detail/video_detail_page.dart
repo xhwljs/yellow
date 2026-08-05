@@ -38,7 +38,14 @@ import 'package:yellow_depot/presentation/widgets/video_card.dart';
 /// 下方用 SliverFillRemaining 居中显示一个轻量加载动画。详情加载完成后
 /// 平滑切换为详情内容，避免页面跳变。
 class VideoDetailPage extends GetView<VideoDetailController> {
-  const VideoDetailPage({super.key, super.tag});
+  const VideoDetailPage({super.key, this.tag});
+
+  /// GetX controller tag，用于区分相关推荐的多个详情页实例。
+  /// GetView 4.6.6 的构造函数只有 key 参数，tag 是 final 属性，
+  /// 通过字段覆盖 GetView 的 tag getter，controller 会用
+  /// `Get.find<VideoDetailController>(tag: tag)` 取到对应实例。
+  @override
+  final String? tag;
 
   @override
   Widget build(BuildContext context) {
@@ -445,9 +452,10 @@ class VideoDetailPage extends GetView<VideoDetailController> {
   /// 同名路由 `/detail` 会复用当前页的 controller 实例 → 新页显示旧数据。
   ///
   /// **方案**：用 `Get.to` + `BindingsBuilder`，以 [v.id] 作为 `tag` 注册
-  /// 独立的 controller 实例。`VideoDetailPage` 是 `GetView`，构造时传
-  /// `tag: v.id`，`controller` getter 会用 `Get.find(tag: v.id)` 取到
-  /// 对应实例。每个详情页的 controller 独立，返回上一个详情页时数据正确。
+  /// 独立的 controller 实例。`GetView` 4.6.6 的构造函数只有 key 参数，
+  /// `tag` 是 final 属性（getter），子类用 `@override final String? tag`
+  /// 字段覆盖，`controller` getter 会用 `Get.find(tag: tag)` 取到对应实例。
+  /// 每个详情页的 controller 独立，返回上一个详情页时数据正确。
   /// 路由 pop 时 GetX 自动清理对应 tag 的 controller（`permanent: false`）。
   ///
   /// 列表页/搜索页首次进入详情页仍走 `Get.toNamed(AppPages.detail, ...)`
@@ -469,8 +477,6 @@ class VideoDetailPage extends GetView<VideoDetailController> {
           tag: v.id,
         );
       }),
-      transition: Transition.downToUp,
-      transitionDuration: const Duration(milliseconds: 250),
     );
   }
 }
