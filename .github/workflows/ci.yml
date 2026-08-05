@@ -277,6 +277,14 @@ jobs:
           setState 延迟到下一帧执行（addPostFrameCallback），让 widget tree
           完全稳定后再 rebuild。
 
+          ### 优化
+
+          #### 相关推荐显示真实播放量 / 收藏数 / 更新时间
+          播放页底部的"相关推荐"之前因解析逻辑缺失，播放量 / 收藏数 /
+          更新时间全部显示为空。现已根据真实页面结构从
+          `.stui-vodlist__detail .sub` 提取 fa-eye（播放量）、
+          fa-heart（收藏数）和 MM-DD 日期，相关推荐卡片显示完整数据。
+
           ### 新功能
 
           #### 域名管理：支持编辑 / 删除 / 添加

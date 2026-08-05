@@ -306,11 +306,36 @@ class VideoDetailParser {
   /// 解析相关推荐视频列表
   ///
   /// 只取 href 含 `/v5/` 的（过滤广告）。
+  ///
+  /// 2026-08-02 优化：根据真实播放页 HTML 源码，相关推荐项的
+  /// `.stui-vodlist__detail p.sub` 实际包含播放量（fa-eye）、
+  /// 收藏数（fa-heart）和更新时间（MM-DD）。之前硬编码为 0/0/''
+  /// 是基于错误假设，现在复用列表页 parser 同款解析逻辑提取真实数据，
+  /// 让相关推荐卡片能显示真实播放量 / 收藏数 / 更新时间。
+  ///
+  /// 真实 HTML 结构（来自 hsck.tv 播放页）：
+  /// ```html
+  /// <div class="stui-vodlist__box">
+  ///   <a class="stui-vodlist__thumb" href="/v5/8802-1-1.html"
+  ///      data-original="https://...jpg">
+  ///     <span class="pic-text text-right">31:05</span>
+  ///   </a>
+  ///   <div class="stui-vodlist__detail">
+  ///     <h4 class="title"><a href="/v5/8802-1-1.html">标题</a></h4>
+  ///     <p class="sub">
+  ///       <span class="number pull-right"><i class="fa fa-heart"></i> 946 </span>
+  ///       <span class="pull-right"><i class="fa fa-eye"></i> 1817286 </span>
+  ///       06-11
+  ///     </p>
+  ///   </div>
+  /// </div>
+  /// ```
   static List<Video> _parseRelatedVideos(dom.Document doc) {
     final items = doc.querySelectorAll('.stui-vodlist__box');
     return items
         .map((element) {
-          // 优先取指向 /v5/ 的 a 标签，降级到旧路径 /voddetail/
+          // 优先取指向 /v5/ 的 a 标签（真实视频），降级到旧路径 /voddetail/
+          // 外站广告的 href 是 https://xxx.com，会被 /v5/ 过滤掉
           final link = element.querySelector('a[href*="/v5/"]') ??
               element.querySelector('a[href*="/voddetail/"]');
           if (link == null) return null;
@@ -321,33 +346,84 @@ class VideoDetailParser {
             return null;
           }
 
+          // 封面：优先 a[data-original]，降级 img[data-original] / img[src]
           final coverUrl = link.attributes['data-original'] ??
               element.querySelector('img')?.attributes['data-original'] ??
               element.querySelector('img')?.attributes['src'] ??
               '';
 
+          // 标题：优先 .stui-vodlist__detail h4 a，降级 a[title] / a.text
           final detailEl = element.querySelector('.stui-vodlist__detail');
           final title = detailEl?.querySelector('h4 a')?.text.trim() ??
               link.attributes['title']?.trim() ??
               link.text.trim();
 
+          // 时长在 a 内的 .pic-text
           final picText = link.querySelector('.pic-text') ??
               element.querySelector('.pic-text');
           final duration = picText?.text.trim() ?? '';
+
+          // 播放量 / 收藏数 / 更新时间（在 .stui-vodlist__detail .sub 内）
+          // 复用列表页 parser 同款逻辑，按 fa 图标 class 区分字段
+          // 注意：不能按数字出现顺序解析（HTML 中 heart 在 eye 前，会搞反）
+          final subEl = detailEl?.querySelector('.sub');
+          final playCount = _extractNumberFromSub(subEl, 'fa-eye');
+          final likeCount = _extractNumberFromSub(subEl, 'fa-heart');
+          final updateTime = _extractUpdateTimeFromSub(subEl);
 
           return Video(
             id: id,
             title: title,
             coverUrl: coverUrl,
             duration: duration,
-            updateTime: '',
-            playCount: 0,
-            likeCount: 0,
+            updateTime: updateTime,
+            playCount: playCount,
+            likeCount: likeCount,
             categoryId: 0,
           );
         })
         .whereType<Video>()
         .toList();
+  }
+
+  /// 从 `.sub` 元素中提取带指定 fa 图标的数字
+  ///
+  /// HTML 结构：`<span class="pull-right"><i class="fa fa-eye"></i> 61753 </span>`
+  /// → 提取 61753
+  ///
+  /// 必须按 fa 图标 class 区分字段（fa-eye=播放量，fa-heart=收藏数），
+  /// 不能按数字出现顺序解析，因为 HTML 中 heart span 在 eye span 之前。
+  static int _extractNumberFromSub(dom.Element? subEl, String faClass) {
+    if (subEl == null) return 0;
+    try {
+      // 匹配带指定 fa 图标的 span（class 含 pull-right 或 number）
+      final spans = subEl.querySelectorAll('span.pull-right, span.number');
+      for (final span in spans) {
+        final icon = span.querySelector('i.fa.$faClass');
+        if (icon != null) {
+          // 去掉所有非数字字符（含 &nbsp;、空格、逗号）
+          final text = span.text.replaceAll(RegExp(r'[^\d]'), '');
+          return int.tryParse(text) ?? 0;
+        }
+      }
+    } catch (_) {}
+    return 0;
+  }
+
+  /// 从 `.sub` 元素提取更新时间（MM-DD 或 YYYY-MM-DD）
+  ///
+  /// HTML 结构：`<p class="sub">...<span>...</span>06-11</p>`
+  /// `.sub` 尾部文本通常是 MM-DD 格式的更新时间。
+  static String _extractUpdateTimeFromSub(dom.Element? subEl) {
+    if (subEl == null) return '';
+    try {
+      final text = subEl.text;
+      // 匹配 YYYY-MM-DD 或 MM-DD
+      final match =
+          RegExp(r'(\d{4}-\d{1,2}-\d{1,2}|\d{1,2}-\d{1,2})').firstMatch(text);
+      return match?.group(1) ?? '';
+    } catch (_) {}
+    return '';
   }
 
   /// 提取 videoId（支持 `/v5/{aid}-{sid}-{nid}.html` 与旧 `/voddetail/{id}.html`）
