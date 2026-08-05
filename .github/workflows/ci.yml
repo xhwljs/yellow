@@ -285,6 +285,18 @@ jobs:
           `.stui-vodlist__detail .sub` 提取 fa-eye（播放量）、
           fa-heart（收藏数）和 MM-DD 日期，相关推荐卡片显示完整数据。
 
+          #### 修复点击相关推荐无法跳转播放
+          播放页点击底部"相关推荐"的视频卡片没有任何反应。
+
+          **根因**：GetX 4.6.6 默认 `preventDuplicates: true`，当前已在
+          `/detail` 路由，`Get.toNamed('/detail')` 同名路由被去重拦截 → 无跳转。
+          即便跳过去，`VideoDetailBinding` 用 `Get.lazyPut` 按路由名注册
+          controller，同名路由会复用当前页的 controller 实例 → 新页显示旧数据。
+
+          **修复**：相关推荐点击改用 `Get.to` + `BindingsBuilder`，以 videoId
+          作为 `tag` 注册独立的 controller 实例。每个详情页的 controller 独立，
+          返回上一个详情页时数据正确，路由 pop 时自动清理对应 controller。
+
           ### 新功能
 
           #### 域名管理：支持编辑 / 删除 / 添加

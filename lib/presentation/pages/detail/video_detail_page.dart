@@ -4,10 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:yellow_depot/core/player/url_decryptor.dart';
 import 'package:yellow_depot/core/theme/app_theme.dart';
 import 'package:yellow_depot/core/theme/design_tokens.dart';
 import 'package:yellow_depot/core/theme/theme_presets.dart';
+import 'package:yellow_depot/data/models/video.dart';
 import 'package:yellow_depot/data/models/video_detail.dart';
+import 'package:yellow_depot/data/repositories/favorite_repository.dart';
+import 'package:yellow_depot/data/repositories/history_repository.dart';
+import 'package:yellow_depot/data/repositories/video_repository.dart';
 import 'package:yellow_depot/presentation/controllers/video_detail_controller.dart';
 import 'package:yellow_depot/presentation/routes/app_pages.dart';
 import 'package:yellow_depot/presentation/widgets/video_card.dart';
@@ -33,7 +38,7 @@ import 'package:yellow_depot/presentation/widgets/video_card.dart';
 /// 下方用 SliverFillRemaining 居中显示一个轻量加载动画。详情加载完成后
 /// 平滑切换为详情内容，避免页面跳变。
 class VideoDetailPage extends GetView<VideoDetailController> {
-  const VideoDetailPage({super.key});
+  const VideoDetailPage({super.key, super.tag});
 
   @override
   Widget build(BuildContext context) {
@@ -421,20 +426,51 @@ class VideoDetailPage extends GetView<VideoDetailController> {
                 width: 160,
                 child: VideoCard(
                   video: v,
-                  onTap: () => Get.toNamed(
-                    AppPages.detail,
-                    arguments: {
-                      'videoId': v.id,
-                      'coverUrl': v.coverUrl,
-                      'title': v.title,
-                    },
-                  ),
+                  onTap: () => _navigateToRelated(v),
                 ),
               );
             },
           ),
         ),
       ],
+    );
+  }
+
+  /// 跳转到相关推荐视频的详情页。
+  ///
+  /// **为什么不用 `Get.toNamed(AppPages.detail, ...)`**：
+  /// GetX 4.6.6 默认 `preventDuplicates: true`，当前已在 `/detail` 路由，
+  /// `toNamed` 同名路由会被去重拦截 → 无跳转。即便设 `preventDuplicates: false`
+  /// 跳过去，`VideoDetailBinding` 用 `Get.lazyPut` 按路由名注册 controller，
+  /// 同名路由 `/detail` 会复用当前页的 controller 实例 → 新页显示旧数据。
+  ///
+  /// **方案**：用 `Get.to` + `BindingsBuilder`，以 [v.id] 作为 `tag` 注册
+  /// 独立的 controller 实例。`VideoDetailPage` 是 `GetView`，构造时传
+  /// `tag: v.id`，`controller` getter 会用 `Get.find(tag: v.id)` 取到
+  /// 对应实例。每个详情页的 controller 独立，返回上一个详情页时数据正确。
+  /// 路由 pop 时 GetX 自动清理对应 tag 的 controller（`permanent: false`）。
+  ///
+  /// 列表页/搜索页首次进入详情页仍走 `Get.toNamed(AppPages.detail, ...)`
+  /// （走 GetPage + VideoDetailBinding，无 tag），两种入口互不冲突。
+  void _navigateToRelated(Video v) {
+    Get.to(
+      () => VideoDetailPage(tag: v.id),
+      binding: BindingsBuilder(() {
+        Get.lazyPut<VideoDetailController>(
+          () => VideoDetailController(
+            Get.find<VideoRepository>(),
+            Get.find<FavoriteRepository>(),
+            Get.find<HistoryRepository>(),
+            Get.find<UrlDecryptor>(),
+            videoId: v.id,
+            initialCoverUrl: v.coverUrl,
+            initialTitle: v.title,
+          ),
+          tag: v.id,
+        );
+      }),
+      transition: Transition.downToUp,
+      transitionDuration: const Duration(milliseconds: 250),
     );
   }
 }
