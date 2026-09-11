@@ -265,6 +265,22 @@ jobs:
 
           ### Bug 修复
 
+          #### 修复收藏 / 历史封面图加载失败（HTTPS 证书）
+          收藏列表 / 历史记录 / 视频卡片的封面图无法加载，但浏览器
+          直接访问图片链接能正常打开（仅提示证书问题）。
+
+          **根因**：封面图通过 cached_network_image 加载，它默认使用
+          Flutter 标准 HttpClient（不走 Dio），对 HTTPS 证书严格校验。
+          源站图片 CDN 常存在自签名 / 过期 / 链路不完整等证书问题，
+          浏览器允许"接受风险继续访问"，但 Flutter HttpClient 默认
+          拒绝 → 图片加载失败。DioClient 已通过
+          `validateCertificate: (cert, host, port) => true` 绕过校验，
+          但那只对 Dio 实例有效，对图片加载无效。
+
+          **修复**：在 main() 设置全局 `HttpOverrides.global`，让所有
+          HttpClient（含 cached_network_image 的图片加载）都绕过证书校验，
+          与 Dio 行为保持一致。
+
           #### 修复添加域名时闪退（dependents.isEmpty）
           设置页 → API 服务器 → 管理模式 → 添加域名 时 App 闪退。
 
