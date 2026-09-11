@@ -263,70 +263,23 @@ jobs:
 
           本次为强制更新，请立即更新到新版本后使用。
 
-          ### Bug 修复
-
-          #### 修复收藏 / 历史封面图加载失败（HTTPS 证书）
-          收藏列表 / 历史记录 / 视频卡片的封面图无法加载，但浏览器
-          直接访问图片链接能正常打开（仅提示证书问题）。
-
-          **根因**：封面图通过 cached_network_image 加载，它默认使用
-          Flutter 标准 HttpClient（不走 Dio），对 HTTPS 证书严格校验。
-          源站图片 CDN 常存在自签名 / 过期 / 链路不完整等证书问题，
-          浏览器允许"接受风险继续访问"，但 Flutter HttpClient 默认
-          拒绝 → 图片加载失败。DioClient 已通过
-          `validateCertificate: (cert, host, port) => true` 绕过校验，
-          但那只对 Dio 实例有效，对图片加载无效。
-
-          **修复**：在 main() 设置全局 `HttpOverrides.global`，让所有
-          HttpClient（含 cached_network_image 的图片加载）都绕过证书校验，
-          与 Dio 行为保持一致。
-
-          #### 修复添加域名时闪退（dependents.isEmpty）
-          设置页 → API 服务器 → 管理模式 → 添加域名 时 App 闪退。
-
-          **根因**：添加域名的对话框（含输入框 + 自动聚焦键盘）关闭时，
-          键盘收起导致 MediaQuery 变化，若同一帧内 setState 触发 rebuild，
-          InheritedElement 的 dependents 清理时序冲突，触发
-          'dependents.isEmpty' 断言失败。
-
-          **修复**：所有镜像管理操作（添加 / 编辑 / 删除 / 切换）的
-          setState 延迟到下一帧执行（addPostFrameCallback），让 widget tree
-          完全稳定后再 rebuild。
-
-          ### 优化
-
-          #### 相关推荐显示真实播放量 / 收藏数 / 更新时间
-          播放页底部的"相关推荐"之前因解析逻辑缺失，播放量 / 收藏数 /
-          更新时间全部显示为空。现已根据真实页面结构从
-          `.stui-vodlist__detail .sub` 提取 fa-eye（播放量）、
-          fa-heart（收藏数）和 MM-DD 日期，相关推荐卡片显示完整数据。
-
-          #### 修复点击相关推荐无法跳转播放
-          播放页点击底部"相关推荐"的视频卡片没有任何反应。
-
-          **根因**：GetX 4.6.6 默认 `preventDuplicates: true`，当前已在
-          `/detail` 路由，`Get.toNamed('/detail')` 同名路由被去重拦截 → 无跳转。
-          即便跳过去，`VideoDetailBinding` 用 `Get.lazyPut` 按路由名注册
-          controller，同名路由会复用当前页的 controller 实例 → 新页显示旧数据。
-
-          **修复**：相关推荐点击改用 `Get.to` + `BindingsBuilder`，以 videoId
-          作为 `tag` 注册独立的 controller 实例。每个详情页的 controller 独立，
-          返回上一个详情页时数据正确，路由 pop 时自动清理对应 controller。
-
           ### 新功能
 
-          #### 域名管理：支持编辑 / 删除 / 添加
-          设置页 → API 服务器 → 镜像列表 标题旁新增"管理"按钮：
-          - **多选删除**：进入管理模式后，每个域名出现 checkbox，可勾选多个
-            一次性删除（含全选 / 取消全选）；点击"删除选中 (N)"二次确认
-          - **单个编辑**：长按任意域名 → 弹底部菜单 → 编辑 / 删除；
-            编辑当前生效的域名会自动切换 baseUrl
-          - **添加域名**：管理模式下"添加域名"按钮录入新地址（不切换 baseUrl）
-          - **安全保护**：当前生效的域名不允许删除（防止 App 失联），
-            但可以编辑（编辑会同步切换）
-          - 所有删除 / 编辑操作均持久化到 SharedPreferences
+          #### 启动时通过根域名自动解析最新源站地址
 
-          适用场景：源站域名经常换，过期域名长期堆积，用户可手动清理。
+          源站域名因反爬频繁更换，运营方维护一个永久不变的根域名
+          `http://68ck.net`，访问它会返回 302 Location 指向当前最新
+          真实源站地址。
+
+          **本次更新**：App 每次启动时优先访问根域名 `http://68ck.net`
+          读取 302 Location，自动获取最新源站地址并切换，无需维护死链
+          列表。
+
+          - 成功解析到最新地址后，镜像列表自动精简为
+            `[根域名, 最新地址]`，避免过期域名长期堆积
+          - 切换逻辑复用现有域名管理机制（重建 Dio + 清缓存 + 刷新首页）
+          - 根域名解析失败时自动回退到旧的跳转壳健康检查逻辑，
+            不影响现有功能
 
           NOTES_EOF
           # 移除 heredoc 导致的每行前导空格（保持 markdown 结构）
