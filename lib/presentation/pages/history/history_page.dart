@@ -15,13 +15,33 @@ import 'package:yellow_depot/presentation/widgets/video_card.dart';
 ///
 /// 严格遵循 design-system/videohub/MASTER.md：
 /// - AppBar "播放历史" + 右侧 "清空" 按钮（弹确认对话框）
-/// - 列表 ListView.separated
+/// - 列表 ListView.separated，按观看日期分组（今天 / 昨天 / 前天 / 具体日期）
+/// - 分组头：日期标签 + 条数 + 收拢/展开箭头（点击整行切换）
 /// - 每条：左侧 80x60 圆角 8 封面 + 右侧标题/时间/进度条
 /// - 进度条显示 PlayHistory.progress
 /// - Dismissible 滑动删除单条
 /// - 空状态 EmptyView
-class HistoryPage extends GetView<HistoryController> {
+class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
+
+  @override
+  State<HistoryPage> createState() => _HistoryPageState();
+}
+
+class _HistoryPageState extends State<HistoryPage> {
+  late final HistoryController controller;
+
+  /// 已收拢的日期分组（dateKey 形如 "2026-09-16"）
+  ///
+  /// 默认全部分组展开；点击分组头切换收拢 / 展开。
+  /// 状态在页面存续期内保持（数据刷新 / 删除单条 / 重新加载不重置）。
+  final Set<String> _collapsedDates = <String>{};
+
+  @override
+  void initState() {
+    super.initState();
+    controller = Get.find<HistoryController>();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -73,13 +93,27 @@ class HistoryPage extends GetView<HistoryController> {
             subtitle: '看完的视频会在这里继续',
           );
         }
+        // 按观看日期分组（histories 已按 updatedAt 倒序，分组天然从新到旧）
+        final groups = _buildGroups(controller.histories);
+        // 扁平行列表：分组头 + 未收拢分组的条目（保持 builder 惰性构建）
+        final rows = <_HistoryRow>[];
+        for (final g in groups) {
+          rows.add(_HistoryRow.header(g));
+          if (!_collapsedDates.contains(g.key)) {
+            rows.addAll(g.items.map(_HistoryRow.item));
+          }
+        }
         return ListView.separated(
           padding: const EdgeInsets.all(DesignTokens.spaceMd),
-          itemCount: controller.histories.length,
+          itemCount: rows.length,
           separatorBuilder: (_, __) =>
               const SizedBox(height: DesignTokens.spaceSm),
-          itemBuilder: (_, i) {
-            final h = controller.histories[i];
+          itemBuilder: (context, i) {
+            final row = rows[i];
+            if (row.isHeader) {
+              return _buildGroupHeader(row.group!, colors);
+            }
+            final h = row.history!;
             return Dismissible(
               key: ValueKey('history_${h.videoId}'),
               direction: DismissDirection.startToEnd,
@@ -185,6 +219,122 @@ class HistoryPage extends GetView<HistoryController> {
         ],
       ),
     );
+  }
+
+  /// 按观看日期（天）分组
+  ///
+  /// [histories] 已按 updatedAt 倒序（DAO ORDER BY updatedAt DESC），
+  /// 因此分组出现顺序天然从新到旧，组内条目保持倒序。
+  /// 同一天的多条记录归入同一组，组随数据变化自动增删。
+  List<_DateGroup> _buildGroups(List<PlayHistory> histories) {
+    final now = DateTime.now();
+    final groups = <_DateGroup>[];
+    final groupIndexByKey = <String, int>{};
+    for (final h in histories) {
+      final dt = _normalizeTime(h.updatedAt);
+      final date = DateTime(dt.year, dt.month, dt.day);
+      final key = '${date.year.toString().padLeft(4, '0')}-'
+          '${date.month.toString().padLeft(2, '0')}-'
+          '${date.day.toString().padLeft(2, '0')}';
+      final idx = groupIndexByKey[key];
+      if (idx == null) {
+        groupIndexByKey[key] = groups.length;
+        groups.add(_DateGroup(key, _dateLabel(date, now)));
+      } else {
+        groups[idx].items.add(h);
+      }
+    }
+    return groups;
+  }
+
+  /// 分组头：主题色竖条 + 日期标签 + 条数 + 收拢/展开箭头
+  ///
+  /// 点击整行切换收拢状态，箭头随状态旋转 -90°（收拢时指向右侧）。
+  /// 背景与页面一致（colors.background），与卡片条目形成层次区分。
+  Widget _buildGroupHeader(_DateGroup group, ThemeColors colors) {
+    final collapsed = _collapsedDates.contains(group.key);
+    return Padding(
+      padding: const EdgeInsets.only(top: DesignTokens.spaceSm),
+      child: Material(
+        color: colors.background,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(DesignTokens.radiusMd),
+          onTap: () => setState(() {
+            if (collapsed) {
+              _collapsedDates.remove(group.key);
+            } else {
+              _collapsedDates.add(group.key);
+            }
+          }),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: DesignTokens.spaceXs,
+              vertical: DesignTokens.spaceXs,
+            ),
+            child: Row(
+              children: [
+                // 主题色竖条装饰
+                Container(
+                  width: 3,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: colors.primary,
+                    borderRadius: BorderRadius.circular(
+                      DesignTokens.radiusPill,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: DesignTokens.spaceSm),
+                Text(
+                  group.label,
+                  style: TextStyle(
+                    fontSize: DesignTokens.textBody,
+                    fontWeight: FontWeight.w600,
+                    color: colors.onBackground,
+                  ),
+                ),
+                const SizedBox(width: DesignTokens.spaceSm),
+                Text(
+                  '${group.items.length} 条',
+                  style: TextStyle(
+                    fontSize: DesignTokens.textCaption,
+                    color: colors.onSurfaceMuted,
+                  ),
+                ),
+                const Spacer(),
+                AnimatedRotation(
+                  turns: collapsed ? -0.25 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: Icon(
+                    PhosphorIconsRegular.caretDown,
+                    size: 16,
+                    color: colors.onSurfaceMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 时间戳转 DateTime（兼容秒级 / 毫秒级，与条目 _formatTime 一致）
+  DateTime _normalizeTime(int timestamp) {
+    if (timestamp <= 0) return DateTime.fromMillisecondsSinceEpoch(0);
+    final ms = timestamp > 1000000000000 ? timestamp : timestamp * 1000;
+    return DateTime.fromMillisecondsSinceEpoch(ms);
+  }
+
+  /// 日期标签：今天 / 昨天 / 前天 / M月d日（往年带年份）
+  String _dateLabel(DateTime date, DateTime now) {
+    final today = DateTime(now.year, now.month, now.day);
+    final diffDays = today.difference(date).inDays;
+    if (diffDays == 0) return '今天';
+    if (diffDays == 1) return '昨天';
+    if (diffDays == 2) return '前天';
+    if (date.year == now.year) return '${date.month}月${date.day}日';
+    return '${date.year}年${date.month}月${date.day}日';
   }
 }
 
@@ -458,4 +608,33 @@ class _HistoryItem extends StatelessWidget {
       ],
     );
   }
+}
+
+/// 按观看日期（天）划分的历史分组
+class _DateGroup {
+  /// 唯一标识（yyyy-MM-dd，用作收拢状态 [_HistoryPageState._collapsedDates] 的 key）
+  final String key;
+
+  /// 展示标签（今天 / 昨天 / 前天 / 9月10日 / 2025年12月31日）
+  final String label;
+
+  /// 组内条目（保持 updatedAt 倒序）
+  final List<PlayHistory> items = <PlayHistory>[];
+
+  _DateGroup(this.key, this.label);
+}
+
+/// 历史列表行模型：分组头 / 历史条目
+///
+/// 把分组头与条目扁平化为同一列表，让 ListView.builder 保持惰性构建
+/// （分组收拢时组内条目不进入 rows，自然不渲染）。
+class _HistoryRow {
+  final _DateGroup? group;
+  final PlayHistory? history;
+
+  const _HistoryRow.header(this.group) : history = null;
+
+  const _HistoryRow.item(this.history) : group = null;
+
+  bool get isHeader => group != null;
 }

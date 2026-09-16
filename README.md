@@ -150,7 +150,7 @@ lib/
     │   ├── search/                    # 搜索页 + 搜索历史
     │   ├── detail/                    # 详情：SliverAppBar 内嵌播放 + 相关推荐
     │   ├── favorites/                 # 收藏列表（GridView + VideoCard）
-    │   ├── history/                   # 历史记录（ListView + 缩略图）
+    │   ├── history/                   # 历史记录（按日期分组 + 收拢/展开）
     │   └── settings/                  # 设置：主题 / API 服务器 / 数据 / 关于
     ├── routes/app_pages.dart      # GetPage 路由表
     └── widgets/
@@ -357,7 +357,7 @@ http://68ck.net/  --200+JS壳-->  https://2626.space:8899/?u=http://68ck.net/&p=
 | Search | `/search` | 搜索 + 搜索历史 |
 | VideoDetail | `/detail` | SliverAppBar 内嵌播放 + 相关推荐 + 收藏 |
 | Favorites | - | 收藏列表（GridView + VideoCard） |
-| History | - | 历史记录（ListView + 缩略图 + 播放进度） |
+| History | - | 历史记录（按观看日期分组收拢/展开 + 缩略图 + 播放进度） |
 | Settings | - | 主题色 / API 服务器 / 域名管理 / 数据导入导出 / 清缓存 / 关于 |
 
 **详情页相关推荐跳转**：用 `Get.to` + `BindingsBuilder` + `tag: videoId` 注册独立 controller 实例，避免同名路由 `/detail` 复用旧 controller 导致显示旧数据。
