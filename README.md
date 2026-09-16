@@ -235,6 +235,13 @@ main()
 
 启动时 Splash 页在检查更新完成后调用 `ApiServerSwitcher.fetchLatestDomain`（可见 + 阻塞式）：优先通过根域名 `http://68ck.net` 解析最新地址，失败则回退到跳转壳健康检查。获取成功时镜像列表精简为 `[根域名, 新域名]` 并按需切换；获取失败时启动页提示失败后正常进入 App，不影响后续功能。详见 [splash_page.dart](lib/presentation/pages/splash/splash_page.dart) 与 [api_server_switcher.dart](lib/core/network/api_server_switcher.dart)。
 
+**根域名解析链路**（实测 2026-09-16）：根域名 `68ck.net` 本身是 JS 跳转壳（200 + hao123/strU HTML），`resolveLatestFromRoot` 复用跳转壳迁移链路完成解析，同时兼容根域名直接返回 3xx Location 的形态：
+
+```
+http://68ck.net/  --200+JS壳-->  https://2626.space:8899/?u=http://68ck.net/&p=/
+                                 --302 Location-->  https://222478.xyz（最新真实源站）
+```
+
 **镜像列表管理**（设置页 → API 服务器 → 管理模式）：
 - 多选删除 / 全选 / 取消全选（含二次确认）
 - 长按单条 → 编辑 / 删除（当前生效域名不可删但可编辑，编辑会同步切换 baseUrl）

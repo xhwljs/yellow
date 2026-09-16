@@ -15,13 +15,16 @@ import 'package:yellow_depot/presentation/controllers/home_controller.dart';
 /// 源站域名可能因反爬频繁更换（如 555973.xyz → 555980.xyz ...），
 /// 提供运行时切换 + 持久化 + Dio 重建 + 数据刷新通知能力，避免每次换域名都要发版。
 ///
-/// **根域名解析机制**（2026-08-05）：
-/// 运营方维护一个永久不变的根域名 `http://68ck.net`，访问它会返回
-/// 302 Location 指向当前最新的真实源站地址。每次源站被封运营方就
-/// 更新此 302 的 Location，相当于"动态域名解析"。
+/// **根域名解析机制**（2026-08-05，2026-09-16 修正）：
+/// 运营方维护一个永久不变的根域名 `http://68ck.net`，指向当前最新的
+/// 真实源站地址。每次源站被封运营方就更新指向，相当于"动态域名解析"。
+/// 实测（2026-09-16）根域名是 JS 跳转壳：返回 200 + hao123/strU HTML，
+/// JS 构造跳转服务 URL（`https://2626.space:8899/?u=...`），跳转服务
+/// 302 Location 指向最新真实源站；[resolveLatestFromRoot] 同时兼容
+/// 根域名直接返回 3xx Location 的形态。
 ///
 /// 启动时 Splash 页在检查更新完成后调用 [fetchLatestDomain]（可见 + 阻塞式）：
-/// - 优先访问根域名拿 Location（[resolveLatestFromRoot]）
+/// - 优先通过根域名解析最新地址（[resolveLatestFromRoot]）
 /// - 成功 → 精简镜像列表为 `[rootRedirectDomain, latest]`（服务器管理只保留
 ///   根域名与新域名）并 [switchTo] 切换，返回最新域名供启动页提示
 /// - 失败 → 回退到旧的跳转壳健康检查逻辑（[testConnectivity]），
@@ -256,16 +259,23 @@ class ApiServerSwitcher {
 
   /// 通过根跳转域名解析最新真实源站地址
   ///
-  /// 访问 [rootRedirectDomain]（`http://68ck.net`），读取 302/301 响应的
-  /// `Location` header，即为运营方当前指向的最新真实源站地址。
+  /// 访问 [rootRedirectDomain]（`http://68ck.net`），解析最新真实源站地址。
+  ///
+  /// **实测（2026-09-16）根域名有两种返回形态，均需支持**：
+  /// 1. **直接 3xx**：Location header 即最新真实源站地址
+  /// 2. **200 + JS 跳转壳**（当前实际形态）：根域名本身就是 hao123/strU
+  ///    跳转壳，JS 构造跳转服务 URL（如 `https://2626.space:8899/?u=...`），
+  ///    跳转服务返回 302 Location 指向最新真实源站（如 `https://222478.xyz`）。
+  ///    此形态复用 [_tryMigrateFromRedirectShell]（模拟 JS 拼接 → 请求跳转
+  ///    服务 → 读 302 Location），与设置页镜像测试（[testConnectivity]）同链路。
   ///
   /// 返回值：
-  /// - 成功：最新真实地址（已规范化，去末尾斜杠），如 `http://555980.xyz`
-  /// - 失败：null（网络错误 / 非 3xx 重定向 / 无 Location / Location 无效）
+  /// - 成功：最新真实地址（已规范化，去末尾斜杠），如 `https://222478.xyz`
+  /// - 失败：null（网络错误 / 无 Location / Location 无效）
   ///
   /// **设计说明**：
-  /// - 用独立 Dio（`followRedirects: false`）拿原始 3xx 响应，不自动跟随
-  /// - 与 [_buildProbeDio] 不同：根域名只关心 Location，不需要拿首页 HTML
+  /// - 用独立 Dio（`followRedirects: false`）拿原始响应，不自动跟随
+  /// - 与 [_buildProbeDio] 不同：根域名只关心 Location / 跳转壳，不验证 macCMS
   /// - 失败不抛异常，返回 null，由调用方决定回退策略
   static Future<String?> resolveLatestFromRoot() async {
     final dio = Dio(
@@ -274,22 +284,44 @@ class ApiServerSwitcher {
         receiveTimeout: const Duration(seconds: 5),
         followRedirects: false, // 不自动跟随，拿原始 3xx
         validateStatus: (s) => s != null, // 接受所有状态码
+        responseType: ResponseType.plain,
         headers: {
           'User-Agent': UserAgentUtils.random(),
+          'Accept':
+              'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
         },
       ),
     );
     try {
       final resp = await dio.get<String>(rootRedirectDomain);
+
+      // 1) 根域名直接返回 3xx：Location 即最新真实地址
       final location = resp.headers.value('location');
-      if (location == null || location.isEmpty) return null;
-      final normalized = _normalizeUrl(location);
-      // 必须是 http(s) 开头的有效 URL
-      if (!normalized.startsWith('http://') &&
-          !normalized.startsWith('https://')) {
-        return null;
+      if (location != null && location.isNotEmpty) {
+        final normalized = _normalizeUrl(location);
+        // 必须是 http(s) 开头的有效 URL
+        if (normalized.startsWith('http://') ||
+            normalized.startsWith('https://')) {
+          return normalized;
+        }
       }
-      return normalized;
+
+      // 2) 根域名返回 200 + JS 跳转壳：走跳转壳迁移链路解析
+      //    （提取跳转服务 URL → 请求 → 读 302 Location）
+      final body = resp.data ?? '';
+      if (_isRedirectShell(body)) {
+        final latest =
+            await _tryMigrateFromRedirectShell(body, rootRedirectDomain);
+        if (latest != null && latest.isNotEmpty) {
+          final normalized = _normalizeUrl(latest);
+          if (normalized.startsWith('http://') ||
+              normalized.startsWith('https://')) {
+            return normalized;
+          }
+        }
+      }
+      return null;
     } catch (_) {
       return null;
     } finally {
