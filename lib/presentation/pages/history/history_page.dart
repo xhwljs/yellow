@@ -236,13 +236,15 @@ class _HistoryPageState extends State<HistoryPage> {
       final key = '${date.year.toString().padLeft(4, '0')}-'
           '${date.month.toString().padLeft(2, '0')}-'
           '${date.day.toString().padLeft(2, '0')}';
-      final idx = groupIndexByKey[key];
+      var idx = groupIndexByKey[key];
       if (idx == null) {
-        groupIndexByKey[key] = groups.length;
+        idx = groups.length;
+        groupIndexByKey[key] = idx;
         groups.add(_DateGroup(key, _dateLabel(date, now)));
-      } else {
-        groups[idx].items.add(h);
       }
+      // 创建新组时也必须加入当前记录，否则每组会漏掉第一条
+      //（单条记录的日期会显示成"0 条"空组）
+      groups[idx].items.add(h);
     }
     return groups;
   }
