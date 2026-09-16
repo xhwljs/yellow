@@ -15,7 +15,9 @@ import 'package:yellow_depot/presentation/widgets/video_card.dart';
 ///
 /// 严格遵循 design-system/videohub/MASTER.md：
 /// - AppBar "播放历史" + 右侧 "清空" 按钮（弹确认对话框）
-/// - 列表 ListView.separated，按观看日期分组（今天 / 昨天 / 前天 / 具体日期）
+/// - 列表 CustomScrollView，按观看日期分组（今天 / 昨天 / 前天 / 具体日期）
+/// - 分组头吸顶（SliverPersistentHeader pinned）：滚动后当前日期的
+///   分组头固定在列表顶部，随时可收拢 / 展开，无需回滚
 /// - 分组头：日期标签 + 条数 + 收拢/展开箭头（点击整行切换）
 /// - 每条：左侧 80x60 圆角 8 封面 + 右侧标题/时间/进度条
 /// - 进度条显示 PlayHistory.progress
@@ -95,26 +97,34 @@ class _HistoryPageState extends State<HistoryPage> {
         }
         // 按观看日期分组（histories 已按 updatedAt 倒序，分组天然从新到旧）
         final groups = _buildGroups(controller.histories);
-        // 扁平行列表：分组头 + 未收拢分组的条目（保持 builder 惰性构建）
-        final rows = <_HistoryRow>[];
-        for (final g in groups) {
-          rows.add(_HistoryRow.header(g));
-          if (!_collapsedDates.contains(g.key)) {
-            rows.addAll(g.items.map(_HistoryRow.item));
-          }
-        }
-        return ListView.separated(
-          padding: const EdgeInsets.all(DesignTokens.spaceMd),
-          itemCount: rows.length,
-          separatorBuilder: (_, __) =>
-              const SizedBox(height: DesignTokens.spaceSm),
-          itemBuilder: (context, i) {
-            final row = rows[i];
-            if (row.isHeader) {
-              return _buildGroupHeader(row.group!, colors);
-            }
-            final h = row.history!;
-            return Dismissible(
+        // 吸顶分组列表：分组头 SliverPersistentHeader(pinned) 固定，
+        // 滚动离开视口后仍贴在列表顶部（直到被下一分组头顶替），
+        // 无需回滚即可收拢 / 展开；收拢分组不渲染条目 sliver，保持惰性构建
+        return CustomScrollView(
+          slivers: [
+            for (final g in groups) ...[
+              SliverPersistentHeader(
+                pinned: true,
+                delegate: _GroupHeaderDelegate(
+                  group: g,
+                  collapsed: _collapsedDates.contains(g.key),
+                  onToggle: () => _toggleGroup(g.key),
+                  colors: colors,
+                ),
+              ),
+              if (!_collapsedDates.contains(g.key))
+                SliverList.builder(
+                  itemCount: g.items.length,
+                  itemBuilder: (context, i) {
+                    final h = g.items[i];
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        DesignTokens.spaceMd,
+                        0,
+                        DesignTokens.spaceMd,
+                        DesignTokens.spaceSm,
+                      ),
+                      child: Dismissible(
               key: ValueKey('history_${h.videoId}'),
               direction: DismissDirection.startToEnd,
               background: Container(
@@ -161,8 +171,16 @@ class _HistoryPageState extends State<HistoryPage> {
                   },
                 ),
               ),
-            );
-          },
+                      ),
+                    );
+                  },
+                ),
+            ],
+            // 列表尾部留白
+            const SliverPadding(
+              padding: EdgeInsets.only(bottom: DesignTokens.spaceMd),
+            ),
+          ],
         );
       }),
     );
@@ -249,76 +267,14 @@ class _HistoryPageState extends State<HistoryPage> {
     return groups;
   }
 
-  /// 分组头：主题色竖条 + 日期标签 + 条数 + 收拢/展开箭头
-  ///
-  /// 点击整行切换收拢状态，箭头随状态旋转 -90°（收拢时指向右侧）。
-  /// 背景与页面一致（colors.background），与卡片条目形成层次区分。
-  Widget _buildGroupHeader(_DateGroup group, ThemeColors colors) {
-    final collapsed = _collapsedDates.contains(group.key);
-    return Padding(
-      padding: const EdgeInsets.only(top: DesignTokens.spaceSm),
-      child: Material(
-        color: colors.background,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(DesignTokens.radiusMd),
-          onTap: () => setState(() {
-            if (collapsed) {
-              _collapsedDates.remove(group.key);
-            } else {
-              _collapsedDates.add(group.key);
-            }
-          }),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: DesignTokens.spaceXs,
-              vertical: DesignTokens.spaceXs,
-            ),
-            child: Row(
-              children: [
-                // 主题色竖条装饰
-                Container(
-                  width: 3,
-                  height: 14,
-                  decoration: BoxDecoration(
-                    color: colors.primary,
-                    borderRadius: BorderRadius.circular(
-                      DesignTokens.radiusPill,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: DesignTokens.spaceSm),
-                Text(
-                  group.label,
-                  style: TextStyle(
-                    fontSize: DesignTokens.textBody,
-                    fontWeight: FontWeight.w600,
-                    color: colors.onBackground,
-                  ),
-                ),
-                const SizedBox(width: DesignTokens.spaceSm),
-                Text(
-                  '${group.items.length} 条',
-                  style: TextStyle(
-                    fontSize: DesignTokens.textCaption,
-                    color: colors.onSurfaceMuted,
-                  ),
-                ),
-                const Spacer(),
-                AnimatedRotation(
-                  turns: collapsed ? -0.25 : 0,
-                  duration: const Duration(milliseconds: 200),
-                  child: Icon(
-                    PhosphorIconsRegular.caretDown,
-                    size: 16,
-                    color: colors.onSurfaceMuted,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+  /// 切换分组收拢 / 展开
+  void _toggleGroup(String dateKey) {
+    setState(() {
+      // remove 返回 false 表示原本未收拢 → 加入收拢集合
+      if (!_collapsedDates.remove(dateKey)) {
+        _collapsedDates.add(dateKey);
+      }
+    });
   }
 
   /// 时间戳转 DateTime（兼容秒级 / 毫秒级，与条目 _formatTime 一致）
@@ -626,17 +582,116 @@ class _DateGroup {
   _DateGroup(this.key, this.label);
 }
 
-/// 历史列表行模型：分组头 / 历史条目
+/// 吸顶分组头 delegate
 ///
-/// 把分组头与条目扁平化为同一列表，让 ListView.builder 保持惰性构建
-/// （分组收拢时组内条目不进入 rows，自然不渲染）。
-class _HistoryRow {
-  final _DateGroup? group;
-  final PlayHistory? history;
+/// 配合 `SliverPersistentHeader(pinned: true)` 实现吸顶：
+/// 分组头随内容滚出视口后固定在列表顶部，直到被下一分组头顶替，
+/// 用户在任意滚动位置都能直接收拢 / 展开当前日期分组。
+///
+/// 视觉：主题色竖条 + 日期标签 + 条数 + 收拢/展开箭头（点击整行切换，
+/// 箭头随状态旋转 -90°）。吸顶与后随内容重叠时（[overlapsContent]）
+/// 底部显示细分割线增强层级感。
+class _GroupHeaderDelegate extends SliverPersistentHeaderDelegate {
+  /// 分组头固定高度
+  static const double headerHeight = 40;
 
-  const _HistoryRow.header(this.group) : history = null;
+  final _DateGroup group;
 
-  const _HistoryRow.item(this.history) : group = null;
+  /// 是否收拢
+  final bool collapsed;
 
-  bool get isHeader => group != null;
+  /// 点击整行切换收拢 / 展开
+  final VoidCallback onToggle;
+
+  final ThemeColors colors;
+
+  _GroupHeaderDelegate({
+    required this.group,
+    required this.collapsed,
+    required this.onToggle,
+    required this.colors,
+  });
+
+  @override
+  double get minExtent => headerHeight;
+
+  @override
+  double get maxExtent => headerHeight;
+
+  @override
+  bool shouldRebuild(covariant _GroupHeaderDelegate oldDelegate) => true;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return Material(
+      color: colors.background,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              width: 0.5,
+              color: overlapsContent ? colors.border : Colors.transparent,
+            ),
+          ),
+        ),
+        child: InkWell(
+          onTap: onToggle,
+          child: SizedBox(
+            height: headerHeight,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: DesignTokens.spaceMd,
+              ),
+              child: Row(
+                children: [
+                  // 主题色竖条装饰
+                  Container(
+                    width: 3,
+                    height: 14,
+                    decoration: BoxDecoration(
+                      color: colors.primary,
+                      borderRadius: BorderRadius.circular(
+                        DesignTokens.radiusPill,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: DesignTokens.spaceSm),
+                  Text(
+                    group.label,
+                    style: TextStyle(
+                      fontSize: DesignTokens.textBody,
+                      fontWeight: FontWeight.w600,
+                      color: colors.onBackground,
+                    ),
+                  ),
+                  const SizedBox(width: DesignTokens.spaceSm),
+                  Text(
+                    '${group.items.length} 条',
+                    style: TextStyle(
+                      fontSize: DesignTokens.textCaption,
+                      color: colors.onSurfaceMuted,
+                    ),
+                  ),
+                  const Spacer(),
+                  AnimatedRotation(
+                    turns: collapsed ? -0.25 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(
+                      PhosphorIconsRegular.caretDown,
+                      size: 16,
+                      color: colors.onSurfaceMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
