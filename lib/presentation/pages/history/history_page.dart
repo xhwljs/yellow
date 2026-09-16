@@ -16,8 +16,9 @@ import 'package:yellow_depot/presentation/widgets/video_card.dart';
 /// 严格遵循 design-system/videohub/MASTER.md：
 /// - AppBar "播放历史" + 右侧 "清空" 按钮（弹确认对话框）
 /// - 列表 CustomScrollView，按观看日期分组（今天 / 昨天 / 前天 / 具体日期）
-/// - 分组头吸顶（SliverPersistentHeader pinned）：滚动后当前日期的
-///   分组头固定在列表顶部，随时可收拢 / 展开，无需回滚
+/// - 分组头单头悬浮吸顶（Stack + 滚动测量）：滚动后仅当前日期的
+///   分组头固定在列表顶部（iOS 通讯录式，滚过的分组不占顶部空间），
+///   随时可收拢 / 展开，无需回滚
 /// - 分组头：日期标签 + 条数 + 收拢/展开箭头（点击整行切换）
 /// - 每条：左侧 80x60 圆角 8 封面 + 右侧标题/时间/进度条
 /// - 进度条显示 PlayHistory.progress
@@ -39,15 +40,72 @@ class _HistoryPageState extends State<HistoryPage> {
   /// 状态在页面存续期内保持（数据刷新 / 删除单条 / 重新加载不重置）。
   final Set<String> _collapsedDates = <String>{};
 
+  /// 列表滚动控制器（监听滚动计算当前吸顶分组）
+  final ScrollController _scrollCtrl = ScrollController();
+
+  /// 各分组头的 GlobalKey（dateKey → key），用于测量分组头视口位置
+  final Map<String, GlobalKey> _headerKeys = <String, GlobalKey>{};
+
+  /// 当前悬浮吸顶的分组下标（null = 未吸顶，列表顶部的真实分组头可见）
+  ///
+  /// 只悬浮"当前"分组一个头：已滚过的分组不固定、不占顶部空间，
+  /// 下一分组头滚入时自然顶替悬浮头（iOS 通讯录式单头吸顶）。
+  int? _stickyIndex;
+
+  /// build 时最新的分组列表（供滚动回调测量使用）
+  List<_DateGroup> _currentGroups = const [];
+
   @override
   void initState() {
     super.initState();
     controller = Get.find<HistoryController>();
+    _scrollCtrl.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
+
+  /// 取分组头的 GlobalKey（按 dateKey 缓存，跨重建保持稳定）
+  GlobalKey _headerKeyOf(String dateKey) =>
+      _headerKeys.putIfAbsent(dateKey, GlobalKey.new);
+
+  /// 计算当前吸顶分组
+  ///
+  /// 找到最后一个"分组头顶边已滚出视口顶（y ≤ 0）"的分组，
+  /// 只悬浮这一个头；更早滚过的分组不固定，更晚的尚未到顶。
+  /// 分组头 sliver 离屏销毁（cacheExtent 之外无 context）时跳过，
+  /// 刚滚出顶部的分组头必在 cache 内，测量总是可靠。
+  void _onScroll() {
+    if (!mounted) return;
+    final groups = _currentGroups;
+    if (groups.isEmpty) {
+      if (_stickyIndex != null) setState(() => _stickyIndex = null);
+      return;
+    }
+    int? sticky;
+    for (var i = 0; i < groups.length; i++) {
+      final ctx = _headerKeys[groups[i].key]?.currentContext;
+      final box = ctx?.findRenderObject() as RenderBox?;
+      if (box == null || !box.attached) continue;
+      if (box.localToGlobal(Offset.zero).dy <= 0) {
+        sticky = i;
+      } else {
+        break; // 更靠下的分组必然未滚出，无需继续
+      }
+    }
+    if (sticky != _stickyIndex) {
+      setState(() => _stickyIndex = sticky);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final colors = AppTheme.colorsOf(context);
+    // 布局完成后校正吸顶分组（数据增删 / 收拢展开会改变分组头位置）
+    WidgetsBinding.instance.addPostFrameCallback((_) => _onScroll());
     return Scaffold(
       backgroundColor: colors.background,
       appBar: AppBar(
@@ -97,23 +155,28 @@ class _HistoryPageState extends State<HistoryPage> {
         }
         // 按观看日期分组（histories 已按 updatedAt 倒序，分组天然从新到旧）
         final groups = _buildGroups(controller.histories);
-        // 吸顶分组列表：分组头 SliverPersistentHeader(pinned) 固定，
-        // 滚动离开视口后仍贴在列表顶部（直到被下一分组头顶替），
-        // 无需回滚即可收拢 / 展开；收拢分组不渲染条目 sliver，保持惰性构建
-        return CustomScrollView(
-          slivers: [
-            for (final g in groups) ...[
-              SliverPersistentHeader(
-                pinned: true,
-                delegate: _GroupHeaderDelegate(
-                  group: g,
-                  collapsed: _collapsedDates.contains(g.key),
-                  onToggle: () => _toggleGroup(g.key),
-                  colors: colors,
-                ),
-              ),
-              if (!_collapsedDates.contains(g.key))
-                SliverList.builder(
+        _currentGroups = groups;
+        // 单头悬浮吸顶：分组头行内正常渲染（SliverToBoxAdapter），
+        // 视口顶部用 Stack 叠一个"当前分组头"悬浮条——只固定当前一个，
+        // 已滚过的分组头随内容滚走不占顶部空间，下一分组头滚入时
+        // 自然顶替悬浮头；收拢分组不渲染条目 sliver，保持惰性构建
+        return Stack(
+          children: [
+            CustomScrollView(
+              controller: _scrollCtrl,
+              slivers: [
+                for (final g in groups) ...[
+                  SliverToBoxAdapter(
+                    child: _GroupHeaderBar(
+                      key: _headerKeyOf(g.key),
+                      group: g,
+                      collapsed: _collapsedDates.contains(g.key),
+                      onToggle: () => _toggleGroup(g.key),
+                      colors: colors,
+                    ),
+                  ),
+                  if (!_collapsedDates.contains(g.key))
+                    SliverList.builder(
                   itemCount: g.items.length,
                   itemBuilder: (context, i) {
                     final h = g.items[i];
@@ -175,11 +238,29 @@ class _HistoryPageState extends State<HistoryPage> {
                     );
                   },
                 ),
-            ],
-            // 列表尾部留白
-            const SliverPadding(
-              padding: EdgeInsets.only(bottom: DesignTokens.spaceMd),
+                ],
+                // 列表尾部留白
+                const SliverPadding(
+                  padding: EdgeInsets.only(bottom: DesignTokens.spaceMd),
+                ),
+              ],
             ),
+            // 悬浮吸顶：仅固定当前分组头一个，滚过的分组不占顶部空间
+            if (_stickyIndex != null && _stickyIndex! < groups.length)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: _GroupHeaderBar(
+                  group: groups[_stickyIndex!],
+                  collapsed: _collapsedDates.contains(
+                    groups[_stickyIndex!].key,
+                  ),
+                  onToggle: () => _toggleGroup(groups[_stickyIndex!].key),
+                  colors: colors,
+                  elevated: true,
+                ),
+              ),
           ],
         );
       }),
@@ -582,17 +663,13 @@ class _DateGroup {
   _DateGroup(this.key, this.label);
 }
 
-/// 吸顶分组头 delegate
-///
-/// 配合 `SliverPersistentHeader(pinned: true)` 实现吸顶：
-/// 分组头随内容滚出视口后固定在列表顶部，直到被下一分组头顶替，
-/// 用户在任意滚动位置都能直接收拢 / 展开当前日期分组。
+/// 分组头条（行内真实渲染 / 悬浮吸顶共用）
 ///
 /// 视觉：主题色竖条 + 日期标签 + 条数 + 收拢/展开箭头（点击整行切换，
-/// 箭头随状态旋转 -90°）。吸顶与后随内容重叠时（[overlapsContent]）
-/// 底部显示细分割线增强层级感。
-class _GroupHeaderDelegate extends SliverPersistentHeaderDelegate {
-  /// 分组头固定高度
+/// 箭头随状态旋转 -90°）。悬浮吸顶实例（[elevated] = true）底部显示
+/// 细分割线，与下层滚动内容区分层级。
+class _GroupHeaderBar extends StatelessWidget {
+  /// 分组头高度（行内与悬浮一致，保证顶替时无缝衔接）
   static const double headerHeight = 40;
 
   final _DateGroup group;
@@ -605,28 +682,20 @@ class _GroupHeaderDelegate extends SliverPersistentHeaderDelegate {
 
   final ThemeColors colors;
 
-  _GroupHeaderDelegate({
+  /// 是否显示底部分割线（悬浮吸顶时 true）
+  final bool elevated;
+
+  const _GroupHeaderBar({
+    super.key,
     required this.group,
     required this.collapsed,
     required this.onToggle,
     required this.colors,
+    this.elevated = false,
   });
 
   @override
-  double get minExtent => headerHeight;
-
-  @override
-  double get maxExtent => headerHeight;
-
-  @override
-  bool shouldRebuild(covariant _GroupHeaderDelegate oldDelegate) => true;
-
-  @override
-  Widget build(
-    BuildContext context,
-    double shrinkOffset,
-    bool overlapsContent,
-  ) {
+  Widget build(BuildContext context) {
     return Material(
       color: colors.background,
       child: DecoratedBox(
@@ -634,7 +703,7 @@ class _GroupHeaderDelegate extends SliverPersistentHeaderDelegate {
           border: Border(
             bottom: BorderSide(
               width: 0.5,
-              color: overlapsContent ? colors.border : Colors.transparent,
+              color: elevated ? colors.border : Colors.transparent,
             ),
           ),
         ),
