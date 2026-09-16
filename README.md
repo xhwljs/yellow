@@ -206,7 +206,11 @@ main()
   └─ runApp(SplashPage())
        └─ SplashPage.initState()
             ├─ initializeApp()                         # DB / Dio / 主题 / 域名加载
-            ├─ GitHubReleaseService.checkForUpdate()  # 并行检查更新
+            ├─ GitHubReleaseService.checkForUpdate()  # 检查更新
+            ├─ ApiServerSwitcher.fetchLatestDomain()  # 检查更新完成后获取最新域名
+            │    ├─ 显示"正在获取新域名"               # 获取中
+            │    ├─ 成功 → 提示成功及新域名            # 镜像列表精简为 [根域名, 新域名]
+            │    └─ 失败 → 提示失败后继续              # 不阻塞进入 App
             ├─ Future.delayed(2s)                      # 最小展示时长
             └─ 分支
                  ├─ 有新版本 + forceUpdate=true → UpdateDialog（仅"立即更新"）
@@ -229,7 +233,7 @@ main()
 5. 新地址通过 macCMS 标志检测 → `switchTo` 持久化并切换
 6. `switchTo` 内部：持久化 baseUrl → 更新 `AppConstants.baseUrl` → 加入镜像列表头部 → 重建 Dio → 清空 DB 缓存 → 刷新首页 / 收藏 / 历史
 
-启动时通过 `_scheduleStartupHealthCheck` 异步触发健康检查，不阻塞启动。详见 [api_server_switcher.dart](lib/core/network/api_server_switcher.dart)。
+启动时 Splash 页在检查更新完成后调用 `ApiServerSwitcher.fetchLatestDomain`（可见 + 阻塞式）：优先通过根域名 `http://68ck.net` 解析最新地址，失败则回退到跳转壳健康检查。获取成功时镜像列表精简为 `[根域名, 新域名]` 并按需切换；获取失败时启动页提示失败后正常进入 App，不影响后续功能。详见 [splash_page.dart](lib/presentation/pages/splash/splash_page.dart) 与 [api_server_switcher.dart](lib/core/network/api_server_switcher.dart)。
 
 **镜像列表管理**（设置页 → API 服务器 → 管理模式）：
 - 多选删除 / 全选 / 取消全选（含二次确认）

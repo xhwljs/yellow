@@ -12,7 +12,8 @@ import 'package:yellow_depot/presentation/pages/splash/splash_page.dart';
 /// 3. runApp(SplashPage()) — 立即显示启动页，避免黑屏
 /// 4. SplashPage 内部启动后台初始化任务：
 ///    - initializeApp()（数据 / 网络 / 主题）
-///    - GitHubReleaseService.checkForUpdate()（并行检查更新）
+///    - GitHubReleaseService.checkForUpdate()（检查更新）
+///    - ApiServerSwitcher.fetchLatestDomain()（检查更新完成后获取最新域名）
 ///    - 等待至少 2 秒（避免快速加载导致闪屏）
 /// 5. 有新版本 → 显示 UpdateDialog
 ///    无新版本 → 切换到 MainShell

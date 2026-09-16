@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:yellow_depot/core/constants/app_constants.dart';
+import 'package:yellow_depot/core/network/api_server_switcher.dart';
 import 'package:yellow_depot/core/services/github_release_service.dart';
 import 'package:yellow_depot/core/theme/design_tokens.dart';
 import 'package:yellow_depot/core/theme/theme_presets.dart';
@@ -24,6 +25,18 @@ const Color _kBackgroundColor = DesignTokens.colorBackground;
 const Color _kOnBackgroundColor = DesignTokens.colorOnBackground;
 const Color _kOnBackgroundMutedColor = DesignTokens.colorOnSurfaceMuted;
 
+/// 启动页"获取最新域名"状态
+enum _DomainStatus {
+  /// 未开始 / 常规加载（显示加载指示器 + 阶段文案）
+  pending,
+
+  /// 获取成功（显示成功图标 + 获取到的新域名）
+  success,
+
+  /// 获取失败（显示失败提示，随后正常进入 App）
+  failure,
+}
+
 /// 启动页（Splash Screen）
 ///
 /// 启动流程：
@@ -31,9 +44,11 @@ const Color _kOnBackgroundMutedColor = DesignTokens.colorOnSurfaceMuted;
 /// 2. runApp(SplashPage()) — 立即显示启动页，避免黑屏
 /// 3. 启动页内部启动后台初始化任务：
 ///    a. initializeApp()（加载 baseUrl / Dio / DB / Controller）
-///    b. GitHubReleaseService.checkForUpdate()（并行检查更新）
-///    c. 等待 (a) 完成 + 显示至少 2 秒（避免加载太快闪屏）
-/// 4. (a)(b)(c) 全部完成：
+///    b. GitHubReleaseService.checkForUpdate()（检查更新）
+///    c. ApiServerSwitcher.fetchLatestDomain()（检查更新完成后获取最新域名：
+///       显示"正在获取新域名"，成功提示成功及新域名，失败提示失败后继续）
+///    d. 等待全部完成 + 显示至少 2 秒（避免加载太快闪屏）
+/// 4. 全部完成：
 ///    - 有新版本 → 弹出 UpdateDialog
 ///      * release.forceUpdate = true（body 含 [强制更新] 标记）：
 ///        仅"立即更新"按钮，用户必须更新或退出 App
@@ -84,6 +99,12 @@ class _SplashPageState extends State<SplashPage> {
   /// 无法重试也无法获知原因。这里把错误展示出来并加重试按钮。
   String _initError = '';
 
+  /// 域名获取结果状态（pending 期间显示常规加载指示）
+  _DomainStatus _domainStatus = _DomainStatus.pending;
+
+  /// 获取到的最新域名（[_domainStatus] 为 success 时非空）
+  String? _fetchedDomain;
+
   /// 启动序列：initializeApp + checkForUpdate + 最小展示 2 秒
   ///
   /// [dialogContext] 是 MaterialApp 内部 Navigator 的 context，
@@ -106,7 +127,7 @@ class _SplashPageState extends State<SplashPage> {
       return;
     }
 
-    // 阶段 2：检查更新（与剩余最小展示时间并行）
+    // 阶段 2：检查更新
     setState(() => _loadingText = '正在检查更新...');
     GitHubRelease? update;
     try {
@@ -116,14 +137,37 @@ class _SplashPageState extends State<SplashPage> {
       appLogger.w('checkForUpdate failed: $e', error: e, stackTrace: st);
     }
 
-    // 阶段 3：保证 splash 至少展示 2 秒（避免快速加载导致闪屏）
-    final minSplashDuration = const Duration(seconds: 2);
+    // 阶段 3：获取最新域名（检查更新完成后）
+    //
+    // 通过根域名 http://68ck.net 解析最新源站地址并应用：
+    // - 获取中：显示"正在获取新域名"
+    // - 成功：提示成功及新域名（服务器管理只保留根域名与新域名）
+    // - 失败：提示失败，随后正常进入 App（后续逻辑不变）
+    setState(() => _loadingText = '正在获取新域名...');
+    String? latestDomain;
+    try {
+      latestDomain = await ApiServerSwitcher.fetchLatestDomain();
+    } catch (e, st) {
+      // 获取失败不阻塞进入 App（使用已保存的域名继续）
+      appLogger.e('fetchLatestDomain failed', error: e, stackTrace: st);
+    }
+    if (!mounted) return;
+    setState(() {
+      _fetchedDomain = latestDomain;
+      _domainStatus =
+          latestDomain != null ? _DomainStatus.success : _DomainStatus.failure;
+    });
+    // 结果停留展示，让用户看清成功 / 失败提示
+    await Future.delayed(const Duration(seconds: 2));
+
+    // 阶段 4：保证 splash 至少展示 2 秒（避免快速加载导致闪屏）
+    const minSplashDuration = Duration(seconds: 2);
     final elapsed = stopwatch.elapsed;
     if (elapsed < minSplashDuration) {
       await Future.delayed(minSplashDuration - elapsed);
     }
 
-    // 阶段 4：进入下一步
+    // 阶段 5：进入下一步
     if (!mounted) return;
 
     if (update != null) {
@@ -131,7 +175,11 @@ class _SplashPageState extends State<SplashPage> {
       // - 强制更新（release.body 含 [强制更新] 标记）：仅"立即更新"按钮，
       //   关闭对话框意味着用户已退出 App 或正在安装新版本，不调用 _enterApp
       // - 非强制更新：用户可选"稍后"跳过本次更新，调用 _enterApp 进入 App
-      setState(() => _loadingText = '发现新版本');
+      setState(() {
+        // 恢复常规加载视图以显示"发现新版本"（域名结果已停留展示完毕）
+        _domainStatus = _DomainStatus.pending;
+        _loadingText = '发现新版本';
+      });
       // 用 MaterialApp 内部 Navigator 的 context 调用 showDialog
       // 不能用 _SplashPageState.context（它不在 Navigator 树下，showDialog 会抛错）
       if (!dialogContext.mounted) return;
@@ -217,9 +265,9 @@ class _SplashPageState extends State<SplashPage> {
           // 副标题
           _buildSubtitle(),
           const Spacer(flex: 3),
-          // 加载指示器 / 错误视图
+          // 状态指示器 / 错误视图
           if (_initError.isEmpty)
-            _buildLoadingIndicator()
+            _buildStatusIndicator()
           else
             _buildErrorIndicator(),
           const SizedBox(height: DesignTokens.spaceXl),
@@ -281,6 +329,8 @@ class _SplashPageState extends State<SplashPage> {
     setState(() {
       _initError = '';
       _loadingText = '正在加载...';
+      _domainStatus = _DomainStatus.pending;
+      _fetchedDomain = null;
     });
     _runStartupSequence(ctx);
   }
@@ -365,11 +415,93 @@ class _SplashPageState extends State<SplashPage> {
     );
   }
 
+  /// 启动状态指示器：常规加载 / 域名获取结果
+  ///
+  /// 根据 [_domainStatus] 切换：
+  /// - pending：CircularProgressIndicator + 当前阶段文案（含"正在获取新域名"）
+  /// - success：成功图标 + "域名获取成功" + 获取到的新域名
+  /// - failure：失败图标 + "域名获取失败" + 说明文案
+  Widget _buildStatusIndicator() {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 300),
+      child: switch (_domainStatus) {
+        _DomainStatus.success => _buildDomainSuccessView(),
+        _DomainStatus.failure => _buildDomainFailureView(),
+        _DomainStatus.pending => _buildLoadingIndicator(),
+      },
+    );
+  }
+
+  /// 域名获取成功视图（成功图标 + 获取到的新域名）
+  Widget _buildDomainSuccessView() {
+    return Column(
+      key: const ValueKey('splash-domain-success'),
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(
+          PhosphorIconsFill.checkCircle,
+          color: DesignTokens.colorSuccess,
+          size: 36,
+        ),
+        const SizedBox(height: DesignTokens.spaceMd),
+        Text(
+          '域名获取成功',
+          style: GoogleFonts.poppins(
+            fontSize: DesignTokens.textBody,
+            fontWeight: FontWeight.w600,
+            color: _kOnBackgroundColor,
+          ),
+        ),
+        const SizedBox(height: DesignTokens.spaceXs),
+        Text(
+          _fetchedDomain ?? '',
+          style: GoogleFonts.poppins(
+            fontSize: DesignTokens.textCaption,
+            color: _kOnBackgroundMutedColor,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 域名获取失败视图（失败图标 + 失败说明，随后正常进入 App）
+  Widget _buildDomainFailureView() {
+    return Column(
+      key: const ValueKey('splash-domain-failure'),
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(
+          PhosphorIconsFill.warningCircle,
+          color: DesignTokens.colorDestructive,
+          size: 36,
+        ),
+        const SizedBox(height: DesignTokens.spaceMd),
+        Text(
+          '域名获取失败',
+          style: GoogleFonts.poppins(
+            fontSize: DesignTokens.textBody,
+            fontWeight: FontWeight.w600,
+            color: _kOnBackgroundColor,
+          ),
+        ),
+        const SizedBox(height: DesignTokens.spaceXs),
+        Text(
+          '将使用已保存的源站地址进入',
+          style: GoogleFonts.poppins(
+            fontSize: DesignTokens.textCaption,
+            color: _kOnBackgroundMutedColor,
+          ),
+        ),
+      ],
+    );
+  }
+
   /// 加载指示器
   ///
   /// 主题色 CircularProgressIndicator + 动态加载文案
   Widget _buildLoadingIndicator() {
     return Column(
+      key: const ValueKey('splash-loading'),
       mainAxisSize: MainAxisSize.min,
       children: [
         SizedBox(
