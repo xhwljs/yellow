@@ -20,10 +20,12 @@ import 'package:yellow_depot/presentation/controllers/home_controller.dart';
 /// 302 Location 指向当前最新的真实源站地址。每次源站被封运营方就
 /// 更新此 302 的 Location，相当于"动态域名解析"。
 ///
-/// 启动时 [_scheduleStartupHealthCheck] 优先调用 [resolveLatestFromRoot]
-/// 访问根域名拿 Location：
-/// - 成功 → 精简镜像列表为 `[rootRedirectDomain, latest]` 并 [switchTo] 切换
-/// - 失败 → 回退到旧的跳转壳健康检查逻辑（[testConnectivity]）
+/// 启动时 Splash 页在检查更新完成后调用 [fetchLatestDomain]（可见 + 阻塞式）：
+/// - 优先访问根域名拿 Location（[resolveLatestFromRoot]）
+/// - 成功 → 精简镜像列表为 `[rootRedirectDomain, latest]`（服务器管理只保留
+///   根域名与新域名）并 [switchTo] 切换，返回最新域名供启动页提示
+/// - 失败 → 回退到旧的跳转壳健康检查逻辑（[testConnectivity]），
+///   仍失败则返回 null，启动页提示失败后正常进入 App
 ///
 /// **跳转壳自动迁移机制**（2026-07-20，作为根域名解析的回退）：
 /// 老入口（如 555973.xyz）实际是"跳转壳"——返回 200 + 425 字节 HTML
@@ -97,14 +99,13 @@ class ApiServerSwitcher {
   /// **加载顺序**：
   /// 1. 加载用户保存的镜像列表覆盖 [presetMirrors]（如果 SP 中有保存）
   /// 2. 加载用户保存的 baseUrl，若为已知死链则回退到默认
-  /// 3. 异步触发跳转壳健康检查（不阻塞启动）
   ///
-  /// **跳转壳自动迁移**（2026-07-20 新增）：即便用户持久化的不在 [_deadMirrors]
-  /// 列表里，启动时也会异步触发健康检查，若发现是跳转壳则自动通过跳转服务
-  /// （cktongji.com:8899 / hk234.space:8899）解析到最新真实地址并切换。
-  /// 例如：持久化 http://555973.xyz → 启动时检测到是跳转壳 → 自动迁移到 http://555980.xyz。
+  /// **注意**：此处不再触发启动健康检查 — 最新域名的获取已改为
+  /// Splash 页在更新检查完成后调用 [fetchLatestDomain]（可见 + 阻塞式，
+  /// 带成功 / 失败提示），见 splash_page.dart。
   ///
-  /// **不阻塞启动**：异步触发，App 立即进入主界面，迁移完成后 Dio 重建并刷新首页。
+  /// **死链自动迁移**：用户旧版 App 持久化过 [_deadMirrors] 中的地址时，
+  /// 启动时自动回退到 [AppConstants.defaultBaseUrl]。
   static Future<void> loadFromPrefs() async {
     final prefs = await SharedPreferences.getInstance();
 
@@ -117,7 +118,6 @@ class ApiServerSwitcher {
     // 2. 加载 baseUrl
     final saved = prefs.getString(AppConstants.keyApiBaseUrl);
     if (saved == null || saved.isEmpty) {
-      _scheduleStartupHealthCheck();
       return;
     }
 
@@ -127,12 +127,10 @@ class ApiServerSwitcher {
         AppConstants.defaultBaseUrl,
       );
       AppConstants.baseUrl = AppConstants.defaultBaseUrl;
-      _scheduleStartupHealthCheck();
       return;
     }
 
     AppConstants.baseUrl = saved;
-    _scheduleStartupHealthCheck();
   }
 
   /// 持久化镜像列表到 SharedPreferences
@@ -299,44 +297,54 @@ class ApiServerSwitcher {
     }
   }
 
-  /// 启动时异步健康检查：优先通过根域名解析最新地址，失败则回退到跳转壳检测
+  /// 启动阶段获取最新域名（由 Splash 页在更新检查完成后调用，可见 + 阻塞式）
   ///
   /// **执行顺序**：
-  /// 1. 优先调用 [resolveLatestFromRoot] 访问根域名 `http://68ck.net`
+  /// 1. 优先调用 [resolveLatestFromRoot] 访问根域名 `http://68ck.net` 拿 Location
   ///    - 成功 → 精简镜像列表为 `[rootRedirectDomain, latest]` 并持久化
-  ///      → 若 latest 与当前 baseUrl 不同则 [switchTo] 切换（重建 Dio + 刷新首页）
-  ///      → 若相同则仅精简列表，不触发切换
-  ///    - 失败 → 进入步骤 2
-  /// 2. 回退到 [testConnectivity] 检测当前 baseUrl 是否是跳转壳并自动迁移
-  ///
-  /// **不阻塞启动**：用 Future.microtask 异步触发，App 立即进入主界面。
-  /// 用户在首页 Loading 状态下等待 1-3 秒后自动刷新出新内容。
-  static void _scheduleStartupHealthCheck() {
-    Future.microtask(() async {
-      try {
-        // 1) 优先通过根域名解析最新地址
-        final latest = await resolveLatestFromRoot();
-        if (latest != null) {
-          // 成功解析：精简镜像列表为 [根域名, 最新地址]
-          presetMirrors = [rootRedirectDomain, latest];
-          await _saveMirrors();
-          appLogger.i(
-            '根域名解析成功：$latest，已精简镜像列表为 [根域名, 最新地址]',
-          );
-          if (latest != AppConstants.baseUrl) {
-            // 与当前不同 → 切换（重建 Dio + 清缓存 + 刷新首页）
-            await switchTo(latest);
-          }
-          return; // 根域名解析已处理，无需走旧逻辑
-        }
-        // 2) 根域名解析失败 → 回退到跳转壳健康检查
-        appLogger.w('根域名解析失败，回退到跳转壳健康检查');
-        final current = AppConstants.baseUrl;
-        await testConnectivity(current);
-      } catch (_) {
-        // 健康检查失败不影响启动流程
-      }
-    });
+  ///      （服务器管理只保留根域名与新域名）
+  ///      → 若 latest 与当前 baseUrl 不同则 [switchTo] 切换（重建 Dio + 清缓存 + 刷新首页）
+  ///      → 返回 latest，由启动页提示"获取成功 + 新域名"
+  /// 2. 根域名解析失败 → 回退到 [testConnectivity] 检测当前 baseUrl 是否是
+  ///    跳转壳并自动迁移；迁移成功返回新地址（同样精简镜像列表）
+  /// 3. 全部失败 → 返回 null，由启动页提示失败后正常进入 App（后续逻辑不变）
+  static Future<String?> fetchLatestDomain() async {
+    // 1) 优先通过根域名解析最新地址
+    final latest = await resolveLatestFromRoot();
+    if (latest != null) {
+      await _applyLatestDomain(latest);
+      appLogger.i('启动获取最新域名成功：$latest');
+      return latest;
+    }
+
+    // 2) 根域名解析失败 → 回退到跳转壳健康检查（可能自动迁移到最新地址）
+    appLogger.w('根域名解析失败，回退到跳转壳健康检查');
+    final before = AppConstants.baseUrl;
+    try {
+      await testConnectivity(before);
+    } catch (_) {
+      return null;
+    }
+    final after = AppConstants.baseUrl;
+    if (after != before) {
+      // 跳转壳健康检查已自动迁移到新地址
+      await _applyLatestDomain(after);
+      appLogger.i('跳转壳迁移获取最新域名成功：$after');
+      return after;
+    }
+    return null;
+  }
+
+  /// 应用获取到的最新域名：精简镜像列表为 [根域名, 新域名] 并按需切换 baseUrl
+  static Future<void> _applyLatestDomain(String latest) async {
+    // 精简镜像列表为 [根域名, 最新地址]（服务器管理只保留这两个）
+    presetMirrors = [rootRedirectDomain, latest];
+    await _saveMirrors();
+    if (latest != AppConstants.baseUrl) {
+      // 与当前不同 → 切换（重建 Dio + 清缓存 + 刷新首页）
+      // switchTo 检测到 latest 已在列表中，不会重复插入
+      await switchTo(latest);
+    }
   }
 
   /// 切换到新 baseUrl
