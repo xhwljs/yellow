@@ -206,16 +206,18 @@ main()
   └─ runApp(SplashPage())
        └─ SplashPage.initState()
             ├─ initializeApp()                         # DB / Dio / 主题 / 域名加载
-            ├─ GitHubReleaseService.checkForUpdate()  # 检查更新
-            ├─ ApiServerSwitcher.fetchLatestDomain()  # 检查更新完成后获取最新域名
-            │    ├─ 显示"正在获取新域名"               # 获取中
-            │    ├─ 成功 → 提示成功及新域名            # 镜像列表精简为 [根域名, 新域名]
-            │    └─ 失败 → 提示失败后继续              # 不阻塞进入 App
+            ├─ GitHubReleaseService.checkForUpdate()  # 检查更新（多源：直连/镜像/302 兜底）
             ├─ Future.delayed(2s)                      # 最小展示时长
-            └─ 分支
-                 ├─ 有新版本 + forceUpdate=true → UpdateDialog（仅"立即更新"）
-                 ├─ 有新版本 + forceUpdate=false → UpdateDialog（"立即更新 / 稍后"）
-                 └─ 无新版本 → MainShell（4 Tab）
+            └─ 分支（更新优先）
+                 ├─ 有新版本 → 不获取域名，直接弹 UpdateDialog
+                 │    ├─ forceUpdate=true → 仅"立即更新"，不进入旧版本
+                 │    └─ forceUpdate=false → "立即更新 / 稍后"
+                 │         └─ 点"稍后" → 获取最新域名 → 进入 App
+                 └─ 无新版本 → 获取最新域名
+                      ├─ 显示"正在获取新域名"            # 获取中
+                      ├─ 成功 → 提示成功及新域名         # 镜像列表精简为 [根域名, 新域名]
+                      ├─ 失败 → 提示失败后继续           # 不阻塞进入 App
+                      └─ MainShell（4 Tab）
 ```
 
 详见 [main.dart](lib/main.dart) 与 [splash_page.dart](lib/presentation/pages/splash/splash_page.dart)。

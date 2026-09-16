@@ -42,19 +42,18 @@ enum _DomainStatus {
 /// 启动流程：
 /// 1. WidgetsFlutterBinding.ensureInitialized（在 main.dart 完成）
 /// 2. runApp(SplashPage()) — 立即显示启动页，避免黑屏
-/// 3. 启动页内部启动后台初始化任务：
+/// 3. 启动页内部启动后台初始化任务（更新优先时序）：
 ///    a. initializeApp()（加载 baseUrl / Dio / DB / Controller）
 ///    b. GitHubReleaseService.checkForUpdate()（检查更新）
-///    c. ApiServerSwitcher.fetchLatestDomain()（检查更新完成后获取最新域名：
-///       显示"正在获取新域名"，成功提示成功及新域名，失败提示失败后继续）
-///    d. 等待全部完成 + 显示至少 2 秒（避免加载太快闪屏）
-/// 4. 全部完成：
-///    - 有新版本 → 弹出 UpdateDialog
+///    c. 等待完成 + 显示至少 2 秒（避免加载太快闪屏）
+/// 4. 分流（更新优先）：
+///    - 有新版本 → 不获取最新域名，直接弹出 UpdateDialog
 ///      * release.forceUpdate = true（body 含 [强制更新] 标记）：
 ///        仅"立即更新"按钮，用户必须更新或退出 App
 ///      * release.forceUpdate = false：有"立即更新"和"稍后"两个按钮，
-///        用户可选"稍后"进入 App
-///    - 无新版本或检查失败 → 直接切换到 MainShell
+///        用户选"稍后" → 获取最新域名后进入 App
+///    - 无新版本或检查失败 → 获取最新域名（显示"正在获取新域名"，
+///      成功提示成功及新域名，失败提示失败后继续）→ 切换到 MainShell
 ///
 /// **关键设计：用 [GlobalKey]<[NavigatorState]> 获取 Navigator context**
 ///
@@ -137,13 +136,55 @@ class _SplashPageState extends State<SplashPage> {
       appLogger.w('checkForUpdate failed: $e', error: e, stackTrace: st);
     }
 
-    // 阶段 3：获取最新域名（检查更新完成后）
+    // 阶段 3：保证 splash 至少展示 2 秒（避免快速加载导致闪屏）
+    const minSplashDuration = Duration(seconds: 2);
+    final elapsed = stopwatch.elapsed;
+    if (elapsed < minSplashDuration) {
+      await Future.delayed(minSplashDuration - elapsed);
+    }
+
+    // 阶段 4：更新优先分流
     //
-    // 通过根域名 http://68ck.net 解析最新源站地址并应用：
-    // - 获取中：显示"正在获取新域名"
-    // - 成功：提示成功及新域名（服务器管理只保留根域名与新域名）
-    // - 失败：提示失败，随后正常进入 App（后续逻辑不变）
-    setState(() => _loadingText = '正在获取新域名...');
+    // - 有新版本 → 不获取最新域名，直接弹更新对话框（避免域名解析
+    //   耗时 / 失败拖慢更新提示）；非强制更新点"稍后"时再补获取域名
+    // - 无新版本 / 检查失败 → 获取最新域名并进入 App
+    if (!mounted) return;
+
+    if (update != null) {
+      // 有新版本 → 显示更新对话框
+      // - 强制更新（release.body 含 [强制更新] 标记）：仅"立即更新"按钮，
+      //   关闭对话框意味着用户已退出 App 或正在安装新版本，不进入旧版本
+      // - 非强制更新：用户可选"稍后"跳过本次更新，
+      //   此时再获取最新域名并进入 App
+      setState(() => _loadingText = '发现新版本');
+      // 用 MaterialApp 内部 Navigator 的 context 调用 showDialog
+      // 不能用 _SplashPageState.context（它不在 Navigator 树下，showDialog 会抛错）
+      if (!dialogContext.mounted) return;
+      await UpdateDialog.show(
+        dialogContext,
+        release: update,
+        forceUpdate: update.forceUpdate,
+        onLater: update.forceUpdate ? null : _fetchDomainThenEnter,
+      );
+      // 强制更新模式下对话框关闭后不进入旧版本 App（用户已退出或在安装新版本）；
+      // 非强制模式下 onLater 已被调用进入 App。
+    } else {
+      // 无新版本或检查失败 → 获取最新域名并进入 App
+      await _fetchDomainThenEnter();
+    }
+  }
+
+  /// 获取最新域名并进入 App
+  ///
+  /// 通过根域名 http://68ck.net 解析最新源站地址并应用：
+  /// - 获取中：显示"正在获取新域名"
+  /// - 成功：提示成功及新域名（服务器管理只保留根域名与新域名）
+  /// - 失败：提示失败，随后正常进入 App（后续逻辑不变）
+  Future<void> _fetchDomainThenEnter() async {
+    setState(() {
+      _domainStatus = _DomainStatus.pending;
+      _loadingText = '正在获取新域名...';
+    });
     String? latestDomain;
     try {
       latestDomain = await ApiServerSwitcher.fetchLatestDomain();
@@ -159,42 +200,8 @@ class _SplashPageState extends State<SplashPage> {
     });
     // 结果停留展示，让用户看清成功 / 失败提示
     await Future.delayed(const Duration(seconds: 2));
-
-    // 阶段 4：保证 splash 至少展示 2 秒（避免快速加载导致闪屏）
-    const minSplashDuration = Duration(seconds: 2);
-    final elapsed = stopwatch.elapsed;
-    if (elapsed < minSplashDuration) {
-      await Future.delayed(minSplashDuration - elapsed);
-    }
-
-    // 阶段 5：进入下一步
     if (!mounted) return;
-
-    if (update != null) {
-      // 有新版本 → 显示更新对话框
-      // - 强制更新（release.body 含 [强制更新] 标记）：仅"立即更新"按钮，
-      //   关闭对话框意味着用户已退出 App 或正在安装新版本，不调用 _enterApp
-      // - 非强制更新：用户可选"稍后"跳过本次更新，调用 _enterApp 进入 App
-      setState(() {
-        // 恢复常规加载视图以显示"发现新版本"（域名结果已停留展示完毕）
-        _domainStatus = _DomainStatus.pending;
-        _loadingText = '发现新版本';
-      });
-      // 用 MaterialApp 内部 Navigator 的 context 调用 showDialog
-      // 不能用 _SplashPageState.context（它不在 Navigator 树下，showDialog 会抛错）
-      if (!dialogContext.mounted) return;
-      await UpdateDialog.show(
-        dialogContext,
-        release: update,
-        forceUpdate: update.forceUpdate,
-        onLater: update.forceUpdate ? null : _enterApp,
-      );
-      // 强制更新模式下对话框关闭后不进入旧版本 App（用户已退出或在安装新版本）；
-      // 非强制模式下 onLater 已被调用进入 App。
-    } else {
-      // 无新版本或检查失败 → 直接进入 App
-      _enterApp();
-    }
+    _enterApp();
   }
 
   /// 切换到 MainShell
