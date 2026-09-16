@@ -74,22 +74,51 @@ class AppUpdateService {
     final filePath =
         '${dir.path}/yellow_depot_${release.tagName}.apk';
 
-    // 2. 下载 APK
-    final dio = Dio(BaseOptions(
-      connectTimeout: const Duration(seconds: 30),
-      receiveTimeout: const Duration(minutes: 10),
-    ));
+    // 2. 下载 APK（镜像优先，直连兜底）
+    //
+    // github.com 的 release 下载会 302 到 objects.githubusercontent.com，
+    // 国内基本无法直连；gh-proxy.com 镜像可代理下载（实测 200）。
+    // 镜像失败再回退直连，保证海外网络同样可用。
+    final downloadUrls = <String>[
+      '${GitHubReleaseService.ghProxyPrefix}${release.apkDownloadUrl}',
+      release.apkDownloadUrl,
+    ];
+    final dio = Dio(
+      BaseOptions(
+        connectTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(minutes: 10),
+      ),
+    );
     try {
-      await dio.download(
-        release.apkDownloadUrl,
-        filePath,
-        onReceiveProgress: (received, total) {
-          if (onProgress != null && total > 0) {
-            final progress = received / total;
-            onProgress(received, total, progress);
+      Object? lastError;
+      for (var i = 0; i < downloadUrls.length; i++) {
+        try {
+          appLogger.i('下载 APK（源 ${i + 1}/${downloadUrls.length}）: ${downloadUrls[i]}');
+          await dio.download(
+            downloadUrls[i],
+            filePath,
+            onReceiveProgress: (received, total) {
+              if (onProgress != null && total > 0) {
+                final progress = received / total;
+                onProgress(received, total, progress);
+              }
+            },
+          );
+          // 魔数校验：APK 是 ZIP 格式（PK 开头），
+          // 防止镜像返回 200 的 HTML 错误页被当作 APK 安装
+          if (!_isZipFile(filePath)) {
+            appLogger.w('下载的文件不是有效 APK（魔数校验失败），尝试下一个源');
+            lastError = Exception('下载的文件无效（非 APK）');
+            continue;
           }
-        },
-      );
+          lastError = null;
+          break;
+        } on DioException catch (e) {
+          appLogger.w('APK 下载失败（${downloadUrls[i]}）: ${e.message}');
+          lastError = e;
+        }
+      }
+      if (lastError != null) throw lastError;
       appLogger.i('APK 下载完成: $filePath (大小: ${NumberFormatter.formatBytes(_fileSize(filePath))})');
     } on DioException catch (e) {
       appLogger.e('APK 下载失败: ${e.message}');
@@ -153,6 +182,25 @@ class AppUpdateService {
       return file.lengthSync();
     } catch (_) {
       return 0;
+    }
+  }
+
+  /// 校验文件是否为 ZIP 格式（APK 即 ZIP，魔数 'PK'）
+  ///
+  /// 用于下载完成后确认拿到的是真正的 APK，
+  /// 而不是镜像 / CDN 返回 200 的 HTML 错误页。
+  static bool _isZipFile(String path) {
+    io.RandomAccessFile? raf;
+    try {
+      final file = io.File(path);
+      if (!file.existsSync() || file.lengthSync() < 4) return false;
+      raf = file.openSync();
+      final bytes = raf.readSync(2);
+      return bytes.length == 2 && bytes[0] == 0x50 && bytes[1] == 0x4B;
+    } catch (_) {
+      return false;
+    } finally {
+      raf?.closeSync();
     }
   }
 }

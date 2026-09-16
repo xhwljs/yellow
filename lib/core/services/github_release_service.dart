@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:yellow_depot/core/constants/app_constants.dart';
 import 'package:yellow_depot/core/utils/logger.dart';
@@ -103,6 +105,16 @@ class GitHubReleaseService {
   /// GitHub API 根 URL
   static const String apiBaseUrl = 'https://api.github.com';
 
+  /// gh-proxy.com 镜像前缀（国内加速）
+  ///
+  /// api.github.com 在中国大陆经常不可达（DNS 污染 / 连接重置 / 403 限流），
+  /// gh-proxy.com 可同时代理 GitHub API 与 release 资源下载：
+  /// - API：GET {ghProxyPrefix}https://api.github.com/repos/.../releases/latest
+  ///   返回原始 JSON（含 body，[强制更新] 标记不丢失）
+  /// - 下载：GET {ghProxyPrefix}https://github.com/.../releases/download/...
+  ///   （[AppUpdateService] 下载 APK 时使用）
+  static const String ghProxyPrefix = 'https://gh-proxy.com/';
+
   /// APK asset 名后缀匹配（CI 构建产物：app-arm64-v8a-debug.apk）
   static const String apkAssetNamePattern = '.apk';
 
@@ -128,27 +140,76 @@ class GitHubReleaseService {
 
   /// 获取最新 release（不含预发布版本）
   ///
-  /// 调用 GitHub API 的 /releases/latest 端点。
-  /// 失败抛 DioException 或自定义异常。
+  /// 依次尝试多个数据源（前一失败才尝试下一个）：
+  /// 1. api.github.com 直连（海外网络 / 未被限流时最快）
+  /// 2. gh-proxy.com 镜像（国内直连不可达 / 403 限流时可用；
+  ///    返回完整 JSON，[强制更新] 标记不丢失）
+  /// 3. github.com /releases/latest 页面 302 解析 tag（最后兜底，
+  ///    拿不到 release body，强制更新标记通过 tag 页面 HTML 补充判断）
   ///
-  /// 返回 null 表示无可用 release（仓库没有任何 release）。
+  /// 404（仓库无 release）与"release 无 APK asset"是确定性结论，
+  /// 直接返回 null，不再尝试其他源。
+  ///
+  /// 全部源都失败时抛出最后一次的异常（由 checkForUpdate 兜底捕获）。
   static Future<GitHubRelease?> getLatestRelease() async {
-    final url = '$apiBaseUrl/repos/$repoOwner/$repoName/releases/latest';
+    const apiPath = '/repos/$repoOwner/$repoName/releases/latest';
+    final sources = <String>[
+      '$apiBaseUrl$apiPath',
+      '$ghProxyPrefix$apiBaseUrl$apiPath',
+    ];
+
+    Object? lastError;
+    for (final url in sources) {
+      try {
+        // null = 仓库无 release / release 无 APK（确定性结论，无需尝试其他源）
+        return await _fetchLatestReleaseJson(url);
+      } on DioException catch (e) {
+        // 404 表示仓库无 release（GitHub 返回 404），无需尝试其他源
+        if (e.response?.statusCode == 404) {
+          appLogger.i('GitHub 仓库无 release（404）');
+          return null;
+        }
+        appLogger.w('GitHub API 请求失败: $url → ${e.message}，尝试下一个源');
+        lastError = e;
+      } catch (e) {
+        // JSON 解析异常等（如镜像返回非 JSON 内容）
+        appLogger.w('GitHub release 响应解析失败: $url → $e，尝试下一个源');
+        lastError = e;
+      }
+    }
+
+    // 最后兜底：github.com 页面 302 解析
+    final fallback = await _fetchLatestReleaseFromRedirect();
+    if (fallback != null) return fallback;
+
+    if (lastError != null) throw lastError;
+    return null;
+  }
+
+  /// 从指定 URL 获取 latest release JSON 并解析为 [GitHubRelease]
+  ///
+  /// [url] 可以是 api.github.com 直连或 gh-proxy.com 镜像地址。
+  ///
+  /// 抛 DioException 表示网络 / 限流失败（调用方尝试下一个源）。
+  /// 返回 null 表示确定性"无更新"（无 tag_name 或 release 无 APK）。
+  static Future<GitHubRelease?> _fetchLatestReleaseJson(String url) async {
     appLogger.i('检查 GitHub 最新 release: $url');
 
-    final dio = Dio(BaseOptions(
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 15),
-      headers: {
-        'Accept': 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-        'User-Agent': 'YellowDepot-Update-Checker/1.0',
-      },
-    ));
+    final dio = Dio(
+      BaseOptions(
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 15),
+        headers: {
+          'Accept': 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+          'User-Agent': 'YellowDepot-Update-Checker/1.0',
+        },
+      ),
+    );
 
     try {
       final response = await dio.get<dynamic>(url);
-      final data = response.data as Map<String, dynamic>;
+      final data = _asJsonMap(response.data);
 
       final tagName = data['tag_name'] as String? ?? '';
       if (tagName.isEmpty) {
@@ -193,21 +254,22 @@ class GitHubReleaseService {
         prerelease: data['prerelease'] as bool? ?? false,
         forceUpdate: forceUpdate,
       );
-    } on DioException catch (e) {
-      // 404 表示仓库无 release（GitHub 返回 404）
-      if (e.response?.statusCode == 404) {
-        appLogger.i('GitHub 仓库无 release（404）');
-        return null;
-      }
-      appLogger.w('GitHub API 请求失败: ${e.message}，尝试 fallback 解析');
-      // Fallback: api.github.com 不可达时，尝试用 github.com 的
-      // /releases/latest 页面 302 redirect 解析 tag_name
-      final fallback = await _fetchLatestReleaseFromRedirect();
-      if (fallback != null) return fallback;
-      rethrow;
     } finally {
       dio.close();
     }
+  }
+
+  /// 把响应数据规整为 Map
+  ///
+  /// Dio 对 application/json 自动解码为 Map；镜像源可能返回
+  /// text/plain（Dio 保持 String），这里统一处理两种形态。
+  static Map<String, dynamic> _asJsonMap(dynamic raw) {
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is String && raw.isNotEmpty) {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map<String, dynamic>) return decoded;
+    }
+    throw const FormatException('release 响应不是有效 JSON');
   }
 
   /// Fallback：通过 GitHub Releases 页面 302 redirect 解析最新 release
@@ -222,26 +284,30 @@ class GitHubReleaseService {
   /// 4. 比较 tag_name（去掉 v）与 AppConstants.appVersion
   /// 5. 若有新版本 → 构造 GitHubRelease（assets URL 用固定路径推断）：
   ///    - apkDownloadUrl = https://github.com/{owner}/{repo}/releases/download/{tag}/{apkName}
-  ///    - body = ""（无法获取 release body，无法判断是否强制更新）
-  ///    - forceUpdate = false（无法解析标记，按非强制处理，让用户可选"稍后"避免误强制更新）
+  ///    - body = ""（无法获取 release body 原文，更新内容留空）
+  ///    - forceUpdate = 通过 tag 页面 HTML 检测 [强制更新] 标记
+  ///      （页面获取失败按非强制处理，避免误强制锁定用户）
   ///
   /// 返回值：
   /// - 有新版本 → 返回 GitHubRelease
   /// - 无新版本 / 网络也失败 → 返回 null
   static Future<GitHubRelease?> _fetchLatestReleaseFromRedirect() async {
-    final url = 'https://github.com/$repoOwner/$repoName/releases/latest';
+    const url = 'https://github.com/$repoOwner/$repoName/releases/latest';
     appLogger.i('Fallback: 通过 GitHub Releases 页面 302 解析 tag: $url');
 
-    final dio = Dio(BaseOptions(
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
-      followRedirects: false, // 不跟随，拿原始 302 Location
-      validateStatus: (s) => s != null,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 '
-            '(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
-      },
-    ));
+    final dio = Dio(
+      BaseOptions(
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 10),
+        followRedirects: false, // 不跟随，拿原始 302 Location
+        validateStatus: (s) => s != null,
+        headers: {
+          'User-Agent':
+              'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 '
+              '(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+        },
+      ),
+    );
 
     try {
       final resp = await dio.get<dynamic>(url);
@@ -259,11 +325,30 @@ class GitHubReleaseService {
       }
       final tagName = tagMatch.group(1)!;
 
-      // 比较版本号：若不大于当前版本，不弹对话框
-      final release = GitHubRelease(
+      // 版本比较：若不大于当前版本，不弹对话框
+      // （不大于时无需再请求 tag 页面，避免多余网络开销）
+      final releaseVersion = tagName.toLowerCase().startsWith('v')
+          ? tagName.substring(1)
+          : tagName;
+      final comparison = GitHubRelease._compareVersions(
+        releaseVersion,
+        AppConstants.appVersion,
+      );
+      if (comparison <= 0) {
+        appLogger.i(
+          'Fallback: GitHub 上 tag $tagName 不大于当前版本 ${AppConstants.appVersion}，跳过',
+        );
+        return null;
+      }
+
+      // 有新版本：请求 tag 页面判断 release body 中的强制更新标记
+      // （302 解析拿不到 body；tag 页面渲染了 release notes，查 HTML 即可）
+      final forceUpdate = await _hasForceUpdateMarkerOnTagPage(tagName);
+      appLogger.i('Fallback: 解析到最新 tag $tagName（强制更新: $forceUpdate），构造 release');
+      return GitHubRelease(
         tagName: tagName,
         name: 'Release $tagName',
-        // fallback 无法获取 release body，无法判断强制更新标记 → 按非强制处理
+        // 302 解析拿不到 release body 原文，更新内容留空（仅显示版本信息）
         body: '',
         // APK URL 用固定路径推断（CI 构建产物固定命名）
         apkDownloadUrl:
@@ -271,18 +356,44 @@ class GitHubReleaseService {
         apkFileName: apkAssetName,
         publishedAt: DateTime.now(),
         prerelease: false,
-        forceUpdate: false,
+        forceUpdate: forceUpdate,
       );
-
-      if (!release.isNewerThan(AppConstants.appVersion)) {
-        appLogger.i('Fallback: GitHub 上 tag $tagName 不大于当前版本 ${AppConstants.appVersion}，跳过');
-        return null;
-      }
-      appLogger.i('Fallback: 解析到最新 tag $tagName，构造 release');
-      return release;
     } catch (e) {
       appLogger.w('Fallback: GitHub Releases 页面 302 解析失败: $e');
       return null;
+    } finally {
+      dio.close();
+    }
+  }
+
+  /// 判断 tag 页面 HTML 是否包含强制更新标记
+  ///
+  /// 兜底链路（302 解析）拿不到 release body 原文。tag 页面
+  /// https://github.com/{owner}/{repo}/releases/tag/{tag} 渲染了
+  /// release notes，直接查 HTML 中是否含标记文本即可。
+  /// 页面获取失败按非强制处理（避免误强制锁定用户）。
+  static Future<bool> _hasForceUpdateMarkerOnTagPage(String tagName) async {
+    final url = 'https://github.com/$repoOwner/$repoName/releases/tag/$tagName';
+    final dio = Dio(
+      BaseOptions(
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 15),
+        responseType: ResponseType.plain,
+        headers: {
+          'User-Agent':
+              'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 '
+              '(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+        },
+      ),
+    );
+    try {
+      final resp = await dio.get<String>(url);
+      final marked = _hasForceUpdateMarker(resp.data ?? '');
+      appLogger.i('Fallback: tag 页面强制更新标记检测 → $marked');
+      return marked;
+    } catch (e) {
+      appLogger.w('Fallback: tag 页面获取失败: $e，按非强制更新处理');
+      return false;
     } finally {
       dio.close();
     }

@@ -53,7 +53,7 @@
 ### 数据持久化
 
 - **Floor 数据库**（Room 的 Flutter 适配版）：分类、视频、收藏、历史
-- **SharedPreferences**：baseUrl、主题、搜索历史、镜像列表、缓存 release 信息
+- **SharedPreferences**：baseUrl、主题、搜索历史、镜像列表
 - **数据备份迁移**：收藏 + 历史 JSON 导入导出，支持卸载重装 / 换机迁移
 
 ### 体验与设计
@@ -68,7 +68,7 @@
 
 - **GitHub Releases 驱动**：CI 构建 APK 并发 Release，App 启动时检查 latest release
 - **强制更新**：Release body 含 `[强制更新]` 标记时，对话框仅显示"立即更新"
-- **缓存降级**：GitHub API 失败时从 SP 读取上次缓存的 release 信息
+- **多源检查 + 国内可用**：api.github.com 直连失败（DNS 污染 / 403 限流）时自动切换 gh-proxy.com 镜像，最后兜底 github.com 页面 302 解析；APK 下载同样镜像优先 + 直连兜底
 
 ---
 
@@ -118,7 +118,7 @@ lib/
 │   ├── player/
 │   │   └── url_decryptor.dart      # token 提取 + count.php POST + 解密 + 重试
 │   ├── services/
-│   │   ├── github_release_service.dart  # latest release 检查 + 缓存降级
+│   │   ├── github_release_service.dart  # latest release 多源检查（直连 / 镜像 / 302 兜底）
 │   │   ├── app_update_service.dart     # APK 下载 + 安装
 │   │   └── data_export_service.dart   # 收藏 / 历史 JSON 导入导出
 │   ├── theme/
@@ -336,11 +336,11 @@ http://68ck.net/  --200+JS壳-->  https://2626.space:8899/?u=http://68ck.net/&p=
 6. `auto-release` job 创建 GitHub Release，body 含 release notes
 
 **App 端**（[github_release_service.dart](lib/core/services/github_release_service.dart)）：
-1. 启动时 GET `/repos/{owner}/{repo}/releases/latest`
+1. 启动时多源依次 GET `/repos/{owner}/{repo}/releases/latest`：api.github.com 直连 → gh-proxy.com 镜像 → github.com 页面 302 解析兜底（国内网络 / 限流场景仍可检查更新）
 2. 比较 `release.tagName`（去 `v` 前缀）与 `AppConstants.appVersion`
-3. release 版本更大 → 缓存到 SP（`keyCachedReleaseInfo`）
-4. Release body 含 `[强制更新]` 标记 → `UpdateDialog` 仅显示"立即更新"
-5. API 失败时从 SP 读取缓存 release（避免更新中途被强杀后再次启动不弹对话框）
+3. release 版本更大 → 返回 release 并弹出 `UpdateDialog`
+4. Release body 含 `[强制更新]` 标记 → `UpdateDialog` 仅显示"立即更新"（兜底链路通过 tag 页面 HTML 补充判断标记）
+5. 下载 APK 时镜像（gh-proxy.com）优先、直连兜底，并做 APK 魔数校验
 
 ---
 
