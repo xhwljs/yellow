@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:yellow_depot/core/constants/app_constants.dart';
+import 'package:yellow_depot/core/utils/human_verification_detector.dart';
 import 'package:yellow_depot/core/utils/logger.dart';
 import 'package:yellow_depot/core/utils/user_agent_utils.dart';
 
@@ -7,12 +8,16 @@ import 'package:yellow_depot/core/utils/user_agent_utils.dart';
 ///
 /// - 连接超时自动重试 3 次
 /// - 418 反爬（Quantum 反爬系统）自动重试 5 次 + 切换 UA + 间隔随机化
+/// - 人机验证页（200 + 滑动验证 HTML）自动重试 3 次 + 随机延迟
 /// - 5xx 服务器错误重试 3 次
 /// - 重试间隔 2 秒（反爬策略）
-/// - 仅对幂等 GET 请求重试（418 特殊处理：POST 也重试，因为是反爬误判）
+/// - 仅对幂等 GET 请求重试（418 / 人机验证特殊处理：POST 也重试，
+///   因为是反爬误判）
 ///
 /// 重要：通过 [dioProvider] 复用原 Dio 实例进行重试，
 /// 否则会丢失 Cookie、UA、baseUrl 等配置，导致重试请求全部失败。
+/// 重试走完整拦截器链：UA 拦截器每次注入新随机 UA（自动换 UA），
+/// CookieJar 自动保存 WAF 下发的验证 Cookie 并在重试时回带。
 class RetryInterceptor extends Interceptor {
   final int maxRetries;
   final Duration retryDelay;
@@ -26,11 +31,60 @@ class RetryInterceptor extends Interceptor {
   /// 418 反爬错误的基础重试间隔（实际会加随机抖动）
   static const Duration antiCrawlerBaseDelay = Duration(seconds: 1);
 
+  /// 人机验证页（200 + 滑动验证 HTML）的最大重试次数
+  ///
+  /// 前置 WAF 偶尔返回 200 + 滑动验证页（华东节点），为概率性拦截，
+  /// 换 UA + 回带 Cookie + 随机延迟重试可绕过。
+  static const int maxHumanVerifyRetries = 3;
+
   RetryInterceptor({
     required this.dioProvider,
     this.maxRetries = AppConstants.maxRetryCount,
     this.retryDelay = AppConstants.retryDelay,
   });
+
+  @override
+  Future<void> onResponse(
+    Response response,
+    ResponseInterceptorHandler handler,
+  ) async {
+    // 源站前置 WAF 偶尔返回 200 + 滑动验证页（非业务 HTML）：
+    // 换 UA（重走拦截器链自动随机）+ 随机延迟重试，
+    // WAF 下发的 Set-Cookie 由 CookieJar 自动保存回带。
+    final data = response.data;
+    if (data is String &&
+        HumanVerificationDetector.isVerificationPage(data)) {
+      final attempt =
+          response.requestOptions.extra['humanverify_attempt'] as int? ?? 0;
+      if (attempt < maxHumanVerifyRetries) {
+        response.requestOptions.extra['humanverify_attempt'] = attempt + 1;
+
+        // 随机延迟 1~2.5s（避免固定重试节奏被 WAF 识别）
+        final jitter = DateTime.now().millisecondsSinceEpoch % 1500;
+        final delay = Duration(milliseconds: 1000 + jitter);
+
+        appLogger.w(
+          '响应为人机验证页，第 ${attempt + 1} 次重试 '
+          '(共 $maxHumanVerifyRetries 次): ${response.requestOptions.uri} '
+          '(延迟 ${delay.inMilliseconds}ms)',
+        );
+
+        await Future.delayed(delay);
+
+        try {
+          final dio = dioProvider();
+          // 重走完整拦截器链：UA 拦截器注入新随机 UA，
+          // 重试响应会再次进入 onResponse 检测（计数累加）
+          final resp = await dio.fetch(response.requestOptions);
+          return handler.resolve(resp);
+        } on DioException catch (e) {
+          return handler.reject(e);
+        }
+      }
+      appLogger.w('人机验证重试次数用尽: ${response.requestOptions.uri}');
+    }
+    handler.next(response);
+  }
 
   @override
   Future<void> onError(

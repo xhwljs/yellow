@@ -292,18 +292,29 @@ http://68ck.net/  --200+JS壳-->  https://2626.space:8899/?u=http://68ck.net/&p=
 
 ### 反爬应对策略
 
-源站使用 Quantum 反爬系统，会概率性返回 418。应对链路：
+源站使用 Quantum 反爬系统，会概率性返回 418；前置 WAF 偶尔返回
+200 + 滑动验证人机验证页（华东节点）。应对链路：
 
 | 拦截器 | 职责 |
 |---|---|
 | `UserAgentInterceptor` | 每次请求随机切换移动端 UA |
 | `CookieInterceptor` | 注入持久化 Cookie，保存响应 Set-Cookie |
-| `RetryInterceptor` | 418 / 超时自动重试（≤3 次），重试时切换 UA |
+| `RetryInterceptor` | 418 / 超时 / 人机验证页自动重试（换 UA + 随机延迟 + Cookie 回带） |
 | `ErrorInterceptor` | `badCertificate` / 网络错误分支处理 |
 | `LoggingInterceptor` | 请求 / 响应分级日志 |
 
 - 全局 `HttpOverrides` + Dio `validateCertificate: (_, _, _) => true` 双层绕过证书校验
 - `AppConstants.requestInterval = 2s` 限制请求频率
+- **人机验证页应对**（[human_verification_detector.dart](lib/core/utils/human_verification_detector.dart)）：
+  检测 200 + 验证页特征（滑动验证 / 人机身份验证 / slideBox / huadong_ 等，
+  ≥2 特征命中 + 内容 < 4KB），命中后换 UA + 回带 WAF Set-Cookie + 随机
+  延迟重试。三层接入：
+  - `RetryInterceptor.onResponse`：正式 API 请求（列表 / 详情 / 播放解密），
+    最多重试 3 次
+  - `ApiServerSwitcher.resolveLatestFromRoot`：根域名解析（启动获取最新域名），
+    最多 4 次尝试，独立 Dio 手动回带 Cookie
+  - `ApiServerSwitcher._fetchHomepage`：镜像连通性测试，最多 3 次，
+    多次拦截视为不可访问（不误判为可用站点）
 
 ### 主题与设计系统
 

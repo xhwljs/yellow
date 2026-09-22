@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yellow_depot/core/constants/app_constants.dart';
 import 'package:yellow_depot/core/network/dio_client.dart';
+import 'package:yellow_depot/core/utils/human_verification_detector.dart';
 import 'package:yellow_depot/core/utils/logger.dart';
 import 'package:yellow_depot/core/utils/user_agent_utils.dart';
 import 'package:yellow_depot/data/database/app_database.dart';
@@ -269,63 +270,125 @@ class ApiServerSwitcher {
   ///    此形态复用 [_tryMigrateFromRedirectShell]（模拟 JS 拼接 → 请求跳转
   ///    服务 → 读 302 Location），与设置页镜像测试（[testConnectivity]）同链路。
   ///
+  /// **人机验证重试（2026-09-16）**：
+  /// 根域名前置 WAF 偶尔返回 200 + 滑动验证页（华东节点），导致解析失败。
+  /// 验证页为概率性拦截（请求频率 / UA 特征），应对：换 UA + 回带响应
+  /// Set-Cookie + 随机延迟重试（最多 4 次尝试），部分 WAF 二次访问带
+  /// Cookie 即放行。
+  ///
   /// 返回值：
   /// - 成功：最新真实地址（已规范化，去末尾斜杠），如 `https://222478.xyz`
-  /// - 失败：null（网络错误 / 无 Location / Location 无效）
+  /// - 失败：null（网络错误 / 无 Location / Location 无效 / 验证重试用尽）
   ///
   /// **设计说明**：
   /// - 用独立 Dio（`followRedirects: false`）拿原始响应，不自动跟随
   /// - 与 [_buildProbeDio] 不同：根域名只关心 Location / 跳转壳，不验证 macCMS
   /// - 失败不抛异常，返回 null，由调用方决定回退策略
   static Future<String?> resolveLatestFromRoot() async {
-    final dio = Dio(
-      BaseOptions(
-        connectTimeout: const Duration(seconds: 5),
-        receiveTimeout: const Duration(seconds: 5),
-        followRedirects: false, // 不自动跟随，拿原始 3xx
-        validateStatus: (s) => s != null, // 接受所有状态码
-        responseType: ResponseType.plain,
-        headers: {
-          'User-Agent': UserAgentUtils.random(),
-          'Accept':
-              'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-        },
-      ),
-    );
-    try {
-      final resp = await dio.get<String>(rootRedirectDomain);
-
-      // 1) 根域名直接返回 3xx：Location 即最新真实地址
-      final location = resp.headers.value('location');
-      if (location != null && location.isNotEmpty) {
-        final normalized = _normalizeUrl(location);
-        // 必须是 http(s) 开头的有效 URL
-        if (normalized.startsWith('http://') ||
-            normalized.startsWith('https://')) {
-          return normalized;
-        }
+    // WAF 滑动验证为概率性拦截：换 UA + 回带 Cookie + 随机延迟重试
+    const maxAttempts = 4;
+    String? cookie;
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+      if (attempt > 1) {
+        // 随机延迟 1~2.5s，避免固定重试节奏被 WAF 识别
+        final jitter =
+            1000 + DateTime.now().millisecondsSinceEpoch % 1500;
+        await Future.delayed(Duration(milliseconds: jitter));
       }
+      final dio = Dio(
+        BaseOptions(
+          connectTimeout: const Duration(seconds: 5),
+          receiveTimeout: const Duration(seconds: 5),
+          followRedirects: false, // 不自动跟随，拿原始 3xx
+          validateStatus: (s) => s != null, // 接受所有状态码
+          responseType: ResponseType.plain,
+          headers: {
+            'User-Agent': UserAgentUtils.random(),
+            if (cookie != null) 'Cookie': cookie,
+            'Accept':
+                'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+          },
+        ),
+      );
+      try {
+        final resp = await dio.get<String>(rootRedirectDomain);
 
-      // 2) 根域名返回 200 + JS 跳转壳：走跳转壳迁移链路解析
-      //    （提取跳转服务 URL → 请求 → 读 302 Location）
-      final body = resp.data ?? '';
-      if (_isRedirectShell(body)) {
-        final latest =
-            await _tryMigrateFromRedirectShell(body, rootRedirectDomain);
-        if (latest != null && latest.isNotEmpty) {
-          final normalized = _normalizeUrl(latest);
+        // 回带响应 Set-Cookie（部分 WAF 二次访问带 Cookie 即放行）
+        final setCookies = resp.headers['set-cookie'];
+        if (setCookies != null && setCookies.isNotEmpty) {
+          cookie = _mergeCookies(cookie, setCookies);
+        }
+
+        // 人机验证页 → 换 UA + Cookie 重试
+        final body = resp.data ?? '';
+        if (HumanVerificationDetector.isVerificationPage(body)) {
+          appLogger.w(
+            '根域名被人机验证拦截（尝试 $attempt/$maxAttempts），'
+            '换 UA + 回带 Cookie 重试',
+          );
+          continue;
+        }
+
+        // 1) 根域名直接返回 3xx：Location 即最新真实地址
+        final location = resp.headers.value('location');
+        if (location != null && location.isNotEmpty) {
+          final normalized = _normalizeUrl(location);
+          // 必须是 http(s) 开头的有效 URL
           if (normalized.startsWith('http://') ||
               normalized.startsWith('https://')) {
             return normalized;
           }
         }
+
+        // 2) 根域名返回 200 + JS 跳转壳：走跳转壳迁移链路解析
+        //    （提取跳转服务 URL → 请求 → 读 302 Location）
+        if (_isRedirectShell(body)) {
+          final latest =
+              await _tryMigrateFromRedirectShell(body, rootRedirectDomain);
+          if (latest != null && latest.isNotEmpty) {
+            final normalized = _normalizeUrl(latest);
+            if (normalized.startsWith('http://') ||
+                normalized.startsWith('https://')) {
+              return normalized;
+            }
+          }
+        }
+        return null;
+      } catch (_) {
+        return null;
+      } finally {
+        dio.close();
       }
-      return null;
-    } catch (_) {
-      return null;
-    } finally {
-      dio.close();
+    }
+    return null;
+  }
+
+  /// 合并响应 Set-Cookie 到请求 Cookie 字符串
+  ///
+  /// 独立 Dio（不走 CookieInterceptor）的手动 Cookie 管理：
+  /// Set-Cookie 形如 `name=value; Path=/; ...`，仅取 `name=value` 部分，
+  /// 与已有 Cookie 合并（后写覆盖同名项），返回 `k1=v1; k2=v2` 形式。
+  static String? _mergeCookies(String? existing, List<String> setCookies) {
+    final jar = <String, String>{};
+    if (existing != null && existing.isNotEmpty) {
+      _parseCookiePairs(existing, jar);
+    }
+    for (final sc in setCookies) {
+      _parseCookiePairs(sc.split(';').first, jar);
+    }
+    if (jar.isEmpty) return existing;
+    return jar.entries.map((e) => '${e.key}=${e.value}').join('; ');
+  }
+
+  /// 解析 `k=v; k2=v2` 或单个 `k=v` 到 [jar]（后写覆盖）
+  static void _parseCookiePairs(String cookieStr, Map<String, String> jar) {
+    for (final part in cookieStr.split(';')) {
+      final kv = part.trim();
+      if (kv.isEmpty) continue;
+      final eq = kv.indexOf('=');
+      if (eq <= 0) continue;
+      jar[kv.substring(0, eq)] = kv.substring(eq + 1);
     }
   }
 
@@ -566,16 +629,37 @@ class ApiServerSwitcher {
   /// 请求 baseUrl 首页并返回 HTML 字符串
   ///
   /// 失败（网络错误/超时）返回 null。
+  ///
+  /// **人机验证重试（2026-09-16）**：前置 WAF 偶尔返回 200 + 滑动验证页，
+  /// 换 UA（每次 [_buildProbeDio] 随机）+ 随机延迟重试最多 3 次；
+  /// 多次均被拦截 → 返回 null（视为不可访问，不误判为可用站点）。
   static Future<String?> _fetchHomepage(String baseUrl) async {
-    final dio = _buildProbeDio(baseUrl);
-    try {
-      final resp = await dio.get<String>('/');
-      return resp.data ?? '';
-    } catch (_) {
-      return null;
-    } finally {
-      dio.close();
+    const maxAttempts = 3;
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+      final dio = _buildProbeDio(baseUrl);
+      try {
+        final resp = await dio.get<String>('/');
+        final html = resp.data ?? '';
+        if (HumanVerificationDetector.isVerificationPage(html)) {
+          appLogger.w(
+            '$baseUrl 被人机验证拦截（尝试 $attempt/$maxAttempts），换 UA 重试',
+          );
+          if (attempt < maxAttempts) {
+            // 随机延迟 0.8~2s，避免固定重试节奏
+            final jitter =
+                800 + DateTime.now().millisecondsSinceEpoch % 1200;
+            await Future.delayed(Duration(milliseconds: jitter));
+          }
+          continue;
+        }
+        return html;
+      } catch (_) {
+        return null;
+      } finally {
+        dio.close();
+      }
     }
+    return null;
   }
 
   /// 统一装配「探测用」Dio — 用于 [_fetchHomepage] / [_lastFetchWasAntiCrawler]
