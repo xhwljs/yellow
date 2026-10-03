@@ -799,7 +799,7 @@ class _InlinePlayerAreaState extends State<_InlinePlayerArea> {
             _formatDuration(target),
             style: const TextStyle(
               color: Colors.white,
-              fontSize: DesignTokens.textH3,
+              fontSize: DesignTokens.textH2,
               fontWeight: FontWeight.w700,
             ),
           ),
