@@ -325,6 +325,30 @@ class VideoDetailController extends GetxController
     }
   }
 
+  /// 内联播放器手势：双击切换播放/暂停
+  void toggleInlinePlayPause() {
+    final vc = inlineVideoController.value;
+    if (vc == null || !vc.value.isInitialized) return;
+    if (vc.value.isPlaying) {
+      vc.pause();
+    } else {
+      vc.play();
+    }
+  }
+
+  /// 内联播放器手势：seek 到目标位置（水平拖动快进/快退）
+  ///
+  /// 目标位置自动 clamp 到 [0, duration]，避免拖出边界。
+  Future<void> seekInlineTo(Duration position) async {
+    final vc = inlineVideoController.value;
+    if (vc == null || !vc.value.isInitialized) return;
+    final duration = vc.value.duration;
+    final clamped = position < Duration.zero
+        ? Duration.zero
+        : (position > duration ? duration : position);
+    await vc.seekTo(clamped);
+  }
+
   /// 重建 ChewieController（用于主题色切换后跟随重建）
   ///
   /// 保留当前播放位置与播放状态，仅替换 [ChewieController]。

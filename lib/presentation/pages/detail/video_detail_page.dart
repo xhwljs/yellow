@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:chewie/chewie.dart';
 import 'package:flutter/material.dart';
@@ -608,12 +610,15 @@ class _MetaChip extends StatelessWidget {
 /// - 初始态（_inlineStarted == false）：封面 + 中央播放按钮
 /// - 加载态（inlineLoading == true）：封面 + 半透明遮罩 + Loading 圈
 /// - 播放态（inlineChewieController != null）：chewie 播放器
+///   - 双击画面：切换播放 / 暂停
+///   - 水平拖动：快进 / 快退（满屏宽 ≈ 90 秒，实时显示目标时间浮层，
+///     松手后跳转；与 CustomScrollView 垂直滚动互不冲突）
 /// - 错误态（inlineErrorMessage != ''）：封面 + 错误图标 + 重试按钮
 ///
 /// 用户点击中央播放按钮 → 调用 [VideoDetailController.startInlinePlay]。
 /// 该方法会调用 [UrlDecryptor.decryptPlayUrl] 解密播放地址，然后初始化
 /// video_player + chewie，autoPlay 自动播放。
-class _InlinePlayerArea extends StatelessWidget {
+class _InlinePlayerArea extends StatefulWidget {
   final VideoDetailController controller;
   final ThemeColors colors;
 
@@ -623,21 +628,88 @@ class _InlinePlayerArea extends StatelessWidget {
   });
 
   @override
+  State<_InlinePlayerArea> createState() => _InlinePlayerAreaState();
+}
+
+class _InlinePlayerAreaState extends State<_InlinePlayerArea> {
+  /// 水平拖动 seek：拖动开始时的播放位置（秒）
+  double? _dragStartSeconds;
+
+  /// 水平拖动 seek：累计水平位移（px，右正左负）
+  double _accumulatedDx = 0;
+
+  /// 当前 seek 目标位置（非 null 时显示浮层）
+  Duration? _seekTarget;
+
+  /// seek 浮层自动隐藏定时器
+  Timer? _seekOverlayTimer;
+
+  /// 手势层宽度（位移 → 时间换算基准），build 时由 LayoutBuilder 更新
+  double _gestureWidth = 1;
+
+  @override
+  void dispose() {
+    _seekOverlayTimer?.cancel();
+    super.dispose();
+  }
+
+  void _onHorizontalDragStart(DragStartDetails details) {
+    final vc = widget.controller.inlineVideoController.value;
+    if (vc == null || !vc.value.isInitialized) return;
+    _dragStartSeconds = vc.value.position.inMilliseconds / 1000;
+    _accumulatedDx = 0;
+    _seekOverlayTimer?.cancel();
+  }
+
+  void _onHorizontalDragUpdate(DragUpdateDetails details) {
+    if (_dragStartSeconds == null) return;
+    final vc = widget.controller.inlineVideoController.value;
+    if (vc == null || !vc.value.isInitialized) return;
+    _accumulatedDx += details.delta.dx;
+    // 满屏宽度 ≈ 90 秒（与主流播放器手感一致）
+    final secondsPerPx = 90 / _gestureWidth;
+    final durationSec = vc.value.duration.inMilliseconds / 1000;
+    final target = (_dragStartSeconds! + _accumulatedDx * secondsPerPx)
+        .clamp(0.0, durationSec);
+    setState(() {
+      _seekTarget = Duration(milliseconds: (target * 1000).round());
+    });
+  }
+
+  Future<void> _onHorizontalDragEnd(DragEndDetails details) async {
+    final target = _seekTarget;
+    _dragStartSeconds = null;
+    if (target == null) return;
+    await widget.controller.seekInlineTo(target);
+    if (!mounted) return;
+    // 保留浮层 600ms 展示跳转结果，再隐藏
+    _seekOverlayTimer?.cancel();
+    _seekOverlayTimer = Timer(const Duration(milliseconds: 600), () {
+      if (mounted) setState(() => _seekTarget = null);
+    });
+  }
+
+  void _onHorizontalDragCancel() {
+    _dragStartSeconds = null;
+    if (mounted) setState(() => _seekTarget = null);
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Obx(() {
-      final videoController = controller.inlineVideoController.value;
-      final chewieController = controller.inlineChewieController.value;
-      final isLoading = controller.inlineLoading.value;
-      final errorMessage = controller.inlineErrorMessage.value;
+      final videoController = widget.controller.inlineVideoController.value;
+      final chewieController = widget.controller.inlineChewieController.value;
+      final isLoading = widget.controller.inlineLoading.value;
+      final errorMessage = widget.controller.inlineErrorMessage.value;
 
       // 错误态：封面 + 重试按钮
       if (errorMessage.isNotEmpty) {
         return _buildThumbnail(
-          coverUrl: controller.effectiveCoverUrl,
+          coverUrl: widget.controller.effectiveCoverUrl,
           overlay: _ErrorOverlay(
             message: errorMessage,
-            onRetry: controller.retryInlinePlay,
-            colors: colors,
+            onRetry: widget.controller.retryInlinePlay,
+            colors: widget.colors,
           ),
         );
       }
@@ -645,31 +717,106 @@ class _InlinePlayerArea extends StatelessWidget {
       // 加载态：封面 + Loading 圈
       if (isLoading) {
         return _buildThumbnail(
-          coverUrl: controller.effectiveCoverUrl,
-          overlay: _LoadingOverlay(colors: colors),
+          coverUrl: widget.controller.effectiveCoverUrl,
+          overlay: _LoadingOverlay(colors: widget.colors),
         );
       }
 
-      // 播放态：chewie 播放器
+      // 播放态：chewie 播放器 + 手势层（双击暂停 / 水平拖动 seek）
       // （播放地址 badge 已移到详情页"简介"位置替换简介，见 _buildPlayUrlCard）
       if (videoController != null &&
           chewieController != null &&
           videoController.value.isInitialized) {
-        return Container(
-          color: Colors.black,
-          child: Chewie(controller: chewieController),
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            _gestureWidth = constraints.maxWidth;
+            return Container(
+              color: Colors.black,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Chewie(controller: chewieController),
+                  // 手势层：双击暂停 + 水平拖动快进快退
+                  // translucent：单击穿透给 chewie（唤出 / 隐藏控制栏不受影响）
+                  GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onDoubleTap: widget.controller.toggleInlinePlayPause,
+                    onHorizontalDragStart: _onHorizontalDragStart,
+                    onHorizontalDragUpdate: _onHorizontalDragUpdate,
+                    onHorizontalDragEnd: _onHorizontalDragEnd,
+                    onHorizontalDragCancel: _onHorizontalDragCancel,
+                  ),
+                  // 拖动中的目标时间浮层
+                  if (_seekTarget != null)
+                    Center(child: _buildSeekOverlay()),
+                ],
+              ),
+            );
+          },
         );
       }
 
       // 初始态：封面 + 中央播放按钮
       return _buildThumbnail(
-        coverUrl: controller.effectiveCoverUrl,
+        coverUrl: widget.controller.effectiveCoverUrl,
         overlay: _PlayButtonOverlay(
-          onTap: controller.startInlinePlay,
-          colors: colors,
+          onTap: widget.controller.startInlinePlay,
+          colors: widget.colors,
         ),
       );
     });
+  }
+
+  /// 拖动 seek 的目标时间浮层（快进 / 快退图标 + 目标时间）
+  Widget _buildSeekOverlay() {
+    final target = _seekTarget!;
+    final vc = widget.controller.inlineVideoController.value;
+    // 拖动中与起点比方向；松手后（600ms 内）与当前位置比
+    final referenceSec = _dragStartSeconds ??
+        (vc?.value.position.inMilliseconds ?? 0) / 1000;
+    final isForward = target.inMilliseconds / 1000 >= referenceSec;
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: DesignTokens.spaceLg,
+        vertical: DesignTokens.spaceMd,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.72),
+        borderRadius: BorderRadius.circular(DesignTokens.radiusLg),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isForward
+                ? PhosphorIconsFill.fastForward
+                : PhosphorIconsFill.rewind,
+            color: Colors.white,
+            size: 22,
+          ),
+          const SizedBox(width: DesignTokens.spaceSm),
+          Text(
+            _formatDuration(target),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: DesignTokens.textH3,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 时长格式化（m:ss / h:mm:ss）
+  String _formatDuration(Duration d) {
+    final h = d.inHours;
+    final m = d.inMinutes % 60;
+    final s = d.inSeconds % 60;
+    final ss = s.toString().padLeft(2, '0');
+    return h > 0
+        ? '$h:${m.toString().padLeft(2, '0')}:$ss'
+        : '$m:$ss';
   }
 
   /// 构建封面略缩图（含底部渐变遮罩 + 叠加层）
@@ -698,7 +845,7 @@ class _InlinePlayerArea extends StatelessWidget {
                 child: Icon(
                   PhosphorIconsRegular.filmSlate,
                   size: 48,
-                  color: colors.onSurfaceMuted,
+                  color: widget.colors.onSurfaceMuted,
                 ),
               ),
             ),
@@ -710,7 +857,7 @@ class _InlinePlayerArea extends StatelessWidget {
               child: Icon(
                 PhosphorIconsRegular.filmSlate,
                 size: 48,
-                color: colors.onSurfaceMuted,
+                color: widget.colors.onSurfaceMuted,
               ),
             ),
           ),

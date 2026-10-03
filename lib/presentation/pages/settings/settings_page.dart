@@ -1,5 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:get/get.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:yellow_depot/core/constants/app_constants.dart';
 import 'package:yellow_depot/core/network/api_server_switcher.dart';
@@ -184,7 +188,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   icon: PhosphorIconsRegular.trash,
                   iconTone: _IconTone.destructive,
                   title: '清除缓存',
-                  subtitle: '清理 Cookie / Session 缓存数据',
+                  subtitle: '清理 Cookie 与图片磁盘缓存，释放存储空间',
                   colors: colors,
                   showTrailingArrow: false,
                   onTap: _clearCache,
@@ -594,10 +598,10 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _clearCache() async {
     final colors = AppTheme.colorsOf(Get.context!);
     try {
-      await DioClient.clearCookies();
+      final freedBytes = await _clearAllCaches();
       Get.snackbar(
         '清除成功',
-        '缓存已清理完毕',
+        '已清理 Cookie 与图片缓存，释放 ${_formatBytes(freedBytes)}',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: colors.surface,
         colorText: colors.onSurface,
@@ -613,6 +617,59 @@ class _SettingsPageState extends State<SettingsPage> {
         duration: const Duration(seconds: 2),
       );
     }
+  }
+
+  /// 清理全部缓存：Cookie + 图片磁盘/内存缓存
+  ///
+  /// 图片磁盘缓存（CachedNetworkImage 的 libCachedImageData 目录，
+  /// 位于临时目录下）才是占用大头，Cookie 仅几十 KB——
+  /// 返回释放的字节数（清理前后临时目录大小差）。
+  Future<int> _clearAllCaches() async {
+    final sizeBefore = await _tempDirSize();
+
+    // 1. 清 Cookie（反爬身份）
+    await DioClient.clearCookies();
+
+    // 2. 清图片磁盘 + 内存缓存
+    try {
+      await DefaultCacheManager().emptyCache();
+    } catch (_) {
+      // 缓存管理器未初始化 / 清理失败不阻断流程
+    }
+
+    final sizeAfter = await _tempDirSize();
+    return sizeBefore > sizeAfter ? sizeBefore - sizeAfter : 0;
+  }
+
+  /// 递归统计临时目录大小（字节，图片缓存所在）
+  Future<int> _tempDirSize() async {
+    try {
+      final dir = await getTemporaryDirectory();
+      var total = 0;
+      await for (final entity
+          in dir.list(recursive: true, followLinks: false)) {
+        if (entity is File) {
+          try {
+            total += await entity.length();
+          } catch (_) {
+            // 文件被并发删除等异常忽略
+          }
+        }
+      }
+      return total;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  /// 字节数格式化（B → KB → MB → GB）
+  String _formatBytes(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / 1024 / 1024).toStringAsFixed(1)} MB';
+    }
+    return '${(bytes / 1024 / 1024 / 1024).toStringAsFixed(2)} GB';
   }
 
   /// 导出收藏 + 播放历史为 JSON 文件，弹出系统分享面板。

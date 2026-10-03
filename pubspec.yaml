@@ -40,6 +40,8 @@ dependencies:
   phosphor_flutter: ^2.1.0
   cached_network_image: ^3.3.1
   shimmer: ^3.0.0
+  # 图片缓存管理（清除缓存设置项直接操作磁盘缓存）
+  flutter_cache_manager: ^3.3.1
 
   # 工具
   logger: ^2.3.0
