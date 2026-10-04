@@ -14,6 +14,7 @@ import 'package:yellow_depot/data/repositories/favorite_repository.dart';
 import 'package:yellow_depot/data/repositories/history_repository.dart';
 import 'package:yellow_depot/data/repositories/video_repository.dart';
 import 'package:yellow_depot/presentation/controllers/history_controller.dart';
+import 'package:yellow_depot/presentation/widgets/app_player_controls.dart';
 
 /// 视频详情控制器
 ///
@@ -325,33 +326,14 @@ class VideoDetailController extends GetxController
     }
   }
 
-  /// 内联播放器手势：双击切换播放/暂停
-  void toggleInlinePlayPause() {
-    final vc = inlineVideoController.value;
-    if (vc == null || !vc.value.isInitialized) return;
-    if (vc.value.isPlaying) {
-      vc.pause();
-    } else {
-      vc.play();
-    }
-  }
-
-  /// 内联播放器手势：seek 到目标位置（水平拖动快进/快退）
-  ///
-  /// 目标位置自动 clamp 到 [0, duration]，避免拖出边界。
-  Future<void> seekInlineTo(Duration position) async {
-    final vc = inlineVideoController.value;
-    if (vc == null || !vc.value.isInitialized) return;
-    final duration = vc.value.duration;
-    final clamped = position < Duration.zero
-        ? Duration.zero
-        : (position > duration ? duration : position);
-    await vc.seekTo(clamped);
-  }
-
   /// 重建 ChewieController（用于主题色切换后跟随重建）
   ///
   /// 保留当前播放位置与播放状态，仅替换 [ChewieController]。
+  ///
+  /// customControls：自定义控制层（手势 + 控制栏），内联与全屏统一：
+  /// - 单击切换控制栏、双击播放/暂停、水平拖动快进快退
+  /// - chewie 默认控件（MaterialControls）的手势穿透会误触发控制栏，
+  ///   且全屏 route 不经过页面叠加的手势层 → 全面接管
   ChewieController _buildChewieController(
     vp.VideoPlayerController videoController, {
     required bool autoPlay,
@@ -361,10 +343,7 @@ class VideoDetailController extends GetxController
       autoPlay: autoPlay,
       looping: false,
       allowFullScreen: true,
-      allowMuting: true,
-      allowPlaybackSpeedChanging: true,
-      playbackSpeeds: const [0.5, 0.75, 1.0, 1.25, 1.5, 2.0],
-      showControlsOnInitialize: true,
+      customControls: const AppPlayerControls(),
       // placeholder 在视频未初始化时显示封面（chewie 内置略缩图能力）
       placeholder: Container(color: Colors.black),
       errorBuilder: (context, errorMessage) {
