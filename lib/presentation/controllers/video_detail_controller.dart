@@ -338,12 +338,16 @@ class VideoDetailController extends GetxController
     vp.VideoPlayerController videoController, {
     required bool autoPlay,
   }) {
+    // 全屏标题栏显示的视频名（详情已加载则取详情标题，否则用列表页传入的标题）
+    final title = detail.value?.video.title.isNotEmpty == true
+        ? detail.value!.video.title
+        : initialTitle;
     return ChewieController(
       videoPlayerController: videoController,
       autoPlay: autoPlay,
       looping: false,
       allowFullScreen: true,
-      customControls: const AppPlayerControls(),
+      customControls: AppPlayerControls(title: title),
       // placeholder 在视频未初始化时显示封面（chewie 内置略缩图能力）
       placeholder: Container(color: Colors.black),
       errorBuilder: (context, errorMessage) {

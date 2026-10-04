@@ -20,7 +20,10 @@ import 'package:yellow_depot/core/theme/theme_presets.dart';
 /// - 控制栏仅底部渐变条，不再整屏变暗
 /// - chewie 全屏 route 同样使用 customControls，手势在全屏也生效
 class AppPlayerControls extends StatefulWidget {
-  const AppPlayerControls({super.key});
+  const AppPlayerControls({super.key, this.title});
+
+  /// 全屏时顶部标题栏显示的标题（视频名）
+  final String? title;
 
   @override
   State<AppPlayerControls> createState() => _AppPlayerControlsState();
@@ -205,6 +208,8 @@ class _AppPlayerControlsState extends State<AppPlayerControls> {
               children: [
                 // 控制栏（底部渐变条，不整屏变暗）
                 _buildControlsBar(colors),
+                // 全屏时的顶部标题栏（返回按钮 + 标题，随控制栏显隐）
+                if (_chewie?.isFullScreen == true) _buildTopBar(),
                 // 拖动中的目标时间浮层
                 if (_seekTarget != null)
                   Center(child: _buildSeekOverlay()),
@@ -213,6 +218,69 @@ class _AppPlayerControlsState extends State<AppPlayerControls> {
           ),
         );
       },
+    );
+  }
+
+  /// 全屏时的顶部标题栏：返回按钮（退出全屏）+ 标题
+  ///
+  /// 随底部控制栏同步显隐（单击画面唤出，3 秒无操作自动隐藏）；
+  /// 内联（非全屏）不显示——详情页自带 AppBar 标题与返回。
+  Widget _buildTopBar() {
+    final chewie = _chewie;
+    return IgnorePointer(
+      ignoring: !_controlsVisible,
+      child: AnimatedOpacity(
+        opacity: _controlsVisible ? 1 : 0,
+        duration: const Duration(milliseconds: 200),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: Container(
+            width: double.infinity,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Colors.black87, Colors.transparent],
+              ),
+            ),
+            padding: const EdgeInsets.only(
+              left: DesignTokens.spaceXs,
+              right: DesignTokens.spaceLg,
+              top: DesignTokens.spaceSm,
+              bottom: DesignTokens.spaceXl,
+            ),
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  color: Colors.white,
+                  iconSize: 24,
+                  constraints: const BoxConstraints(
+                    minWidth: 36,
+                    minHeight: 36,
+                  ),
+                  padding: const EdgeInsets.all(4),
+                  onPressed: chewie?.exitFullScreen,
+                  tooltip: '退出全屏',
+                ),
+                const SizedBox(width: DesignTokens.spaceXs),
+                Expanded(
+                  child: Text(
+                    widget.title ?? '',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: DesignTokens.textH2,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
