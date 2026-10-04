@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:yellow_depot/core/theme/app_theme.dart';
 import 'package:yellow_depot/core/theme/design_tokens.dart';
+import 'package:yellow_depot/core/theme/theme_presets.dart';
 
 /// 自定义播放器控制层（作为 ChewieController.customControls 使用）
 ///
@@ -106,11 +107,11 @@ class _AppPlayerControlsState extends State<AppPlayerControls> {
   }
 
   void _cycleSpeed() {
-    final cur = _vpc.value.speed;
+    final cur = _vpc.value.playbackSpeed;
     var idx = _speeds.indexWhere((s) => (s - cur).abs() < 0.01);
     if (idx < 0) idx = -1;
     final next = _speeds[(idx + 1) % _speeds.length];
-    _vpc.setSpeed(next);
+    _vpc.setPlaybackSpeed(next);
     _scheduleHide();
   }
 
@@ -267,11 +268,10 @@ class _AppPlayerControlsState extends State<AppPlayerControls> {
                           playedColor: colors.primary,
                           backgroundColor: Colors.white24,
                           bufferedColor: Colors.white38,
-                          handleColor: colors.primary,
                         ),
                       ),
                     ),
-                    _buildSpeedButton(v.speed),
+                    _buildSpeedButton(v.playbackSpeed),
                     _buildFullScreenButton(_chewie?.isFullScreen ?? false),
                   ],
                 );
@@ -295,7 +295,7 @@ class _AppPlayerControlsState extends State<AppPlayerControls> {
     );
   }
 
-  /// 倍速按钮（点击按 [ _speeds ] 循环切换）
+  /// 倍速按钮（点击按 [_speeds] 循环切换）
   Widget _buildSpeedButton(double speed) {
     final label = speed == speed.roundToDouble()
         ? speed.toInt().toString()
