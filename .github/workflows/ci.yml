@@ -127,7 +127,14 @@ jobs:
           sed -i 's|android:label="videohub"|android:label="Yellow Depot"|' android/app/src/main/AndroidManifest.xml
 
           # 在 </manifest> 前注入权限
-          sed -i 's|</manifest>|    <!-- 自动更新：安装未知来源 APK 权限（Android 8+ 必需） -->\n    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />\n</manifest>|' android/app/src/main/AndroidManifest.xml
+          # INTERNET：Flutter 模板仅把 INTERNET 放在 src/debug/ 的 Manifest，
+          #   release 构建不合并 → 无网络权限 → 所有请求失败（含 GitHub 更新检查）
+          # REQUEST_INSTALL_PACKAGES：自动更新安装 APK（Android 8+ 必需）
+          sed -i 's|</manifest>|    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />\n</manifest>|' android/app/src/main/AndroidManifest.xml
+
+          # 明文 HTTP 许可：源站 baseUrl 为 http://（Android 9+ 默认禁明文），
+          # 同样只在 debug Manifest 提供，release 需显式声明
+          sed -i 's|<application|<application android:usesCleartextTraffic="true"|' android/app/src/main/AndroidManifest.xml
 
           # PiP：activity 声明支持画中画
           # 注意：flutter create 模板的 activity 已自带
@@ -214,7 +221,7 @@ jobs:
           }
           KOTLIN_EOF
 
-          grep -E 'android:label=|REQUEST_INSTALL_PACKAGES|supportsPictureInPicture' android/app/src/main/AndroidManifest.xml
+          grep -E 'android:label=|INTERNET|REQUEST_INSTALL_PACKAGES|usesCleartextTraffic|supportsPictureInPicture' android/app/src/main/AndroidManifest.xml
 
       - name: Bump Kotlin to 1.9.22 for plugin compatibility
         run: |
@@ -373,16 +380,21 @@ jobs:
           # 2. "[强制更新]" 标记（App 启动时 GitHubReleaseService 解析此标记
           #    设置 forceUpdate=true，UpdateDialog 仅显示"立即更新"按钮）
           # 本次为强制更新（含 [强制更新] 标记）。
-          cat > /tmp/release_notes.md <<'NOTES_EOF'
+          cat > /tmp/release_notes.md << 'NOTES_EOF'
           ## 本次更新内容
 
           [强制更新]
 
-          ### 安装包精简（54MB → 约 20MB）
+          ### 修复 release 版本网络无法访问的问题
 
-          - 构建方式从 debug 切换为 release（AOT 编译），
-            包体约减半，滚动与播放更流畅
-          - Dart 符号混淆（--obfuscate），进一步减小体积
+          - 上一版（9.66MB 精简版）release 构建缺少 INTERNET 权限
+            与明文 HTTP 许可（Flutter 模板仅在 debug 构建提供），
+            导致所有网络请求失败
+          - 本版已修复，包体保持约 10MB
+
+          ### 安装包精简（54MB → 约 10MB）
+
+          - 构建方式从 debug 切换为 release（AOT 编译），包体缩小 82%
           - 签名不变，可直接覆盖安装升级
 
           NOTES_EOF
