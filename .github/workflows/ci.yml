@@ -377,24 +377,20 @@ jobs:
         run: |
           # release body 包含：
           # 1. 本次具体修改内容（让用户知道更新了什么）
-          # 2. "[强制更新]" 标记（App 启动时 GitHubReleaseService 解析此标记
-          #    设置 forceUpdate=true，UpdateDialog 仅显示"立即更新"按钮）
-          # 本次为强制更新（含 [强制更新] 标记）。
+          # 2. 是否强制更新由 body 中是否含 [强制更新] 标记决定
+          #    - 含标记 → UpdateDialog 仅显示"立即更新"按钮
+          #    - 不含标记 → 可选更新，显示"立即更新" + "稍后"按钮
+          # 本次为可选更新（不含 [强制更新] 标记），用户可选择稍后更新。
           cat > /tmp/release_notes.md << 'NOTES_EOF'
           ## 本次更新内容
 
-          [强制更新]
+          本次为可选更新，可选择立即更新或稍后。
 
-          ### 修复 release 版本网络无法访问的问题
+          ### 回退到稳定版本
 
-          - 上一版（9.66MB 精简版）release 构建缺少 INTERNET 权限
-            与明文 HTTP 许可（Flutter 模板仅在 debug 构建提供），
-            导致所有网络请求失败
-          - 本版已修复，包体保持约 10MB
-
-          ### 安装包精简（54MB → 约 10MB）
-
-          - 构建方式从 debug 切换为 release（AOT 编译），包体缩小 82%
+          - 回退到 7bb6c49（fix(ci): release 构建注入 INTERNET 权限
+            与明文 HTTP 许可）
+          - 移除后续实验性改动，恢复到已验证可用的稳定状态
           - 签名不变，可直接覆盖安装升级
 
           NOTES_EOF
