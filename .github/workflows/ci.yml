@@ -129,8 +129,12 @@ jobs:
           # 在 </manifest> 前注入权限
           sed -i 's|</manifest>|    <!-- 自动更新：安装未知来源 APK 权限（Android 8+ 必需） -->\n    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />\n</manifest>|' android/app/src/main/AndroidManifest.xml
 
-          # PiP：activity 声明支持画中画 + 尺寸变化时不重建 Activity
-          sed -i 's|android:name=".MainActivity"|android:name=".MainActivity"\n            android:supportsPictureInPicture="true"\n            android:configChanges="orientation\|keyboardHidden\|keyboard\|screenSize\|smallestScreenSize\|screenLayout"|' android/app/src/main/AndroidManifest.xml
+          # PiP：activity 声明支持画中画
+          # 注意：flutter create 模板的 activity 已自带
+          # android:configChanges="orientation|keyboardHidden|keyboard|screenSize|
+          # smallestScreenSize|screenLayout|uiMode"（含 PiP 所需项），仅注入本属性，
+          # 重复注入 configChanges 会造成 XML 属性冲突导致 Manifest 解析失败
+          sed -i 's|android:name=".MainActivity"|android:name=".MainActivity"\n            android:supportsPictureInPicture="true"|' android/app/src/main/AndroidManifest.xml
 
           # PiP：覆盖 MainActivity.kt（onUserLeaveHint 自动进小窗 + 状态回传 Flutter）
           cat > android/app/src/main/kotlin/com/videohub/videohub/MainActivity.kt << 'KOTLIN_EOF'
