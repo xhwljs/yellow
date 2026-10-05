@@ -224,19 +224,32 @@ jobs:
       - name: Run Floor codegen
         run: dart run build_runner build --delete-conflicting-outputs
 
-      - name: Build APK (arm64-v8a debug only)
-        run: flutter build apk --debug --target-platform android-arm64 --split-per-abi
+      - name: Build APK (arm64-v8a release, AOT + obfuscate)
+        #
+        # release 构建（此前为 debug，包体 54MB）：
+        # - AOT 编译：体积约减半（54MB → ~20MB），运行性能更好
+        # - --obfuscate：Dart 符号混淆，进一步减小体积并防逆向
+        # - 签名：Flutter 模板 release 块默认 signingConfig = debug keystore，
+        #   与历史 debug 构建同签名（GitHub runner 镜像预置 debug.keystore），
+        #   老用户可直接覆盖安装，升级路径不变
+        # - 更新链路不受影响：App 按 assets[].name 以 ".apk" 后缀匹配
+        run: |
+          # 防御：若模板 release 签名行为注释状态则打开（默认模板已启用，无变化）
+          sed -i 's|// signingConfig = signingConfigs.debug|signingConfig = signingConfigs.debug|' android/app/build.gradle || true
+          grep -n "signingConfig" android/app/build.gradle || true
+          flutter build apk --release --target-platform android-arm64 --split-per-abi \
+            --obfuscate --split-debug-info=/tmp/symbols
 
       - name: Verify produced APK
         run: |
           ls -lh build/app/outputs/flutter-apk/
-          test -f build/app/outputs/flutter-apk/app-arm64-v8a-debug.apk
+          test -f build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: android-apk
-          path: build/app/outputs/flutter-apk/app-arm64-v8a-debug.apk
+          path: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
           retention-days: 14
           if-no-files-found: error
 
@@ -279,7 +292,7 @@ jobs:
             ## Yellow Depot ${{ github.ref_name }}
 
             ### 📦 Downloads
-            - **Android APK**: `app-arm64-v8a-debug.apk`（见下方附件）
+            - **Android APK**: `app-arm64-v8a-release.apk`（见下方附件）
 
             ### ✅ CI 状态
             - Android 构建: ${{ needs.build-android.result }}
@@ -347,13 +360,12 @@ jobs:
 
           [强制更新]
 
-          ### 体验优化
+          ### 安装包精简（54MB → 约 20MB）
 
-          #### 详情页元数据补全
-
-          - 详情页新增播放量展示（与网站一致的实时数据）
-          - 更新时间展示精确到分钟（此前详情页缺这两项数据）
-          - 播放量 / 收藏数为 0 时不再显示，元信息行更干净
+          - 构建方式从 debug 切换为 release（AOT 编译），
+            包体约减半，滚动与播放更流畅
+          - Dart 符号混淆（--obfuscate），进一步减小体积
+          - 签名不变，可直接覆盖安装升级
 
           NOTES_EOF
           # 移除 heredoc 导致的每行前导空格（保持 markdown 结构）

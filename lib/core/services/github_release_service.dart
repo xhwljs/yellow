@@ -115,7 +115,7 @@ class GitHubReleaseService {
   ///   （[AppUpdateService] 下载 APK 时使用）
   static const String ghProxyPrefix = 'https://gh-proxy.com/';
 
-  /// APK asset 名后缀匹配（CI 构建产物：app-arm64-v8a-debug.apk）
+  /// APK asset 名后缀匹配（CI 构建产物：app-arm64-v8a-release.apk）
   static const String apkAssetNamePattern = '.apk';
 
   /// 强制更新标记列表
