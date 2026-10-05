@@ -114,7 +114,8 @@ lib/
 │   ├── parser/
 │   │   ├── category_parser.dart     # 首页"目录"区块 .stui-pannel__menu
 │   │   ├── video_list_parser.dart   # 列表页 .stui-vodlist__box + .sub 字段
-│   │   └── video_detail_parser.dart # 详情页 + 相关推荐（复用列表解析）
+│   │   ├── video_detail_parser.dart # 详情页 + 相关推荐（复用列表解析）
+│   │   └── hot_keyword_parser.dart # /topic.html header 热门搜索词条
 │   ├── player/
 │   │   └── url_decryptor.dart      # token 提取 + count.php POST + 解密 + 重试
 │   ├── services/
@@ -147,7 +148,7 @@ lib/
     │   ├── main_shell.dart            # GetMaterialApp + 4 Tab BottomNav
     │   ├── home/                      # 首页：分类目录卷帘 + 视频网格
     │   ├── category/                  # 分类详情列表
-    │   ├── search/                    # 搜索页 + 搜索历史
+    │   ├── search/                    # 搜索页：实时联想 + 热门词条 + 搜索历史
     │   ├── detail/                    # 详情：SliverAppBar 内嵌播放 + 相关推荐
     │   ├── favorites/                 # 收藏列表（GridView + VideoCard）
     │   ├── history/                   # 历史记录（按日期分组 + 收拢/展开）

@@ -59,4 +59,23 @@ class ApiEndpoints {
     }
     return '$base/vodsearch/$encoded----------$page---.html';
   }
+
+  /// 热门搜索词条来源页（专题页）
+  ///
+  /// 页面 header 区含 15 个站方运营配置的快捷搜索链接
+  /// `/vodsearch/{词条}-------------.html`（服务端渲染，稳定可解析）。
+  /// 注意：topic 正文区块（.zhuanti-list）为 JS 动态渲染，服务端无数据。
+  static String get topic => '$base/topic.html';
+
+  /// 搜索联想接口（macCMS 标准 suggest API）
+  ///
+  /// GET `/index.php/ajax/suggest?mid=1&wd={keyword}`
+  /// 返回 JSON：
+  /// ```json
+  /// {"code":1,"list":[{"id":"271207","name":"标题","en":"拼音","pic":"https://..."}]}
+  /// ```
+  /// - 最多返回 20 条（不支持翻页，page 参数无效）
+  /// - `id` 为影片 aid，配合站点单集结构可直接构造详情页 videoId = `{id}-1-1`
+  static String searchSuggest(String keyword) =>
+      '$base/index.php/ajax/suggest?mid=1&wd=${Uri.encodeComponent(keyword)}';
 }

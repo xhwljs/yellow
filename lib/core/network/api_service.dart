@@ -51,6 +51,35 @@ class ApiService {
     return response.data ?? '';
   }
 
+  /// 获取专题页 HTML（用于解析 header 区的热门搜索词条）
+  Future<String> fetchTopicHtml() async {
+    final response = await _dio.get<String>(ApiEndpoints.topic);
+    return response.data ?? '';
+  }
+
+  /// 搜索联想（macCMS suggest JSON 接口）
+  ///
+  /// 返回原始 JSON Map：`{code, list: [{id, name, en, pic}], ...}`。
+  /// 由 [SearchSuggestService] 转换为 [SearchSuggestion] 列表。
+  Future<Map<String, dynamic>> fetchSearchSuggest(String keyword) async {
+    final response = await _dio.get<dynamic>(
+      ApiEndpoints.searchSuggest(keyword),
+      options: Options(responseType: ResponseType.json),
+    );
+    final data = response.data;
+    if (data is Map<String, dynamic>) return data;
+    if (data is Map) return Map<String, dynamic>.from(data);
+    if (data is String) {
+      try {
+        final decoded = jsonDecode(data);
+        if (decoded is Map) return Map<String, dynamic>.from(decoded);
+      } catch (_) {
+        // 解码失败返回空
+      }
+    }
+    return <String, dynamic>{};
+  }
+
   /// POST 获取播放地址（解密接口）
   ///
   /// 参数: id, sid, nid, tk, g, x, y, dt, sw, sh, tz, t

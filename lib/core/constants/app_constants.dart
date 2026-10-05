@@ -91,4 +91,20 @@ class AppConstants {
   /// isCatalog 字段（数据库不持久化此字段，需用 id 集合在内存中重建分组）。
   /// 序列化格式：逗号分隔的 int 字符串，如 "8,9,10,15,21,26,7"
   static const String keyCatalogCategoryIds = 'catalog_category_ids';
+
+  /// 热门搜索词条缓存（解析自站点 /topic.html header 的快捷搜索链接）
+  ///
+  /// 序列化格式：StringList（URL 解码后的关键词）。
+  /// 与 [keyHotKeywordsCacheTs] 配合实现 TTL 失效。
+  static const String keyHotKeywordsCache = 'hot_keywords_cache';
+
+  /// 热门搜索词条缓存的写入时间戳（毫秒 epoch）
+  ///
+  /// 超过 [hotKeywordsCacheTtl] 视为过期，下次进入搜索页时刷新。
+  static const String keyHotKeywordsCacheTs = 'hot_keywords_cache_ts';
+
+  /// 热门搜索词条缓存有效期（12 小时）
+  ///
+  /// 词条由站方运营配置，变更频率低；TTL 内直接读缓存不发起网络请求。
+  static const Duration hotKeywordsCacheTtl = Duration(hours: 12);
 }

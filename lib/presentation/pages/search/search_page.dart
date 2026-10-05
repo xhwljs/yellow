@@ -1,23 +1,24 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart' hide SearchController;
 import 'package:get/get.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:yellow_depot/core/theme/app_theme.dart';
 import 'package:yellow_depot/core/theme/design_tokens.dart';
 import 'package:yellow_depot/core/theme/theme_presets.dart';
+import 'package:yellow_depot/data/services/search_suggest_service.dart';
 import 'package:yellow_depot/presentation/controllers/search_controller.dart';
 import 'package:yellow_depot/presentation/routes/app_pages.dart';
 import 'package:yellow_depot/presentation/widgets/video_card.dart';
 
 /// 搜索页
 ///
-/// 严格遵循 design-system/videohub/MASTER.md：
+/// 交互模型（联想 + 提交式搜索）：
 /// - 顶部固定搜索框（带返回 + 输入 + 清空 + 搜索按钮）
-/// - 500ms 防抖触发搜索
-/// - 初始空态：占位图标 + 提示文案
-/// - 加载中：骨架屏
-/// - 无结果：友好提示 + "试试搜索…" 建议
+/// - 输入 350ms 防抖触发实时联想（封面 + 标题，点击直达详情页）
+/// - 初始空态：占位图标 + 热门搜索词条 + 历史搜索记录
+/// - 提交搜索（回车/按钮/词条点击）后：加载骨架 → 结果网格（分页）
+/// - 无结果：友好提示 + 热门词条推荐
 /// - 错误：错误视图 + 重试
-/// - 列表：2 列网格，下拉加载更多
 class SearchPage extends GetView<SearchController> {
   const SearchPage({super.key});
 
@@ -31,8 +32,15 @@ class SearchPage extends GetView<SearchController> {
         child: _SearchAppBar(controller: controller),
       ),
       body: Obx(() {
-        // 初始空态（含历史搜索记录）
+        // 初始空态（未搜索）
         if (!controller.hasSearched.value && !controller.isLoading.value) {
+          // 已输入文字 → 联想层；否则初始空态（热门 + 历史）
+          if (controller.keyword.value.trim().isNotEmpty) {
+            return _SuggestView(
+              colors: colors,
+              controller: controller,
+            );
+          }
           return _InitialEmptyView(
             colors: colors,
             controller: controller,
@@ -53,7 +61,7 @@ class SearchPage extends GetView<SearchController> {
         if (controller.results.isEmpty) {
           return _NoResultView(
             colors: colors,
-            keyword: controller.keyword.value,
+            controller: controller,
           );
         }
         // 结果列表
@@ -253,9 +261,11 @@ class _SearchAppBar extends StatelessWidget {
 
 /// 初始空态（未搜索时）
 ///
-/// 包含两部分：
+/// 包含三部分：
 /// 1. 顶部：搜索引导图标 + 标题 + 提示文案
-/// 2. 历史搜索区：标题栏（"历史搜索" + "清空"按钮）+ Wrap（chip 列表）
+/// 2. 热门搜索区：站方运营配置的快捷词条（/topic.html header 解析，
+///    SP 缓存 12h），点击直接提交搜索；加载失败静默隐藏
+/// 3. 历史搜索区：标题栏（"历史搜索" + "清空"按钮）+ Wrap（chip 列表）
 ///    - chip 显示关键字 + 单条删除按钮（x 图标）
 ///    - 点击 chip 文本 → 触发搜索
 ///    - 点击 x → 删除单条历史
@@ -294,7 +304,7 @@ class _InitialEmptyView extends StatelessWidget {
         ),
         const SizedBox(height: DesignTokens.spaceXs),
         Text(
-          '输入关键词，回车或点击搜索按钮',
+          '输入关键词实时联想，回车查看全部结果',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: DesignTokens.textCaption,
@@ -302,6 +312,18 @@ class _InitialEmptyView extends StatelessWidget {
           ),
         ),
         const SizedBox(height: DesignTokens.space2xl),
+        // 热门搜索区（词条非空时显示）
+        Obx(() {
+          if (controller.hotKeywords.isEmpty) {
+            return const SizedBox.shrink();
+          }
+          return _HotKeywordSection(
+            colors: colors,
+            keywords: controller.hotKeywords,
+            onTap: (kw) => controller.search(kw),
+          );
+        }),
+        const SizedBox(height: DesignTokens.spaceLg),
         // 历史搜索区（有记录时显示）
         Obx(() {
           if (controller.history.isEmpty) {
@@ -310,6 +332,289 @@ class _InitialEmptyView extends StatelessWidget {
           return _HistorySearchSection(
             colors: colors,
             controller: controller,
+          );
+        }),
+      ],
+    );
+  }
+}
+
+/// 热门搜索区
+///
+/// 站方运营配置的快捷词条（来自 /topic.html header），点击提交搜索。
+/// chip 采用胶囊样式：火焰图标 + 词条文本，主色调点缀。
+class _HotKeywordSection extends StatelessWidget {
+  final ThemeColors colors;
+  final List<String> keywords;
+  final ValueChanged<String> onTap;
+
+  const _HotKeywordSection({
+    required this.colors,
+    required this.keywords,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              PhosphorIconsRegular.fire,
+              size: 18,
+              color: colors.primary,
+            ),
+            const SizedBox(width: DesignTokens.spaceXs),
+            Text(
+              '热门搜索',
+              style: TextStyle(
+                fontSize: DesignTokens.textBody,
+                fontWeight: FontWeight.w600,
+                color: colors.onSurface,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: DesignTokens.spaceSm),
+        Wrap(
+          spacing: DesignTokens.spaceSm,
+          runSpacing: DesignTokens.spaceSm,
+          children: keywords.map((kw) {
+            return ActionChip(
+              label: Text(
+                kw,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: colors.onSurface,
+                  fontSize: DesignTokens.textCaption,
+                ),
+              ),
+              backgroundColor: colors.surface,
+              side: BorderSide(color: colors.border),
+              visualDensity: VisualDensity.compact,
+              onPressed: () => onTap(kw),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+}
+
+/// 实时联想视图（输入文字且未提交搜索时）
+///
+/// 三种状态：
+/// - 联想加载中（列表为空）→ 3 条骨架行
+/// - 有联想结果 → 联想项列表（封面缩略 + 标题 + 箭头），点击直达详情页
+/// - 加载完成但无联想 → 轻提示 + 热门词条兜底（引导提交搜索）
+class _SuggestView extends StatelessWidget {
+  final ThemeColors colors;
+  final SearchController controller;
+
+  const _SuggestView({
+    required this.colors,
+    required this.controller,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      final loading = controller.isSuggestLoading.value;
+      final items = controller.suggestions;
+
+      if (loading && items.isEmpty) {
+        return const _SuggestSkeleton();
+      }
+      if (items.isEmpty) {
+        return _SuggestEmpty(colors: colors, controller: controller);
+      }
+      return ListView.separated(
+        padding: const EdgeInsets.symmetric(
+          horizontal: DesignTokens.spaceMd,
+          vertical: DesignTokens.spaceSm,
+        ),
+        itemCount: items.length,
+        separatorBuilder: (_, __) => Divider(
+          height: 1,
+          color: colors.border,
+        ),
+        itemBuilder: (_, i) {
+          final s = items[i];
+          return _SuggestItem(
+            colors: colors,
+            suggestion: s,
+            onTap: () => Get.toNamed(
+              AppPages.detail,
+              arguments: {
+                'videoId': s.videoId,
+                'coverUrl': s.coverUrl,
+                'title': s.title,
+              },
+            ),
+          );
+        },
+      );
+    });
+  }
+}
+
+/// 联想项 — 封面缩略 + 标题 + 箭头
+class _SuggestItem extends StatelessWidget {
+  final ThemeColors colors;
+  final SearchSuggestion suggestion;
+  final VoidCallback onTap;
+
+  const _SuggestItem({
+    required this.colors,
+    required this.suggestion,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: DesignTokens.spaceSm),
+        child: Row(
+          children: [
+            // 封面缩略（16:9）
+            ClipRRect(
+              borderRadius: BorderRadius.circular(DesignTokens.radiusSm),
+              child: SizedBox(
+                width: 96,
+                height: 54,
+                child: CachedNetworkImage(
+                  imageUrl: suggestion.coverUrl,
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) => Container(color: colors.border),
+                  errorWidget: (_, __, ___) => Container(
+                    color: colors.border,
+                    child: Icon(
+                      PhosphorIconsRegular.image,
+                      size: 20,
+                      color: colors.onSurfaceMuted,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: DesignTokens.spaceMd),
+            // 标题
+            Expanded(
+              child: Text(
+                suggestion.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: DesignTokens.textBody,
+                  color: colors.onSurface,
+                ),
+              ),
+            ),
+            const SizedBox(width: DesignTokens.spaceSm),
+            Icon(
+              PhosphorIconsRegular.caretRight,
+              size: 18,
+              color: colors.onSurfaceMuted,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 联想骨架行
+class _SuggestSkeleton extends StatelessWidget {
+  const _SuggestSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppTheme.colorsOf(context);
+    return ListView(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(
+        horizontal: DesignTokens.spaceMd,
+        vertical: DesignTokens.spaceSm,
+      ),
+      children: List.generate(3, (_) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: DesignTokens.spaceSm),
+          child: Row(
+            children: [
+              Container(
+                width: 96,
+                height: 54,
+                decoration: BoxDecoration(
+                  color: colors.border,
+                  borderRadius: BorderRadius.circular(DesignTokens.radiusSm),
+                ),
+              ),
+              const SizedBox(width: DesignTokens.spaceMd),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      height: 14,
+                      decoration: BoxDecoration(color: colors.border),
+                    ),
+                    const SizedBox(height: 8),
+                    FractionallySizedBox(
+                      widthFactor: 0.6,
+                      child: Container(
+                        height: 14,
+                        decoration: BoxDecoration(color: colors.border),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      }),
+    );
+  }
+}
+
+/// 联想无结果 — 轻提示 + 热门词条兜底
+class _SuggestEmpty extends StatelessWidget {
+  final ThemeColors colors;
+  final SearchController controller;
+
+  const _SuggestEmpty({
+    required this.colors,
+    required this.controller,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(DesignTokens.spaceXl),
+      children: [
+        const SizedBox(height: DesignTokens.spaceLg),
+        Text(
+          '暂无联想结果，回车搜索全部内容',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: DesignTokens.textCaption,
+            color: colors.onSurfaceMuted,
+          ),
+        ),
+        const SizedBox(height: DesignTokens.space2xl),
+        Obx(() {
+          if (controller.hotKeywords.isEmpty) {
+            return const SizedBox.shrink();
+          }
+          return _HotKeywordSection(
+            colors: colors,
+            keywords: controller.hotKeywords,
+            onTap: (kw) => controller.search(kw),
           );
         }),
       ],
@@ -514,14 +819,14 @@ class _HistoryChip extends StatelessWidget {
   }
 }
 
-/// 无结果视图 — 给出搜索建议
+/// 无结果视图 — 给出搜索建议（优先热门词条，兜底静态推荐）
 class _NoResultView extends StatelessWidget {
   final ThemeColors colors;
-  final String keyword;
-  const _NoResultView({required this.colors, required this.keyword});
+  final SearchController controller;
+  const _NoResultView({required this.colors, required this.controller});
 
-  /// 推荐搜索词（用于引导用户）
-  static const _suggestions = ['国产', '日本', '欧美', 'CAWD', 'SSIS'];
+  /// 静态兜底推荐词（热门词条未加载时使用）
+  static const _fallbackSuggestions = ['国产', '日本', '欧美', 'CAWD', 'SSIS'];
 
   @override
   Widget build(BuildContext context) {
@@ -538,7 +843,7 @@ class _NoResultView extends StatelessWidget {
             ),
             const SizedBox(height: DesignTokens.spaceLg),
             Text(
-              '未找到 "$keyword" 相关结果',
+              '未找到 "${controller.keyword.value}" 相关结果',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: DesignTokens.textH2,
@@ -555,27 +860,32 @@ class _NoResultView extends StatelessWidget {
               ),
             ),
             const SizedBox(height: DesignTokens.spaceXl),
-            Wrap(
-              spacing: DesignTokens.spaceSm,
-              runSpacing: DesignTokens.spaceSm,
-              alignment: WrapAlignment.center,
-              children: _suggestions.map((s) {
-                return ActionChip(
-                  label: Text(s),
-                  backgroundColor: colors.surface,
-                  side: BorderSide(color: colors.border),
-                  labelStyle: TextStyle(
-                    color: colors.primary,
-                    fontSize: DesignTokens.textCaption,
-                  ),
-                  onPressed: () {
-                    final c = Get.find<SearchController>();
-                    c.textController.text = s;
-                    c.search(s);
-                  },
-                );
-              }).toList(),
-            ),
+            Obx(() {
+              // 推荐词：热门词条前 8 个；未加载时回退静态推荐
+              final suggestions = controller.hotKeywords.isNotEmpty
+                  ? controller.hotKeywords.take(8).toList()
+                  : _fallbackSuggestions;
+              return Wrap(
+                spacing: DesignTokens.spaceSm,
+                runSpacing: DesignTokens.spaceSm,
+                alignment: WrapAlignment.center,
+                children: suggestions.map((s) {
+                  return ActionChip(
+                    label: Text(s),
+                    backgroundColor: colors.surface,
+                    side: BorderSide(color: colors.border),
+                    labelStyle: TextStyle(
+                      color: colors.primary,
+                      fontSize: DesignTokens.textCaption,
+                    ),
+                    onPressed: () {
+                      controller.textController.text = s;
+                      controller.search(s);
+                    },
+                  );
+                }).toList(),
+              );
+            }),
           ],
         ),
       ),

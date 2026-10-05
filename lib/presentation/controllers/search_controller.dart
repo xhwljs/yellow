@@ -1,17 +1,26 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:yellow_depot/core/utils/logger.dart';
 import 'package:yellow_depot/data/models/video.dart';
 import 'package:yellow_depot/data/repositories/video_repository.dart';
+import 'package:yellow_depot/data/services/hot_keyword_service.dart';
 import 'package:yellow_depot/data/services/search_history_service.dart';
+import 'package:yellow_depot/data/services/search_suggest_service.dart';
 
 /// 搜索控制器
 ///
-/// 严格遵循 ui-ux-pro-max Search UX 建议：
-/// - Debounced fetch（500ms 防抖，避免每次按键都请求）
-/// - "No results" 时给出建议而非空白屏
-/// - 历史搜索关键字（SharedPreferences 持久化，最多 20 条）
+/// 交互模型（联想 + 提交式搜索）：
+/// - 输入变化 → 350ms 防抖触发**实时联想**（suggest JSON 接口，
+///   封面 + 标题，点击联想项直达详情页）
+/// - 回车 / 搜索按钮 / 历史词条 / 热门词条点击 → 提交**完整搜索**
+///   （vodsearch HTML 链路，支持分页）
+/// - 初始空态展示：历史搜索 + 热门搜索词条（/topic.html header 解析，
+///   SP 缓存 12h）
+///
+/// 说明：早期版本为"输入 500ms 自动执行完整搜索"，与联想层冲突
+/// （自动搜索会立即切走空态，联想项来不及点击），故调整为提交式。
 class SearchController extends GetxController {
   final VideoRepository _videoRepo;
 
@@ -48,8 +57,22 @@ class SearchController extends GetxController {
   /// 单条删除（x 按钮）和一键清空。
   final RxList<String> history = <String>[].obs;
 
-  /// 搜索防抖 Timer
-  Timer? _debounce;
+  /// 热门搜索词条（站点 /topic.html header 解析，SP 缓存 12h）
+  ///
+  /// 展示在初始空态的历史搜索区上方；无结果时也作为推荐搜索词。
+  final RxList<String> hotKeywords = <String>[].obs;
+
+  /// 实时联想列表（suggest JSON 接口）
+  final RxList<SearchSuggestion> suggestions = <SearchSuggestion>[].obs;
+
+  /// 联想加载中
+  final RxBool isSuggestLoading = false.obs;
+
+  /// 联想请求序号（防竞态：仅最新请求的响应才更新列表）
+  int _suggestSeq = 0;
+
+  /// 联想防抖 Timer
+  Timer? _suggestDebounce;
 
   /// 文本输入控制器
   final TextEditingController textController = TextEditingController();
@@ -58,11 +81,12 @@ class SearchController extends GetxController {
   void onInit() {
     super.onInit();
     _loadHistory();
+    _loadHotKeywords();
   }
 
   @override
   void onClose() {
-    _debounce?.cancel();
+    _suggestDebounce?.cancel();
     textController.dispose();
     super.onClose();
   }
@@ -70,6 +94,15 @@ class SearchController extends GetxController {
   /// 加载搜索历史到 Rx
   Future<void> _loadHistory() async {
     history.value = await SearchHistoryService.load();
+  }
+
+  /// 加载热门搜索词条（失败静默，区域不显示）
+  Future<void> _loadHotKeywords() async {
+    try {
+      hotKeywords.value = await HotKeywordService.load();
+    } catch (e, st) {
+      appLogger.w('热门词条加载失败', error: e, stackTrace: st);
+    }
   }
 
   /// 添加当前关键字到搜索历史
@@ -92,25 +125,44 @@ class SearchController extends GetxController {
     history.clear();
   }
 
-  /// 输入框文本变化 — 500ms 防抖后触发搜索
+  /// 输入框文本变化 — 350ms 防抖触发实时联想
+  ///
+  /// 联想层仅展示在初始空态（hasSearched=false）；
+  /// 提交搜索（回车/按钮/词条点击）后由 [search] 清空联想。
   void onKeywordChanged(String text) {
     keyword.value = text;
-    _debounce?.cancel();
-    if (text.trim().isEmpty) {
-      // 清空时立即重置状态
+    _suggestDebounce?.cancel();
+
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) {
+      // 清空时立即重置：联想 + 结果状态
+      suggestions.clear();
+      isSuggestLoading.value = false;
       results.clear();
       hasSearched.value = false;
       error.value = '';
       return;
     }
-    _debounce = Timer(const Duration(milliseconds: 500), () {
-      search(text);
+
+    isSuggestLoading.value = true;
+    _suggestDebounce = Timer(const Duration(milliseconds: 350), () {
+      _fetchSuggestions(trimmed);
     });
+  }
+
+  /// 请求联想（带竞态保护）
+  Future<void> _fetchSuggestions(String text) async {
+    final seq = ++_suggestSeq;
+    final list = await SearchSuggestService.suggest(text);
+    // 仅最新请求生效（用户可能已继续输入或已提交搜索）
+    if (seq != _suggestSeq || isClosed) return;
+    suggestions.value = list;
+    isSuggestLoading.value = false;
   }
 
   /// 提交搜索（点击键盘搜索按钮或搜索 icon）
   void submitSearch() {
-    _debounce?.cancel();
+    _suggestDebounce?.cancel();
     final text = keyword.value.trim();
     if (text.isEmpty) return;
     search(text);
@@ -118,6 +170,12 @@ class SearchController extends GetxController {
 
   /// 执行搜索（首页）
   Future<void> search(String text) async {
+    // 提交搜索：联想层退场
+    _suggestSeq++;
+    _suggestDebounce?.cancel();
+    suggestions.clear();
+    isSuggestLoading.value = false;
+
     keyword.value = text;
     textController.text = text;
     textController.selection = TextSelection.fromPosition(
@@ -174,8 +232,12 @@ class SearchController extends GetxController {
 
   /// 清空搜索（保留历史）
   void clear() {
+    _suggestSeq++;
+    _suggestDebounce?.cancel();
     textController.clear();
     keyword.value = '';
+    suggestions.clear();
+    isSuggestLoading.value = false;
     results.clear();
     hasSearched.value = false;
     error.value = '';
