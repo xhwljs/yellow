@@ -231,10 +231,13 @@ jobs:
         # （曾尝试 subprojects afterEvaluate 强锁 compileSdk 34，但模板的
         #  evaluationDependsOn(':app') 会使子项目提前评估完毕导致钩子报错。）
         run: |
-          sed -i 's|com.android.application" version "8\.[0-9]\+\.[0-9]\+"|com.android.application" version "8.6.1"|' android/settings.gradle
+          sed -i 's|com.android.application" version "[0-9.]*"|com.android.application" version "8.6.1"|' android/settings.gradle
           grep 'com.android.application' android/settings.gradle
-          sed -i 's|gradle-8\.[0-9]\+-[a-z]*\.zip|gradle-8.9-bin.zip|' android/gradle/wrapper/gradle-wrapper.properties
+          sed -i 's|gradle-[0-9.]*-[a-z]*\.zip|gradle-8.9-bin.zip|' android/gradle/wrapper/gradle-wrapper.properties
           grep distributionUrl android/gradle/wrapper/gradle-wrapper.properties
+          # 校验：若未命中（模板版本格式变化）则直接失败，避免静默未生效
+          grep -q 'version "8.6.1"' android/settings.gradle
+          grep -q 'gradle-8.9' android/gradle/wrapper/gradle-wrapper.properties
 
       - name: Run Floor codegen
         run: dart run build_runner build --delete-conflicting-outputs
