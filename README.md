@@ -375,7 +375,7 @@ http://68ck.net/  --200+JS壳-->  https://2626.space:8899/?u=http://68ck.net/&p=
 |---|---|---|
 | Splash | - | 启动初始化 + 更新检查 |
 | MainShell | `/` | 4 Tab：首页 / 收藏 / 历史 / 设置 |
-| Home | - | 分类目录卷帘 + 视频网格 |
+| Home | - | 分类 Tab 左右滑动切换（PageView + KeepAlive 独立缓存）+ 分类目录卷帘 + 视频网格 |
 | Category | `/category` | 分类详情列表 |
 | Search | `/search` | 搜索 + 搜索历史 |
 | VideoDetail | `/detail` | SliverAppBar 内嵌播放 + 相关推荐 + 收藏 |

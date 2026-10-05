@@ -43,20 +43,28 @@ class HomeController extends GetxController {
   /// "最新"Tab 错误信息（非空表示错误态）
   final RxString latestError = RxString('');
 
-  /// 单分类 Tab 选中时的视频列表
-  final RxList<Video> selectedCategoryVideos = <Video>[].obs;
+  /// 各分类 Tab 的页面状态（按分类独立存储）
+  ///
+  /// PageView 滑动切换 Tab 时相邻两页并排可见，且各页 KeepAlive
+  /// 常驻保活 — 单一全局状态会导致旧页瞬间显示新页的数据（视觉跳变），
+  /// 因此每个分类持有独立的 videos/loading/分页状态。
+  final RxMap<int, CategoryPageState> categoryPageStates =
+      <int, CategoryPageState>{}.obs;
 
-  /// 单分类 Tab 的当前页码
-  int _selectedPage = 1;
+  /// 取分类的页面状态（不存在时创建）
+  CategoryPageState stateOf(int categoryId) =>
+      categoryPageStates.putIfAbsent(categoryId, CategoryPageState.new);
 
-  /// 单分类 Tab 是否还有更多
-  final RxBool selectedHasMore = true.obs;
-
-  /// 单分类 Tab 是否正在加载第一页（独立于 [isLoading]，避免切换 Tab 时影响首页整体状态）
-  final RxBool selectedLoading = false.obs;
-
-  /// 单分类 Tab 是否正在加载更多
-  final RxBool selectedLoadingMore = false.obs;
+  /// 确保分类页已开始加载
+  ///
+  /// PageView 预构建相邻页（拖动时进入缓存区）即触发，
+  /// 松手切页前数据已在加载 — 滑动切换零等待。
+  void ensureCategoryLoaded(int categoryId) {
+    final state = stateOf(categoryId);
+    if (state.videos.isEmpty && !state.loading && state.error.isEmpty) {
+      _loadCategoryFirstPage(categoryId);
+    }
+  }
 
   @override
   void onInit() {
@@ -124,28 +132,26 @@ class HomeController extends GetxController {
   /// - null：选中"推荐"Tab，显示所有分类 section
   /// - [latestTabId]：选中"最新"Tab，加载 RSS 最新上架流
   /// - 其他非 null：选中具体分类，加载并展示该分类的视频
+  ///
+  /// 分类页状态独立存储：无缓存时加载第一页，切回已缓存分类
+  /// 直接显示缓存（瞬时），数据由下拉刷新统一更新。
   Future<void> selectCategory(int? categoryId) async {
     if (selectedCategoryId.value == categoryId) return;
     selectedCategoryId.value = categoryId;
 
-    if (categoryId == null) {
-      // 切回推荐：清空单分类 Tab 数据
-      selectedCategoryVideos.clear();
-      return;
-    }
+    if (categoryId == null) return;
 
     if (categoryId == latestTabId) {
       // 选中"最新"：加载 RSS 最新上架（有缓存时几乎瞬时）
-      selectedCategoryVideos.clear();
       await loadLatestVideos();
       return;
     }
 
-    // 选中具体分类：加载第一页
-    selectedCategoryVideos.clear();
-    selectedHasMore.value = true;
-    _selectedPage = 1;
-    await _loadSelectedCategoryFirstPage(categoryId);
+    // 选中具体分类：无缓存才加载第一页（有缓存直接显示）
+    final state = stateOf(categoryId);
+    if (state.videos.isEmpty && !state.loading) {
+      await _loadCategoryFirstPage(categoryId);
+    }
   }
 
   /// 加载最新上架（RSS 数据源）
@@ -166,57 +172,92 @@ class HomeController extends GetxController {
     }
   }
 
-  Future<void> _loadSelectedCategoryFirstPage(int categoryId) async {
-    selectedLoading.value = true;
+  /// 加载分类第一页（写入该分类独立状态）
+  Future<void> _loadCategoryFirstPage(int categoryId) async {
+    final state = stateOf(categoryId);
+    state.loading.value = true;
+    state.error.value = '';
     try {
       final videos = await _videoRepo.getCategoryVideos(categoryId);
-      selectedCategoryVideos.value = videos;
+      state.videos.value = videos;
       if (videos.isEmpty) {
-        selectedHasMore.value = false;
+        state.hasMore.value = false;
       }
     } catch (e) {
-      error.value = e.toString();
+      state.error.value = e.toString();
     } finally {
-      selectedLoading.value = false;
+      state.loading.value = false;
     }
   }
 
-  /// 单分类 Tab：加载下一页
-  Future<void> loadMoreSelectedCategory() async {
-    final categoryId = selectedCategoryId.value;
-    if (categoryId == null) return;
-    if (selectedLoadingMore.value ||
-        !selectedHasMore.value ||
-        selectedLoading.value) return;
+  /// 重新加载指定分类第一页（清空缓存后加载，供错误重试/空态刷新）
+  Future<void> reloadCategory(int categoryId) async {
+    final state = stateOf(categoryId);
+    state.videos.clear();
+    state.page = 1;
+    state.hasMore.value = true;
+    await _loadCategoryFirstPage(categoryId);
+  }
 
-    selectedLoadingMore.value = true;
+  /// 分类 Tab：加载下一页（按分类独立防重入）
+  Future<void> loadMoreCategory(int categoryId) async {
+    final state = stateOf(categoryId);
+    if (state.loadingMore.value || !state.hasMore.value || state.loading.value) {
+      return;
+    }
+
+    state.loadingMore.value = true;
     try {
-      final next = _selectedPage + 1;
+      final next = state.page + 1;
       final videos = await _videoRepo.getCategoryVideos(categoryId, page: next);
       if (videos.isEmpty) {
-        selectedHasMore.value = false;
+        state.hasMore.value = false;
       } else {
-        selectedCategoryVideos.addAll(videos);
-        _selectedPage = next;
+        state.videos.addAll(videos);
+        state.page = next;
       }
     } catch (e, st) {
-      appLogger.w('loadMoreSelectedCategory 失败: categoryId=$categoryId',
+      appLogger.w('loadMoreCategory 失败: categoryId=$categoryId',
           error: e, stackTrace: st);
     } finally {
-      selectedLoadingMore.value = false;
+      state.loadingMore.value = false;
     }
   }
 
   @override
   Future<void> refresh() async {
     await loadData(forceRefresh: true);
-    // 刷新当前选中的 Tab
-    final categoryId = selectedCategoryId.value;
-    if (categoryId == latestTabId) {
-      // "最新"Tab：强制绕过 TTL 刷新 RSS
-      await loadLatestVideos(forceRefresh: true);
-    } else if (categoryId != null) {
-      await _loadSelectedCategoryFirstPage(categoryId);
-    }
+    // 并发刷新所有已缓存的分类页第一页（各页 KeepAlive 常驻，数据统一更新）
+    await Future.wait([
+      ...categoryPageStates.keys.map(_loadCategoryFirstPage),
+      // "最新"Tab 已加载过（用户看过）才强制刷新 RSS
+      if (latestVideos.isNotEmpty)
+        loadLatestVideos(forceRefresh: true),
+    ]);
   }
+}
+
+/// 单个分类 Tab 的页面状态（按分类独立）
+///
+/// PageView 滑动切换 + KeepAlive 常驻的配套设计：
+/// 每个分类 Tab 持有独立的视频列表 / 加载 / 分页状态，
+/// 相邻页并排可见时互不串数据，切回时保留已加载内容与滚动位置。
+class CategoryPageState {
+  /// 该分类的视频列表
+  final RxList<Video> videos = <Video>[].obs;
+
+  /// 是否正在加载第一页
+  final RxBool loading = false.obs;
+
+  /// 是否正在加载更多
+  final RxBool loadingMore = false.obs;
+
+  /// 是否还有更多（分页结束标记）
+  final RxBool hasMore = true.obs;
+
+  /// 错误信息（非空表示错误态）
+  final RxString error = RxString('');
+
+  /// 当前已加载到的页码
+  int page = 1;
 }
