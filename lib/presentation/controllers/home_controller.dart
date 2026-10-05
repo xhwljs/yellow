@@ -61,7 +61,7 @@ class HomeController extends GetxController {
   /// 松手切页前数据已在加载 — 滑动切换零等待。
   void ensureCategoryLoaded(int categoryId) {
     final state = stateOf(categoryId);
-    if (state.videos.isEmpty && !state.loading && state.error.isEmpty) {
+    if (state.videos.isEmpty && !state.loading.value && state.error.isEmpty) {
       _loadCategoryFirstPage(categoryId);
     }
   }
@@ -149,7 +149,7 @@ class HomeController extends GetxController {
 
     // 选中具体分类：无缓存才加载第一页（有缓存直接显示）
     final state = stateOf(categoryId);
-    if (state.videos.isEmpty && !state.loading) {
+    if (state.videos.isEmpty && !state.loading.value) {
       await _loadCategoryFirstPage(categoryId);
     }
   }

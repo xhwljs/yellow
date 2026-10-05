@@ -183,6 +183,7 @@ class _HomePageState extends State<HomePage> {
                       final tab = tabs[i];
                       // KeepAlive：切走再切回保留滚动位置不重建
                       return KeepAlive(
+                        keepAlive: true,
                         child: tab.id == null
                             ? _buildRecommendView(colors)
                             : tab.id == HomeController.latestTabId
