@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import 'package:yellow_depot/core/services/watched_service.dart';
 import 'package:yellow_depot/core/utils/logger.dart';
 import 'package:yellow_depot/data/models/play_history.dart';
 import 'package:yellow_depot/data/repositories/history_repository.dart';
@@ -39,10 +40,20 @@ class HistoryController extends GetxController {
   Future<void> deleteHistory(String videoId) async {
     await _historyRepo.deleteByVideoId(videoId);
     histories.removeWhere((h) => h.videoId == videoId);
+    // 同步"已看"角标集合（删除历史后角标随之消失）
+    _refreshWatched();
   }
 
   Future<void> clearAll() async {
     await _historyRepo.clearAll();
     histories.clear();
+    // 同步"已看"角标集合
+    _refreshWatched();
+  }
+
+  /// 刷新列表"已看"角标集合（防御性检查，服务未注册时跳过）
+  void _refreshWatched() {
+    if (!Get.isRegistered<WatchedService>()) return;
+    Get.find<WatchedService>().refresh();
   }
 }

@@ -6,6 +6,8 @@ import 'package:get/get.dart';
 import 'package:video_player/video_player.dart' as vp;
 import 'package:yellow_depot/core/error/exceptions.dart';
 import 'package:yellow_depot/core/player/url_decryptor.dart';
+import 'package:yellow_depot/core/services/pip_service.dart';
+import 'package:yellow_depot/core/services/watched_service.dart';
 import 'package:yellow_depot/core/utils/logger.dart';
 import 'package:yellow_depot/data/models/play_history.dart';
 import 'package:yellow_depot/data/models/video.dart';
@@ -100,6 +102,17 @@ class VideoDetailController extends GetxController
   /// App 切后台前是否正在播放（用于切回前台时恢复）
   bool _wasPlayingBeforePause = false;
 
+  // ===== 画中画（PiP，N7）=====
+  //
+  // 播放启动 → PipService.enable(视频宽高比)：
+  // 用户切后台时原生 onUserLeaveHint 自动进 PiP 小窗继续播放。
+  // 退出详情页 → disable。
+  // PiP 期间不暂停播放、不停历史保存定时器（小窗内继续记进度）。
+  final RxBool isInPipMode = false.obs;
+
+  /// PiP 状态订阅（onClose 时取消）
+  StreamSubscription<bool>? _pipSub;
+
   /// 当前生效的封面 URL
   ///
   /// 详情页 parser 不提取封面（站点无独立大图），
@@ -121,6 +134,10 @@ class VideoDetailController extends GetxController
   void onInit() {
     super.onInit();
     WidgetsBinding.instance.addObserver(this);
+    // 订阅 PiP 状态（进入小窗 → UI 切纯视频布局；退出 → 恢复详情布局）
+    _pipSub = PipService.onPipChanged.listen((isInPip) {
+      isInPipMode.value = isInPip;
+    });
     loadDetail();
   }
 
@@ -132,6 +149,11 @@ class VideoDetailController extends GetxController
     _historySaveTimer = null;
     _historyRefreshThrottle?.cancel();
     _historyRefreshThrottle = null;
+    _pipSub?.cancel();
+    _pipSub = null;
+    isInPipMode.value = false;
+    // 离开播放页：取消自动进入画中画
+    PipService.disable();
     _disposeInlinePlayer();
     WidgetsBinding.instance.removeObserver(this);
     super.onClose();
@@ -145,6 +167,9 @@ class VideoDetailController extends GetxController
     switch (state) {
       case AppLifecycleState.paused:
       case AppLifecycleState.inactive:
+        // 画中画已启用 → 切后台将进入 PiP 小窗继续播放：
+        // 不暂停、不停历史保存定时器（小窗内继续记进度）
+        if (_pipAutoEnabled) break;
         // App 切后台/失焦 → 暂停播放，记录原状态用于恢复
         _wasPlayingBeforePause = vc.value.isPlaying;
         if (_wasPlayingBeforePause) {
@@ -167,6 +192,15 @@ class VideoDetailController extends GetxController
       default:
         break;
     }
+  }
+
+  /// 是否已启用自动画中画（播放启动后为 true）
+  bool _pipAutoEnabled = false;
+
+  /// 启用自动画中画（播放器就绪后调用）
+  Future<void> _enablePip(double aspectRatio) async {
+    _pipAutoEnabled = true;
+    await PipService.enable(aspectRatio);
   }
 
   Future<void> loadDetail() async {
@@ -303,6 +337,12 @@ class VideoDetailController extends GetxController
       inlineChewieController.value = chewie;
       inlineLoading.value = false;
 
+      // 启用自动画中画（切后台进 PiP 小窗继续播放，宽高比匹配视频）
+      if (videoController.value.isInitialized &&
+          videoController.value.aspectRatio > 0) {
+        _enablePip(videoController.value.aspectRatio);
+      }
+
       // 立即写入一次历史记录（position = 续播位置或 0）
       //
       // 用户需求：开始播放就出现在历史列表，不必等节流定时器首次触发。
@@ -310,6 +350,11 @@ class VideoDetailController extends GetxController
       // _saveHistoryFromPlayer 内部会判断 duration > 0 才保存，
       // 因此这里直接调用即可（duration 0 时静默跳过，下一次定时器触发会写入）。
       _saveHistoryFromPlayer();
+
+      // 播放启动即标记已看（列表"已看"角标响应式刷新，返回列表页即可见）
+      if (Get.isRegistered<WatchedService>()) {
+        Get.find<WatchedService>().markWatched(videoId);
+      }
 
       // 启动历史记录节流保存定时器
       _startHistorySaveTimer();
@@ -384,6 +429,9 @@ class VideoDetailController extends GetxController
     inlineChewieController.value = null;
     inlineVideoController.value = null;
     _inlineStarted = false;
+    // 播放器释放后不再允许自动进入画中画
+    _pipAutoEnabled = false;
+    PipService.disable();
   }
 
   // ===== 历史记录节流保存 =====

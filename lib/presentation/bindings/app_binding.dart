@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:get/get.dart';
 import 'package:yellow_depot/core/network/api_server_switcher.dart';
 import 'package:yellow_depot/core/network/api_service.dart';
 import 'package:yellow_depot/core/network/dio_client.dart';
 import 'package:yellow_depot/core/player/url_decryptor.dart';
+import 'package:yellow_depot/core/services/watched_service.dart';
 import 'package:yellow_depot/core/theme/theme_controller.dart';
 import 'package:yellow_depot/data/database/app_database.dart';
 import 'package:yellow_depot/data/repositories/category_repository.dart';
@@ -59,6 +62,13 @@ Future<void> initializeApp() async {
     FavoriteRepository(Get.find<AppDatabase>()),
     permanent: true,
   );
+
+  // 5.5 已看标记服务（基于播放历史的"已看"角标）
+  //     启动时异步全量加载，不阻塞初始化
+  final watchedService =
+      WatchedService(Get.find<HistoryRepository>());
+  Get.put<WatchedService>(watchedService, permanent: true);
+  unawaited(watchedService.refresh());
 
   // 6. 解密器
   Get.put<UrlDecryptor>(

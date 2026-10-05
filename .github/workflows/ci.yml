@@ -120,7 +120,8 @@ jobs:
         #
         # 1. launcher 显示名 sed 改为 "Yellow Depot"
         # 2. 注入 REQUEST_INSTALL_PACKAGES 权限（自动更新功能需要）
-        # 3. 注入 FileProvider 用于分享 APK 给系统安装器（open_file 包需要）
+        # 3. 注入 PiP（画中画）支持：Manifest 属性 + 覆盖 MainActivity.kt
+        #    （MethodChannel "pip_channel" 桥接，播放页切后台自动进小窗）
         run: |
           flutter create --platforms=android --project-name=videohub --org com.videohub .
           sed -i 's|android:label="videohub"|android:label="Yellow Depot"|' android/app/src/main/AndroidManifest.xml
@@ -128,7 +129,88 @@ jobs:
           # 在 </manifest> 前注入权限
           sed -i 's|</manifest>|    <!-- 自动更新：安装未知来源 APK 权限（Android 8+ 必需） -->\n    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />\n</manifest>|' android/app/src/main/AndroidManifest.xml
 
-          grep -E 'android:label=|REQUEST_INSTALL_PACKAGES' android/app/src/main/AndroidManifest.xml
+          # PiP：activity 声明支持画中画 + 尺寸变化时不重建 Activity
+          sed -i 's|android:name=".MainActivity"|android:name=".MainActivity"\n            android:supportsPictureInPicture="true"\n            android:configChanges="orientation\|keyboardHidden\|keyboard\|screenSize\|smallestScreenSize\|screenLayout"|' android/app/src/main/AndroidManifest.xml
+
+          # PiP：覆盖 MainActivity.kt（onUserLeaveHint 自动进小窗 + 状态回传 Flutter）
+          cat > android/app/src/main/kotlin/com/videohub/videohub/MainActivity.kt << 'KOTLIN_EOF'
+          package com.videohub.videohub
+
+          import android.app.PictureInPictureParams
+          import android.os.Build
+          import android.util.Rational
+          import io.flutter.embedding.android.FlutterActivity
+          import io.flutter.embedding.engine.FlutterEngine
+          import io.flutter.plugin.common.MethodChannel
+          import kotlin.math.roundToInt
+
+          /// 画中画（PiP）桥接 Activity
+          ///
+          /// MethodChannel "pip_channel" 协议：
+          /// - setPipEnabled {enabled, aspectRatio}：Flutter 播放页启停自动 PiP
+          /// - enterPip：主动进入（预留）
+          /// - onPipChanged {bool}：进入/退出小窗时反向通知 Flutter 切布局
+          class MainActivity : FlutterActivity() {
+              private var pipEnabled = false
+              private var pipAspect = 16f / 9f
+
+              override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+                  super.configureFlutterEngine(flutterEngine)
+                  MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "pip_channel")
+                      .setMethodCallHandler { call, result ->
+                          when (call.method) {
+                              "setPipEnabled" -> {
+                                  pipEnabled = call.argument<Boolean>("enabled") ?: false
+                                  val ratio = call.argument<Double>("aspectRatio")
+                                  if (ratio != null && ratio > 0) {
+                                      pipAspect = ratio.toFloat()
+                                  }
+                                  result.success(null)
+                              }
+                              "enterPip" -> {
+                                  result.success(enterPipMode())
+                              }
+                              else -> result.notImplemented()
+                          }
+                      }
+              }
+
+              private fun enterPipMode(): Boolean {
+                  if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
+                  return try {
+                      // clamp 到系统允许范围（约 0.42 ~ 2.38），千分比近似分数
+                      val clamped = pipAspect.coerceIn(0.42f, 2.38f)
+                      val num = (clamped * 1000f).roundToInt()
+                      val params = PictureInPictureParams.Builder()
+                          .setAspectRatio(Rational(num, 1000))
+                          .build()
+                      enterPictureInPictureMode(params)
+                      true
+                  } catch (e: Exception) {
+                      false
+                  }
+              }
+
+              override fun onUserLeaveHint() {
+                  super.onUserLeaveHint()
+                  // 用户按 Home / 切后台：播放页已启用 → 进小窗继续播放
+                  if (pipEnabled) {
+                      enterPipMode()
+                  }
+              }
+
+              @Deprecated("Deprecated in Java")
+              override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean) {
+                  super.onPictureInPictureModeChanged(isInPictureInPictureMode)
+                  flutterEngine?.dartExecutor?.binaryMessenger?.let { messenger ->
+                      MethodChannel(messenger, "pip_channel")
+                          .invokeMethod("onPipChanged", isInPictureInPictureMode)
+                  }
+              }
+          }
+          KOTLIN_EOF
+
+          grep -E 'android:label=|REQUEST_INSTALL_PACKAGES|supportsPictureInPicture' android/app/src/main/AndroidManifest.xml
 
       - name: Bump Kotlin to 1.9.22 for plugin compatibility
         run: |
@@ -263,28 +345,28 @@ jobs:
 
           ### 新功能
 
-          #### 搜索实时联想
+          #### 首页"最新"Tab（RSS 最新上架）
 
-          - 搜索框输入文字即实时联想（封面 + 标题），
-            点击联想项直达详情页，无需先搜再翻
-          - 输入演员名片段可快速定位其参演作品
-          - 联想基于站点 JSON 接口，比完整搜索更轻量快速
+          - 首页分类 Tab 新增"最新"：全站跨分类最新上架流（约 30 条）
+          - 数据源为站点 RSS 订阅，卡片展示相对发布时间（"3小时前"）
+          - 1 小时本地缓存，下拉刷新强制更新
 
-          #### 热门搜索词条
+          #### 列表"已看"角标
 
-          - 搜索页空状态新增"热门搜索"区，
-            展示站方运营配置的精选词条（12 小时缓存）
-          - 点击词条直接提交搜索
-          - 搜索无结果时的推荐词同步替换为热门词条
+          - 首页 / 分类 / 搜索 / 相关推荐卡片右上角显示"已看"角标
+          - 基于播放历史自动标记，播放启动即生效，返回列表即可见
+          - 删除历史或清空历史后角标同步消失
 
-          ### 交互调整
+          #### 画中画（Android 8.0+）
 
-          #### 搜索改为"联想 + 提交式"
+          - 播放中按 Home 键 / 切后台自动进入画中画小窗继续播放
+          - 小窗宽高比自动匹配视频画面
+          - 点击小窗返回应用自动恢复详情页布局
 
-          - 旧版输入停顿 500ms 自动执行完整搜索，
-            与联想层冲突（联想项来不及点击就被切走）
-          - 现改为：输入实时联想；回车 / 搜索按钮 /
-            词条点击提交完整搜索（支持分页的结果网格不变）
+          ### 体验优化
+
+          - 启动页获取最新域名后的停留时间由 2 秒缩短为 1 秒，
+            更快进入首页
 
           NOTES_EOF
           # 移除 heredoc 导致的每行前导空格（保持 markdown 结构）

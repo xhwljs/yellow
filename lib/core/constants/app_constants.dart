@@ -107,4 +107,15 @@ class AppConstants {
   ///
   /// 词条由站方运营配置，变更频率低；TTL 内直接读缓存不发起网络请求。
   static const Duration hotKeywordsCacheTtl = Duration(hours: 12);
+
+  /// 最新上架（RSS）缓存（解析自站点 /rss.xml，序列化为 Video JSON List）
+  static const String keyLatestVideosCache = 'latest_videos_cache';
+
+  /// 最新上架（RSS）缓存的写入时间戳（毫秒 epoch）
+  static const String keyLatestVideosCacheTs = 'latest_videos_cache_ts';
+
+  /// 最新上架（RSS）缓存有效期（1 小时）
+  ///
+  /// 站点更新频率较高，TTL 设短（1 小时）；TTL 内直接读缓存不发起请求。
+  static const Duration latestVideosCacheTtl = Duration(hours: 1);
 }

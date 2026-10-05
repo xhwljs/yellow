@@ -112,6 +112,9 @@ class HomePage extends GetView<HomeController> {
                   if (selectedId == null) {
                     return _buildRecommendView(colors);
                   }
+                  if (selectedId == HomeController.latestTabId) {
+                    return _buildLatestView(colors);
+                  }
                   return _buildSingleCategoryView(colors, selectedId);
                 }),
               ),
@@ -337,6 +340,7 @@ class HomePage extends GetView<HomeController> {
         // Tab 列表：推荐 + nav 分类（不含目录区块分类）
         final tabs = <_CategoryTab>[
           const _CategoryTab(id: null, name: '推荐'),
+          const _CategoryTab(id: HomeController.latestTabId, name: '最新'),
           ...controller.navCategories.map(
             (c) => _CategoryTab(id: c.id, name: c.name),
           ),
@@ -409,6 +413,63 @@ class HomePage extends GetView<HomeController> {
         const SizedBox(height: DesignTokens.spaceXl),
       ],
     );
+  }
+
+  /// "最新"Tab 内容：RSS 最新上架流（约 30 条，无分页）
+  ///
+  /// 数据源：站点 /rss.xml（全站跨分类最新上架，含发布时间）。
+  /// 卡片元信息行展示相对发布时间（"3小时前"），
+  /// 封面由详情页补全（RSS 不提供封面图）。
+  Widget _buildLatestView(colors) {
+    return Obx(() {
+      // 加载中（首次进入且无缓存）
+      if (controller.latestLoading.value &&
+          controller.latestVideos.isEmpty) {
+        return _buildSkeletonGrid();
+      }
+      // 错误（无缓存可用）
+      if (controller.latestError.value.isNotEmpty &&
+          controller.latestVideos.isEmpty) {
+        return ErrorView(
+          message: controller.latestError.value,
+          onRetry: () => controller.loadLatestVideos(forceRefresh: true),
+        );
+      }
+      // 无数据
+      if (controller.latestVideos.isEmpty) {
+        return EmptyView(
+          icon: PhosphorIconsRegular.fire,
+          title: '暂无最新上架',
+          subtitle: '下拉刷新试试',
+          onAction: () => controller.loadLatestVideos(forceRefresh: true),
+          actionLabel: '刷新',
+        );
+      }
+      return GridView.builder(
+        padding: const EdgeInsets.all(DesignTokens.spaceMd),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: DesignTokens.videoGridCrossAxisCount,
+          mainAxisSpacing: DesignTokens.videoGridMainAxisSpacing,
+          crossAxisSpacing: DesignTokens.videoGridSpacing,
+          childAspectRatio: 0.88,
+        ),
+        itemCount: controller.latestVideos.length,
+        itemBuilder: (_, i) {
+          final v = controller.latestVideos[i];
+          return VideoCard(
+            video: v,
+            onTap: () => Get.toNamed(
+              AppPages.detail,
+              arguments: {
+                'videoId': v.id,
+                'coverUrl': v.coverUrl,
+                'title': v.title,
+              },
+            ),
+          );
+        },
+      );
+    });
   }
 
   /// 单分类 Tab 内容：网格布局 + 分页懒加载

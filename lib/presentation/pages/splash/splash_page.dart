@@ -198,8 +198,8 @@ class _SplashPageState extends State<SplashPage> {
       _domainStatus =
           latestDomain != null ? _DomainStatus.success : _DomainStatus.failure;
     });
-    // 结果停留展示，让用户看清成功 / 失败提示
-    await Future.delayed(const Duration(seconds: 2));
+    // 结果短暂停留后进入 App（用户要求：获取到最新地址后 1 秒进入首页）
+    await Future.delayed(const Duration(seconds: 1));
     if (!mounted) return;
     _enterApp();
   }

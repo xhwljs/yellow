@@ -1,7 +1,9 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:yellow_depot/core/services/watched_service.dart';
 import 'package:yellow_depot/core/theme/app_theme.dart';
 import 'package:yellow_depot/core/theme/design_tokens.dart';
 import 'package:yellow_depot/core/theme/theme_presets.dart';
@@ -36,6 +38,9 @@ class VideoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = AppTheme.colorsOf(context);
+    // 已看角标依赖 WatchedService（permanent 注册）；
+    // 测试 / 预览环境未注册时静默降级（不渲染角标）
+    final hasWatchedService = Get.isRegistered<WatchedService>();
 
     return Material(
       color: colors.surface,
@@ -103,6 +108,49 @@ class VideoCard extends StatelessWidget {
                           size: 14,
                         ),
                       ),
+                    ),
+                  // 已看角标（右上角，基于播放历史响应式刷新）
+                  if (hasWatchedService)
+                    Positioned(
+                      right: DesignTokens.spaceSm,
+                      top: DesignTokens.spaceSm,
+                      child: Obx(() {
+                        final ws = Get.find<WatchedService>();
+                        // 读 RxInt 确保 Obx 依赖注册（RxSet.contains 不保证）
+                        final watched = ws.watchedCount.value > 0 &&
+                            ws.isWatched(video.id);
+                        if (!watched) return const SizedBox.shrink();
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: DesignTokens.spaceSm,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: DesignTokens.colorVideoOverlay,
+                            borderRadius:
+                                BorderRadius.circular(DesignTokens.radiusSm),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                PhosphorIconsRegular.check,
+                                size: 10,
+                                color: colors.primary,
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                '已看',
+                                style: TextStyle(
+                                  color: colors.primary,
+                                  fontSize: DesignTokens.textLabel,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
                     ),
                   // 进度条
                   if (progress != null && progress! > 0 && progress! < 1)

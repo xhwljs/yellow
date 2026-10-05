@@ -57,6 +57,14 @@ class ApiService {
     return response.data ?? '';
   }
 
+  /// 获取 RSS 订阅 XML（全站最新上架流，30 条）
+  ///
+  /// 由 [RssParser] 解析为最新视频列表（title / aid / 发布时间）。
+  Future<String> fetchRss() async {
+    final response = await _dio.get<String>(ApiEndpoints.rss);
+    return response.data ?? '';
+  }
+
   /// 搜索联想（macCMS suggest JSON 接口）
   ///
   /// 返回原始 JSON Map：`{code, list: [{id, name, en, pic}], ...}`。

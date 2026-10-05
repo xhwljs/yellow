@@ -1,21 +1,26 @@
 import 'package:get/get.dart';
 import 'package:yellow_depot/core/utils/logger.dart';
 import 'package:yellow_depot/data/models/category.dart';
+import 'package:yellow_depot/data/models/video.dart';
 import 'package:yellow_depot/data/repositories/category_repository.dart';
 import 'package:yellow_depot/data/repositories/video_repository.dart';
-import 'package:yellow_depot/data/models/video.dart';
+import 'package:yellow_depot/data/services/latest_video_service.dart';
 
 /// 首页控制器
 ///
 /// **分类菜单 Tab 设计**（参考网页导航菜单 + ui-ux-pro-max MD3 风格）：
-/// - 顶部固定 Tab 栏：推荐 + 各分类
+/// - 顶部固定 Tab 栏：推荐 + 最新 + 各分类
 /// - 选中"推荐"：保留原 Section 布局，所有分类都展示前 6 条
+/// - 选中"最新"（[latestTabId] 哨兵）：展示 RSS 最新上架流（约 30 条，无分页）
 /// - 选中具体分类：只展示该分类的视频网格，分页加载
 class HomeController extends GetxController {
   final CategoryRepository _categoryRepo;
   final VideoRepository _videoRepo;
 
   HomeController(this._categoryRepo, this._videoRepo);
+
+  /// "最新"Tab 哨兵 ID（负值避免与真实分类 id 冲突）
+  static const int latestTabId = -1;
 
   final RxList<Category> categories = <Category>[].obs;
   final RxMap<int, List<Video>> categoryVideos = <int, List<Video>>{}.obs;
@@ -25,8 +30,18 @@ class HomeController extends GetxController {
   /// 当前选中的分类 ID
   ///
   /// - null：选中"推荐"Tab，显示所有分类 section
-  /// - 非 null：选中具体分类，只显示该分类的视频网格
+  /// - [latestTabId]：选中"最新"Tab，显示 RSS 最新上架流
+  /// - 其他非 null：选中具体分类，只显示该分类的视频网格
   final Rx<int?> selectedCategoryId = Rx<int?>(null);
+
+  /// "最新"Tab 的视频列表（RSS 数据源）
+  final RxList<Video> latestVideos = <Video>[].obs;
+
+  /// "最新"Tab 是否正在加载
+  final RxBool latestLoading = false.obs;
+
+  /// "最新"Tab 错误信息（非空表示错误态）
+  final RxString latestError = RxString('');
 
   /// 单分类 Tab 选中时的视频列表
   final RxList<Video> selectedCategoryVideos = <Video>[].obs;
@@ -107,7 +122,8 @@ class HomeController extends GetxController {
   ///
   /// [categoryId]：
   /// - null：选中"推荐"Tab，显示所有分类 section
-  /// - 非 null：选中具体分类，加载并展示该分类的视频
+  /// - [latestTabId]：选中"最新"Tab，加载 RSS 最新上架流
+  /// - 其他非 null：选中具体分类，加载并展示该分类的视频
   Future<void> selectCategory(int? categoryId) async {
     if (selectedCategoryId.value == categoryId) return;
     selectedCategoryId.value = categoryId;
@@ -118,11 +134,36 @@ class HomeController extends GetxController {
       return;
     }
 
+    if (categoryId == latestTabId) {
+      // 选中"最新"：加载 RSS 最新上架（有缓存时几乎瞬时）
+      selectedCategoryVideos.clear();
+      await loadLatestVideos();
+      return;
+    }
+
     // 选中具体分类：加载第一页
     selectedCategoryVideos.clear();
     selectedHasMore.value = true;
     _selectedPage = 1;
     await _loadSelectedCategoryFirstPage(categoryId);
+  }
+
+  /// 加载最新上架（RSS 数据源）
+  ///
+  /// 下拉刷新传 [forceRefresh]：true 强制绕过 TTL。
+  Future<void> loadLatestVideos({bool forceRefresh = false}) async {
+    if (latestLoading.value) return;
+    latestLoading.value = true;
+    latestError.value = '';
+    try {
+      final videos = await LatestVideoService.load(forceRefresh: forceRefresh);
+      latestVideos.value = videos;
+    } catch (e, st) {
+      appLogger.w('loadLatestVideos 失败', error: e, stackTrace: st);
+      latestError.value = e.toString();
+    } finally {
+      latestLoading.value = false;
+    }
   }
 
   Future<void> _loadSelectedCategoryFirstPage(int categoryId) async {
@@ -171,7 +212,10 @@ class HomeController extends GetxController {
     await loadData(forceRefresh: true);
     // 刷新当前选中的 Tab
     final categoryId = selectedCategoryId.value;
-    if (categoryId != null) {
+    if (categoryId == latestTabId) {
+      // "最新"Tab：强制绕过 TTL 刷新 RSS
+      await loadLatestVideos(forceRefresh: true);
+    } else if (categoryId != null) {
       await _loadSelectedCategoryFirstPage(categoryId);
     }
   }

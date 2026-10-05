@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:video_player/video_player.dart' as vp;
 import 'package:yellow_depot/core/player/url_decryptor.dart';
 import 'package:yellow_depot/core/theme/app_theme.dart';
 import 'package:yellow_depot/core/theme/design_tokens.dart';
@@ -50,13 +51,42 @@ class VideoDetailPage extends GetView<VideoDetailController> {
   @override
   Widget build(BuildContext context) {
     final colors = AppTheme.colorsOf(context);
-    return Scaffold(
-      backgroundColor: colors.background,
-      // SafeArea 包裹 CustomScrollView，让 SliverAppBar 顶部留出系统状态栏空间
-      body: SafeArea(
-        top: true,
-        bottom: false,
-        child: Obx(() => _buildContent(context, colors)),
+    return Obx(() {
+      // 画中画小窗：纯视频布局（黑底 + 视频居中撑满，无任何控件）
+      // 系统按 PiP 窗口宽高比裁剪中央画面
+      if (controller.isInPipMode.value) {
+        return _buildPipView();
+      }
+      return Scaffold(
+        backgroundColor: colors.background,
+        // SafeArea 包裹 CustomScrollView，让 SliverAppBar 顶部留出系统状态栏空间
+        body: SafeArea(
+          top: true,
+          bottom: false,
+          child: _buildContent(context, colors),
+        ),
+      );
+    });
+  }
+
+  /// PiP 小窗视图（N7 画中画）
+  ///
+  /// 仅渲染视频画面本体（vp.VideoPlayer，不带 chewie 控件）：
+  /// - 小窗内不支持交互，控件渲染无意义
+  /// - PiP 窗口 aspectRatio 已按视频宽高比设置，画面完整无黑边
+  /// - 播放器未就绪（理论不可达）时渲染空白
+  Widget _buildPipView() {
+    final vc = controller.inlineVideoController.value;
+    if (vc == null || !vc.value.isInitialized) {
+      return const SizedBox.shrink();
+    }
+    return Container(
+      color: Colors.black,
+      child: Center(
+        child: AspectRatio(
+          aspectRatio: vc.value.aspectRatio,
+          child: vp.VideoPlayer(vc),
+        ),
       ),
     );
   }

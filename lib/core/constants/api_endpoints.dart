@@ -78,4 +78,18 @@ class ApiEndpoints {
   /// - `id` 为影片 aid，配合站点单集结构可直接构造详情页 videoId = `{id}-1-1`
   static String searchSuggest(String keyword) =>
       '$base/index.php/ajax/suggest?mid=1&wd=${Uri.encodeComponent(keyword)}';
+
+  /// RSS 订阅（全站最新上架流）
+  ///
+  /// GET `/rss.xml`，返回 30 条最新上架影片：
+  /// ```xml
+  /// <item>
+  ///   <title>标题</title>
+  ///   <link>http://http://hsck.tv/voddetail/272445.html</link>
+  ///   <pubDate>2026-10-05 07:46:31</pubDate>
+  /// </item>
+  /// ```
+  /// 注意：item 的 link 是站方配置错误的双前缀外域地址，
+  /// 需从中提取 aid 再构造本站详情页 videoId = `{aid}-1-1`（见 RssParser）。
+  static String get rss => '$base/rss.xml';
 }
