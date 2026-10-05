@@ -221,6 +221,29 @@ jobs:
           sed -i 's/org.jetbrains.kotlin.android" version "1\.[0-9]\+\.[0-9]\+"/org.jetbrains.kotlin.android" version "1.9.22"/' android/settings.gradle
           grep kotlin android/settings.gradle
 
+      - name: Pin plugin subprojects to compileSdk 34
+        #
+        # 部分新版本插件（如 flutter_plugin_android_lifecycle）声明 compileSdk 35，
+        # 而 Flutter 3.24 模板的 AGP 8.1 aapt2 无法解析 android-35 资源表
+        # （RES_TABLE_TYPE_TYPE entry offsets overlap），release 构建的
+        # verifyReleaseResources 任务必失败（debug 不走该任务所以此前未暴露）。
+        # 解法：强制所有 library 子项目 compileSdk 34（社区通用做法）。
+        run: |
+          cat >> android/build.gradle << 'GRADLE_EOF'
+
+          // 强制插件子项目 compileSdk 34（见 workflow 此步骤注释）
+          subprojects {
+              afterEvaluate { project ->
+                  if (project.plugins.hasPlugin("com.android.library")) {
+                      project.android {
+                          compileSdk 34
+                      }
+                  }
+              }
+          }
+          GRADLE_EOF
+          /usr/bin/tail -15 android/build.gradle
+
       - name: Run Floor codegen
         run: dart run build_runner build --delete-conflicting-outputs
 
