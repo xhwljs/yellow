@@ -29,68 +29,8 @@ import 'package:yellow_depot/presentation/widgets/video_card.dart';
 /// - "推荐"Tab：保留原 Section 布局，每个分类横向滚动 6 条
 /// - 具体分类 Tab：网格布局 + 分页懒加载
 /// - 下拉刷新 / 加载骨架屏 / 错误 / 空数据三态
-/// - **内容区左右滑动切换 Tab**（PageView）：
-///   - 点击 pill Tab → animateToPage 滑动跳页（反向联动）
-///   - 内容区左右滑动 → onPageChanged 切换选中 Tab（正向联动）
-///   - 滑动切页后选中 pill 自动滚动到可见（窄屏 Tab 栏溢出时）
-///   - 每页 KeepAlive 保持滚动位置，切回不重建
-class HomePage extends StatefulWidget {
+class HomePage extends GetView<HomeController> {
   const HomePage({super.key});
-
-  @override
-  State<HomePage> createState() => _HomePageState();
-}
-
-class _HomePageState extends State<HomePage> {
-  HomeController get controller => Get.find<HomeController>();
-
-  /// 页面滑动控制器（内容区左右滑动切换 Tab）
-  ///
-  /// HomePage 由 MainShell IndexedStack 常驻保活，
-  /// State 与 PageController 同生命周期（App 全程存活，切底部 Tab 不丢页码）。
-  final PageController _pageController = PageController();
-
-  /// 各 Tab pill 的 GlobalKey（选中项自动滚动到可见）
-  final Map<String, GlobalKey> _tabKeys = {};
-
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
-  }
-
-  /// Tab 列表：推荐 + 最新 + nav 分类（不含目录区块分类）
-  List<_CategoryTab> _buildTabs() {
-    return [
-      const _CategoryTab(id: null, name: '推荐'),
-      const _CategoryTab(id: HomeController.latestTabId, name: '最新'),
-      ...controller.navCategories.map(
-        (c) => _CategoryTab(id: c.id, name: c.name),
-      ),
-    ];
-  }
-
-  /// Tab 的稳定 key（推荐用 'recommend'，其余用分类 id）
-  String _tabKeyId(_CategoryTab tab) => tab.id?.toString() ?? 'recommend';
-
-  /// 选中 pill 自动滚动到可见
-  ///
-  /// Tab 栏横向溢出（分类多 / 窄屏）时，滑动切页后选中的 pill
-  /// 可能在屏幕外 — post-frame ensureVisible 轻滚到视口边缘
-  /// （alignment 0.1，尽量少移动，已可见时几乎不动）。
-  void _ensureTabVisible(_CategoryTab tab) {
-    final ctx = _tabKeys[_tabKeyId(tab)]?.currentContext;
-    if (ctx == null) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        Scrollable.ensureVisible(
-          ctx,
-          alignment: 0.1,
-          duration: const Duration(milliseconds: 200),
-        );
-      }
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -165,33 +105,17 @@ class _HomePageState extends State<HomePage> {
               // 分类菜单 Tab 栏（固定）
               _buildCategoryTabs(colors),
               const SizedBox(height: DesignTokens.spaceMd),
-              // 内容区（PageView：左右滑动切换 Tab + 点击 Tab 联动跳页）
+              // 内容区（根据 Tab 切换）
               Expanded(
                 child: Obx(() {
-                  // 读 navCategories 使 Obx 响应分类列表变化
-                  final tabs = _buildTabs();
-                  return PageView.builder(
-                    controller: _pageController,
-                    onPageChanged: (i) {
-                      // 滑动切页 → 同步选中 Tab（selectCategory 幂等）
-                      controller.selectCategory(tabs[i].id);
-                      // 选中 pill 滚动到可见（窄屏 Tab 栏溢出时）
-                      _ensureTabVisible(tabs[i]);
-                    },
-                    itemCount: tabs.length,
-                    itemBuilder: (_, i) {
-                      final tab = tabs[i];
-                      // KeepAlive：切走再切回保留滚动位置不重建
-                      return KeepAlive(
-                        keepAlive: true,
-                        child: tab.id == null
-                            ? _buildRecommendView(colors)
-                            : tab.id == HomeController.latestTabId
-                                ? _buildLatestView(colors)
-                                : _buildSingleCategoryView(colors, tab.id!),
-                      );
-                    },
-                  );
+                  final selectedId = controller.selectedCategoryId.value;
+                  if (selectedId == null) {
+                    return _buildRecommendView(colors);
+                  }
+                  if (selectedId == HomeController.latestTabId) {
+                    return _buildLatestView(colors);
+                  }
+                  return _buildSingleCategoryView(colors, selectedId);
                 }),
               ),
             ],
@@ -414,7 +338,13 @@ class _HomePageState extends State<HomePage> {
       child: Obx(() {
         final selectedId = controller.selectedCategoryId.value;
         // Tab 列表：推荐 + nav 分类（不含目录区块分类）
-        final tabs = _buildTabs();
+        final tabs = <_CategoryTab>[
+          const _CategoryTab(id: null, name: '推荐'),
+          const _CategoryTab(id: HomeController.latestTabId, name: '最新'),
+          ...controller.navCategories.map(
+            (c) => _CategoryTab(id: c.id, name: c.name),
+          ),
+        ];
         return ListView.separated(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(
@@ -426,47 +356,31 @@ class _HomePageState extends State<HomePage> {
           itemBuilder: (_, i) {
             final tab = tabs[i];
             final isSelected = tab.id == selectedId;
-            return KeyedSubtree(
-              // 注册 GlobalKey：滑动切页后选中 pill ensureVisible 用
-              key: _tabKeys.putIfAbsent(_tabKeyId(tab), GlobalKey.new),
-              child: GestureDetector(
-                onTap: () {
-                  // 点击 Tab → 同步选中 + PageView 滑动跳页（反向联动）
-                  controller.selectCategory(tab.id);
-                  _pageController.animateToPage(
-                    i,
-                    duration: const Duration(milliseconds: 250),
-                    curve: Curves.easeOutCubic,
-                  );
-                  _ensureTabVisible(tab);
-                },
-                behavior: HitTestBehavior.opaque,
-                child: AnimatedContainer(
-                  duration: DesignTokens.motionFast,
-                  curve: Curves.easeOutCubic,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: DesignTokens.spaceLg,
-                    vertical: DesignTokens.spaceSm,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isSelected ? colors.primary : colors.surface,
-                    borderRadius:
-                        BorderRadius.circular(DesignTokens.radiusPill),
-                    border:
-                        isSelected ? null : Border.all(color: colors.border),
-                    boxShadow: isSelected ? DesignTokens.elevation1 : null,
-                  ),
-                  child: Center(
-                    child: Text(
-                      tab.name,
-                      style: TextStyle(
-                        color: isSelected
-                            ? colors.onPrimary
-                            : colors.onSurfaceMuted,
-                        fontSize: DesignTokens.textBody,
-                        fontWeight:
-                            isSelected ? FontWeight.w700 : FontWeight.w500,
-                      ),
+            return GestureDetector(
+              onTap: () => controller.selectCategory(tab.id),
+              behavior: HitTestBehavior.opaque,
+              child: AnimatedContainer(
+                duration: DesignTokens.motionFast,
+                curve: Curves.easeOutCubic,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: DesignTokens.spaceLg,
+                  vertical: DesignTokens.spaceSm,
+                ),
+                decoration: BoxDecoration(
+                  color: isSelected ? colors.primary : colors.surface,
+                  borderRadius: BorderRadius.circular(DesignTokens.radiusPill),
+                  border: isSelected ? null : Border.all(color: colors.border),
+                  boxShadow: isSelected ? DesignTokens.elevation1 : null,
+                ),
+                child: Center(
+                  child: Text(
+                    tab.name,
+                    style: TextStyle(
+                      color:
+                          isSelected ? colors.onPrimary : colors.onSurfaceMuted,
+                      fontSize: DesignTokens.textBody,
+                      fontWeight:
+                          isSelected ? FontWeight.w700 : FontWeight.w500,
                     ),
                   ),
                 ),
@@ -578,35 +492,29 @@ class _HomePageState extends State<HomePage> {
     return false;
   }
 
-  /// 单分类 Tab 内容：网格布局 + 分页懒加载（读该分类独立状态）
-  ///
-  /// 页面构建即预加载（ensureCategoryLoaded）：
-  /// PageView 拖动时相邻页进入缓存区构建 → 立即开始请求，
-  /// 松手切页前数据已在路上。
+  /// 单分类 Tab 内容：网格布局 + 分页懒加载
   Widget _buildSingleCategoryView(colors, int categoryId) {
-    // 预加载（幂等：有数据/加载中/有错误均跳过）
-    controller.ensureCategoryLoaded(categoryId);
     return Obx(() {
-      // 读该分类独立状态（视频列表/加载/分页互不串页）
-      final state = controller.stateOf(categoryId);
-      // 加载中（首次进入该分类）
-      if (state.loading.value && state.videos.isEmpty) {
+      // 加载中（首次切换）
+      if (controller.selectedLoading.value &&
+          controller.selectedCategoryVideos.isEmpty) {
         return _buildSkeletonGrid();
       }
-      // 错误（无缓存可用）
-      if (state.error.value.isNotEmpty && state.videos.isEmpty) {
+      // 错误
+      if (controller.error.value.isNotEmpty &&
+          controller.selectedCategoryVideos.isEmpty) {
         return ErrorView(
-          message: state.error.value,
-          onRetry: () => controller.reloadCategory(categoryId),
+          message: controller.error.value,
+          onRetry: () => controller.selectCategory(categoryId),
         );
       }
       // 无结果
-      if (state.videos.isEmpty) {
+      if (controller.selectedCategoryVideos.isEmpty) {
         return EmptyView(
           icon: PhosphorIconsRegular.filmSlate,
           title: '该分类暂无视频',
           subtitle: '下拉刷新试试',
-          onAction: () => controller.reloadCategory(categoryId),
+          onAction: controller.refresh,
           actionLabel: '刷新',
         );
       }
@@ -616,9 +524,9 @@ class _HomePageState extends State<HomePage> {
           if (notification is ScrollEndNotification &&
               notification.metrics.pixels >
                   notification.metrics.maxScrollExtent - 200 &&
-              state.hasMore.value &&
-              !state.loadingMore.value) {
-            controller.loadMoreCategory(categoryId);
+              controller.selectedHasMore.value &&
+              !controller.selectedLoadingMore.value) {
+            controller.loadMoreSelectedCategory();
           }
           return false;
         },
@@ -633,13 +541,13 @@ class _HomePageState extends State<HomePage> {
             // 0.88 给元信息行充足高度余量，避免溢出
             childAspectRatio: 0.88,
           ),
-          itemCount:
-              state.videos.length + (state.loadingMore.value ? 1 : 0),
+          itemCount: controller.selectedCategoryVideos.length +
+              (controller.selectedLoadingMore.value ? 1 : 0),
           itemBuilder: (_, i) {
-            if (i >= state.videos.length) {
+            if (i >= controller.selectedCategoryVideos.length) {
               return const VideoCardSkeleton();
             }
-            final v = state.videos[i];
+            final v = controller.selectedCategoryVideos[i];
             return VideoCard(
               video: v,
               onTap: () => Get.toNamed(
