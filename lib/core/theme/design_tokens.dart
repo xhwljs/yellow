@@ -78,6 +78,11 @@ class DesignTokens {
   static const Color colorWarning = Color(0xFFF59E0B);
   static const Color colorSkeleton = Color(0xFFE5E7EB);
   static const Color colorVideoOverlay = Color(0x66000000); // rgba(0,0,0,0.4)
+  /// 封面角标玻璃底（rgba(0,0,0,0.55)）
+  ///
+  /// 比视频遮罩略深：保证角标白字 / 主色字在任意封面
+  /// 上的对比度 ≥4.5:1（配合 0.5px 白 24% 描边形成玻璃质感）
+  static const Color colorBadgeScrim = Color(0x8C000000);
 
   // ===== 视频卡片尺寸 =====
   static const double videoCardAspectRatio = 16 / 9; // 列表卡片

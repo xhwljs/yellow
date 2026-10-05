@@ -13,9 +13,15 @@ import 'package:yellow_depot/data/models/video.dart';
 /// 视频卡片（Bento Grid 风格）
 ///
 /// 展示内容（自上而下）：
-/// - 封面（16:9）+ 时长 badge + 收藏角标 + 进度条
+/// - 封面（16:9）+ 角标（时长 / 收藏 / 已看 / 时间）+ 进度条
 /// - 标题（最多 2 行）
 /// - 元信息行（播放次数 · 收藏次数 · 更新时间）
+///
+/// 角标体系（统一玻璃拟态胶囊，见 [_GlassBadge]）：
+/// - 右下：时长（深色玻璃底 + 时钟图标 + 白字）
+/// - 右上：已看（深色玻璃底 + 主色勾选图标与文字）
+/// - 左上：收藏（主色圆形实底）或时间角标 [timeLabel]
+///   （互斥：有收藏时优先收藏，时间角标隐藏）
 ///
 /// 元信息行规则：
 /// - 三项都有 → eye count · heart count · clock time
@@ -27,12 +33,25 @@ class VideoCard extends StatelessWidget {
   final bool isFavorited;
   final double? progress;
 
+  /// 封面左上角的时间角标文案（如"3小时前"）
+  ///
+  /// 供"最新"Tab 展示相对发布时间；为 null 时不渲染。
+  final String? timeLabel;
+
+  /// 时间角标是否高亮（如 24 小时内上架）
+  ///
+  /// true → 主色实底 + 白字（与收藏角标同视觉层级）；
+  /// false → 深色玻璃底 + 白字（普通角标层级）。
+  final bool highlightTimeLabel;
+
   const VideoCard({
     super.key,
     required this.video,
     this.onTap,
     this.isFavorited = false,
     this.progress,
+    this.timeLabel,
+    this.highlightTimeLabel = false,
   });
 
   @override
@@ -66,29 +85,32 @@ class VideoCard extends StatelessWidget {
                       icon: PhosphorIconsRegular.filmSlate,
                     ),
                   ),
-                  // 时长 badge
+                  // 时长 badge（右下：深色玻璃胶囊 + 时钟图标）
                   if (video.duration.isNotEmpty)
                     Positioned(
                       right: DesignTokens.spaceSm,
                       bottom: DesignTokens.spaceSm,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: DesignTokens.spaceSm,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: DesignTokens.colorVideoOverlay,
-                          borderRadius:
-                              BorderRadius.circular(DesignTokens.radiusSm),
-                        ),
-                        child: Text(
-                          video.duration,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: DesignTokens.textLabel,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
+                      child: _GlassBadge(
+                        icon: PhosphorIconsRegular.clock,
+                        text: video.duration,
+                      ),
+                    ),
+                  // 时间角标（左上：最新页相对发布时间；有收藏时让位隐藏）
+                  if (timeLabel != null && timeLabel!.isNotEmpty && !isFavorited)
+                    Positioned(
+                      left: DesignTokens.spaceSm,
+                      top: DesignTokens.spaceSm,
+                      child: _GlassBadge(
+                        text: timeLabel!,
+                        background: highlightTimeLabel
+                            ? colors.primary
+                            : DesignTokens.colorBadgeScrim,
+                        textColor: highlightTimeLabel
+                            ? colors.onPrimary
+                            : Colors.white,
+                        iconColor: highlightTimeLabel
+                            ? colors.onPrimary
+                            : Colors.white70,
                       ),
                     ),
                   // 收藏角标
@@ -120,35 +142,11 @@ class VideoCard extends StatelessWidget {
                         final watched = ws.watchedCount.value > 0 &&
                             ws.isWatched(video.id);
                         if (!watched) return const SizedBox.shrink();
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: DesignTokens.spaceSm,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: DesignTokens.colorVideoOverlay,
-                            borderRadius:
-                                BorderRadius.circular(DesignTokens.radiusSm),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                PhosphorIconsRegular.check,
-                                size: 10,
-                                color: colors.primary,
-                              ),
-                              const SizedBox(width: 2),
-                              Text(
-                                '已看',
-                                style: TextStyle(
-                                  color: colors.primary,
-                                  fontSize: DesignTokens.textLabel,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
+                        return _GlassBadge(
+                          icon: PhosphorIconsFill.checkCircle,
+                          text: '已看',
+                          textColor: colors.primary,
+                          iconColor: colors.primary,
                         );
                       }),
                     ),
@@ -302,6 +300,78 @@ class _MetaItem extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// 玻璃拟态角标（胶囊形）
+///
+/// 深色半透明底 + 细白描边模拟玻璃质感（静态样式，
+/// 不用 BackdropFilter，保证长列表滚动性能）。
+///
+/// 设计约束（ui-ux-pro-max 技能检索结论）：
+/// - 单行不换行（Compact Label Overflow, Severity: High）
+/// - 深色 scrim 上白字对比度 ≥4.5:1
+/// - 图标 10px 与 textLabel(11) 字号层级匹配
+class _GlassBadge extends StatelessWidget {
+  final String text;
+
+  /// 前置图标（可选，与其他角标统一线性/填充语言）
+  final IconData? icon;
+
+  final Color textColor;
+  final Color? iconColor;
+
+  /// 底色（默认深色玻璃 scrim，可覆写为主题色实底）
+  final Color background;
+
+  const _GlassBadge({
+    required this.text,
+    this.icon,
+    this.textColor = Colors.white,
+    this.iconColor,
+    this.background = DesignTokens.colorBadgeScrim,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final resolvedIconColor = iconColor ?? textColor;
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: DesignTokens.spaceSm,
+        vertical: 3,
+      ),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(DesignTokens.radiusXl),
+        border: Border.all(
+          color: background == DesignTokens.colorBadgeScrim
+              ? Colors.white24
+              : Colors.transparent,
+          width: 0.5,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 10, color: resolvedIconColor),
+            const SizedBox(width: 3),
+          ],
+          Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: textColor,
+              fontSize: DesignTokens.textLabel,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.2,
+              height: 1.0,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

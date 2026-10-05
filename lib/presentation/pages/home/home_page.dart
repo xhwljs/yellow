@@ -458,6 +458,10 @@ class HomePage extends GetView<HomeController> {
           final v = controller.latestVideos[i];
           return VideoCard(
             video: v,
+            // 左上角时间角标：RSS 相对发布时间（"3小时前"）
+            timeLabel: v.updateTime.isNotEmpty ? v.updateTime : null,
+            // 24 小时内上架 → 主色实底高亮（更早为普通玻璃角标）
+            highlightTimeLabel: _isFreshlyPublished(v.updateTime),
             onTap: () => Get.toNamed(
               AppPages.detail,
               arguments: {
@@ -470,6 +474,22 @@ class HomePage extends GetView<HomeController> {
         },
       );
     });
+  }
+
+  /// 判断相对发布时间是否在 24 小时内（"刚刚 / N分钟前 / N小时前(N<24)"）
+  ///
+  /// 供"最新"Tab 时间角标高亮：24 小时内上架 → 主色实底。
+  /// 解析不了或"天"级单位 → 非高亮。
+  bool _isFreshlyPublished(String updateTime) {
+    if (updateTime == '刚刚') return true;
+    final minutes = RegExp(r'(\d+)分钟前').firstMatch(updateTime);
+    if (minutes != null) return true;
+    final hours = RegExp(r'(\d+)小时前').firstMatch(updateTime);
+    if (hours != null) {
+      final n = int.tryParse(hours.group(1) ?? '') ?? 99;
+      return n < 24;
+    }
+    return false;
   }
 
   /// 单分类 Tab 内容：网格布局 + 分页懒加载
