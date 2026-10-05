@@ -25,11 +25,7 @@ class VideoListParser {
       final doc = html_parser.parse(html);
       final items = doc.querySelectorAll('.stui-vodlist__box');
 
-      return items
-          .map((element) => _parseItem(element))
-          .whereType<Video>()
-          .where((v) => v.id.isNotEmpty)
-          .toList();
+      return parseElements(items);
     } catch (e) {
       throw ParseException(
         '视频列表解析失败',
@@ -37,6 +33,18 @@ class VideoListParser {
         cause: e,
       );
     }
+  }
+
+  /// 解析一组 `.stui-vodlist__box` 元素
+  ///
+  /// 供其它解析器复用卡片解析逻辑
+  /// （如首页"最近更新"区块，见 [RecentUpdateParser]）。
+  List<Video> parseElements(Iterable<dom.Element> elements) {
+    return elements
+        .map((element) => _parseItem(element))
+        .whereType<Video>()
+        .where((v) => v.id.isNotEmpty)
+        .toList();
   }
 
   /// 解析单个 `.stui-vodlist__box` 元素
