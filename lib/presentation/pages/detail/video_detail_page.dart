@@ -190,16 +190,18 @@ class VideoDetailPage extends GetView<VideoDetailController> {
       spacing: DesignTokens.spaceLg,
       runSpacing: DesignTokens.spaceSm,
       children: [
-        _MetaChip(
-          icon: PhosphorIconsRegular.play,
-          text: '${detail.video.playCount} 次播放',
-          colors: colors,
-        ),
-        _MetaChip(
-          icon: PhosphorIconsRegular.heart,
-          text: '${detail.video.likeCount} 喜欢',
-          colors: colors,
-        ),
+        if (detail.video.playCount > 0)
+          _MetaChip(
+            icon: PhosphorIconsRegular.play,
+            text: '${detail.video.playCount} 次播放',
+            colors: colors,
+          ),
+        if (detail.video.likeCount > 0)
+          _MetaChip(
+            icon: PhosphorIconsRegular.heart,
+            text: '${detail.video.likeCount} 喜欢',
+            colors: colors,
+          ),
         if (detail.video.duration.isNotEmpty)
           _MetaChip(
             icon: PhosphorIconsRegular.timer,

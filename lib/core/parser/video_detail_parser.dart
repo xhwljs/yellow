@@ -160,14 +160,20 @@ class VideoDetailParser {
     return '';
   }
 
-  /// 提取播放量（fa-eye 图标旁边的数字）
+  /// 提取播放量
   ///
-  /// macCMS V10 + stui 主题常见结构：
-  /// `<span><i class="fa fa-eye"></i> 61753</span>`
-  /// 或 `<li><i class="fa fa-eye"></i> 61753</li>`
-  ///
-  /// 提取失败返回 0，由 controller 经 cacheVideo 从列表页缓存补全。
+  /// 站点实际结构（2026-09 实测）：播放器下方 `.stui-player__foot` 内
+  /// 服务端直出 `<span class="text-red">7173</span>次播放`；
+  /// 提取不到时回退 fa-eye 旧结构兜底。
   static int _extractPlayCount(dom.Document doc) {
+    final foot = doc.querySelector('.stui-player__foot');
+    if (foot != null) {
+      final hitEl = foot.querySelector('.text-red');
+      if (hitEl != null) {
+        final m = RegExp(r'\d+').firstMatch(hitEl.text);
+        if (m != null) return int.tryParse(m.group(0) ?? '') ?? 0;
+      }
+    }
     return _extractFaIconNumber(doc, 'fa-eye');
   }
 
@@ -221,6 +227,26 @@ class VideoDetailParser {
   /// `<span>更新时间：2024-01-01</span>`
   /// 或 `<li>2024-01-01</li>`
   static String _extractUpdateTime(dom.Document doc) {
+    // 站点实际结构（2026-09 实测）：`.stui-player__foot` 服务端直出
+    // "时间：2026-10-05 07:10:31"，优先取完整"日期 时:分"
+    final foot = doc.querySelector('.stui-player__foot');
+    if (foot != null) {
+      final m = RegExp(
+        r'时间\s*[：:]\s*(\d{4}-\d{1,2}-\d{1,2}(?:\s*\d{1,2}:\d{1,2})?)',
+      ).firstMatch(foot.text);
+      if (m != null) {
+        var t = (m.group(1) ?? '').trim();
+        // 截到分钟（去掉可能的 ":ss"）
+        final minMatch = RegExp(r'^(\d{4}-\d{1,2}-\d{1,2})(?:\s+(\d{1,2}:\d{1,2}))?').firstMatch(t);
+        if (minMatch != null) {
+          final d = minMatch.group(1);
+          final hm = minMatch.group(2);
+          t = hm != null ? '$d $hm' : d!;
+        }
+        if (t.isNotEmpty) return t;
+      }
+    }
+
     final scopes = <dom.Element?>[
       doc.querySelector('.stui-content__detail'),
       doc.querySelector('.stui-content'),
