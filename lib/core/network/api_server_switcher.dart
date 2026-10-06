@@ -297,8 +297,8 @@ class ApiServerSwitcher {
       }
       final dio = Dio(
         BaseOptions(
-          connectTimeout: const Duration(seconds: 8),
-          receiveTimeout: const Duration(seconds: 8),
+          connectTimeout: const Duration(seconds: 5),
+          receiveTimeout: const Duration(seconds: 5),
           followRedirects: false, // 不自动跟随，拿原始 3xx
           validateStatus: (s) => s != null, // 接受所有状态码
           responseType: ResponseType.plain,
@@ -402,9 +402,7 @@ class ApiServerSwitcher {
   ///      → 返回 latest，由启动页提示"获取成功 + 新域名"
   /// 2. 根域名解析失败 → 回退到 [testConnectivity] 检测当前 baseUrl 是否是
   ///    跳转壳并自动迁移；迁移成功返回新地址（同样精简镜像列表）
-  /// 3. 当前 baseUrl 也失败 → 轮询所有镜像 [autoTestMirrors]，发现可用镜像
-  ///    即切换（应对 WiFi 下当前域名被屏蔽但其他镜像可用的情况）
-  /// 4. 全部失败 → 返回 null，由启动页提示失败后正常进入 App（后续逻辑不变）
+  /// 3. 全部失败 → 返回 null，由启动页提示失败后正常进入 App（后续逻辑不变）
   static Future<String?> fetchLatestDomain() async {
     // 1) 优先通过根域名解析最新地址
     final latest = await resolveLatestFromRoot();
@@ -420,7 +418,7 @@ class ApiServerSwitcher {
     try {
       await testConnectivity(before);
     } catch (_) {
-      // testConnectivity 抛异常视为不可用，继续尝试其他镜像
+      return null;
     }
     final after = AppConstants.baseUrl;
     if (after != before) {
@@ -428,15 +426,6 @@ class ApiServerSwitcher {
       await _applyLatestDomain(after);
       appLogger.i('跳转壳迁移获取最新域名成功：$after');
       return after;
-    }
-
-    // 3) 当前 baseUrl 不可用 → 轮询所有镜像，发现可用镜像即切换
-    //    （应对 WiFi 下当前域名被屏蔽但镜像列表中其他地址可用的情况）
-    appLogger.w('当前地址不可用，轮询所有镜像');
-    final mirrorResult = await autoTestMirrors();
-    if (mirrorResult != null) {
-      appLogger.i('镜像轮询获取最新域名成功：$mirrorResult');
-      return mirrorResult;
     }
     return null;
   }
@@ -684,8 +673,8 @@ class ApiServerSwitcher {
     return Dio(
       BaseOptions(
         baseUrl: baseUrl,
-        connectTimeout: const Duration(seconds: 8),
-        receiveTimeout: const Duration(seconds: 8),
+        connectTimeout: const Duration(seconds: 5),
+        receiveTimeout: const Duration(seconds: 5),
         followRedirects: true,
         // 跳转壳也返回 200，validateStatus 必须放宽到所有状态码都通过
         validateStatus: (s) => s != null,
@@ -834,8 +823,8 @@ class ApiServerSwitcher {
     // 6. 请求跳转服务，禁用 followRedirects 拿到原始 302 响应
     final dio = Dio(
       BaseOptions(
-        connectTimeout: const Duration(seconds: 8),
-        receiveTimeout: const Duration(seconds: 8),
+        connectTimeout: const Duration(seconds: 5),
+        receiveTimeout: const Duration(seconds: 5),
         followRedirects: false, // 不自动跟随，拿原始 302
         validateStatus: (s) => s != null, // 接受所有状态码
         headers: {
