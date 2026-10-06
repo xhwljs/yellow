@@ -50,15 +50,46 @@ void main() {
   runApp(const SplashPage());
 }
 
-/// 全局 HTTP 覆盖：绕过 HTTPS 证书校验。
+/// 全局 HTTP 覆盖：绕过 HTTPS 证书校验 + 强制 IPv4 连接。
 ///
 /// 与 [DioClient] 的 `validateCertificate: (cert, host, port) => true`
 /// 行为一致，让 cached_network_image 等非 Dio 客户端也能加载
 /// 证书有问题的图片资源（源站图片 CDN 常见自签名 / 过期证书）。
+///
+/// **强制 IPv4**（2026-10-05）：
+/// 部分 WiFi 网络（尤其 IPv6 优先的家庭 / 公共 WiFi）会先尝试 AAAA 记录，
+/// 而源站仅 IPv4 或 IPv6 链路异常时，连接会挂起直至超时，表现为
+/// 「数据网络正常，WiFi 无法获取数据」。强制仅解析 A 记录（IPv4）可
+/// 避免此问题，对数据网络（通常返回 IPv4 或快速回退）同样兼容。
 class _BadCertHttpOverrides extends HttpOverrides {
   @override
   HttpClient createHttpClient(SecurityContext? context) {
     return super.createHttpClient(context)
-      ..badCertificateCallback = (cert, host, port) => true;
+      ..badCertificateCallback = (cert, host, port) => true
+      ..connectionFactory = _forceIPv4Connection;
+  }
+
+  /// 强制 IPv4 连接工厂
+  ///
+  /// 解析主机名时仅查询 A 记录（IPv4），跳过 AAAA 记录（IPv6），
+  /// 避免 IPv6 优先的 WiFi 网络下连接挂起问题。
+  /// 代理场景下 [proxyHost] / [proxyPort] 非空，解析的是代理服务器地址。
+  static Future<ConnectionTask<Socket>> _forceIPv4Connection(
+    Uri url,
+    String? proxyHost,
+    int? proxyPort,
+  ) async {
+    final host = proxyHost ?? url.host;
+    final port = proxyPort ?? (url.port != 0
+        ? url.port
+        : (url.scheme == 'https' ? 443 : 80));
+    final addresses = await InternetAddress.lookup(
+      host,
+      type: InternetAddressType.IPv4,
+    );
+    if (addresses.isEmpty) {
+      throw SocketException('IPv4 地址解析失败：$host');
+    }
+    return Socket.startConnect(addresses.first, port);
   }
 }
