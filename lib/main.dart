@@ -64,9 +64,12 @@ void main() {
 class _BadCertHttpOverrides extends HttpOverrides {
   @override
   HttpClient createHttpClient(SecurityContext? context) {
-    return super.createHttpClient(context)
-      ..badCertificateCallback = (cert, host, port) => true
-      ..connectionFactory = _forceIPv4Connection;
+    final client = super.createHttpClient(context);
+    // 注意：badCertificateCallback 是 functional setter，赋值时会回调一次返回
+    // bool，无法用 `..` 链式继续 set 其它字段，必须分两条语句赋值。
+    client.badCertificateCallback = (cert, host, port) => true;
+    client.connectionFactory = _forceIPv4Connection;
+    return client;
   }
 
   /// 强制 IPv4 连接工厂
