@@ -1472,6 +1472,23 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
                   ],
                   const SizedBox(height: DesignTokens.spaceLg),
 
+                  // 主域名（根跳转域名）— 启动时通过此域名获取最新源站
+                  // 运营方偶尔会更换根域名本身，用户可在此手动修改并持久化
+                  _buildSubLabel('主域名'),
+                  const SizedBox(height: DesignTokens.spaceXs),
+                  _buildRootDomainRow(),
+                  const SizedBox(height: DesignTokens.spaceXs),
+                  Text(
+                    '启动时通过此域名获取最新源站地址。'
+                    '若获取失败可在此手动修改为新主域名。',
+                    style: TextStyle(
+                      fontSize: DesignTokens.textLabel,
+                      color: colors.onSurfaceMuted,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: DesignTokens.spaceLg),
+
                   // 镜像列表标题行：左侧 label + 右侧「管理 / 完成」按钮
                   Row(
                     children: [
@@ -1743,6 +1760,232 @@ class _ApiServerSheetState extends State<_ApiServerSheet> {
             compact: true,
           ),
       ],
+    );
+  }
+
+  /// 主域名（根跳转域名）行：展示当前根域名 + 编辑按钮 + 重置按钮
+  ///
+  /// 主域名是 App 启动时通过它获取最新源站地址的「永久入口」。运营方
+  /// 偶尔会更换主域名本身（如 68ck.net → 952ck.net），用户可在此修改
+  /// 并持久化，下次启动时由 ApiServerSwitcher.loadFromPrefs 加载覆盖。
+  Widget _buildRootDomainRow() {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: DesignTokens.spaceMd,
+        vertical: DesignTokens.spaceSm,
+      ),
+      decoration: BoxDecoration(
+        color: colors.surfaceVariant,
+        borderRadius: BorderRadius.circular(DesignTokens.radiusMd),
+        border: Border.all(color: colors.border),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            PhosphorIconsRegular.globe,
+            size: 14,
+            color: colors.primary,
+          ),
+          const SizedBox(width: DesignTokens.spaceXs),
+          Expanded(
+            child: Text(
+              ApiServerSwitcher.rootRedirectDomain,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: DesignTokens.textCaption,
+                color: colors.onSurface,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          // 编辑主域名
+          GestureDetector(
+            onTap: _editRootDomainDialog,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    PhosphorIconsRegular.pencilSimpleLine,
+                    size: 14,
+                    color: colors.primary,
+                  ),
+                  const SizedBox(width: 2),
+                  Text(
+                    '编辑',
+                    style: TextStyle(
+                      fontSize: DesignTokens.textCaption,
+                      fontWeight: FontWeight.w600,
+                      color: colors.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: DesignTokens.spaceXs),
+          // 重置为内置默认主域名
+          GestureDetector(
+            onTap: _resetRootDomainDialog,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: Icon(
+                PhosphorIconsRegular.arrowCounterClockwise,
+                size: 14,
+                color: colors.onSurfaceMuted,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 编辑主域名对话框（保存后立即持久化，下次启动生效）
+  Future<void> _editRootDomainDialog() async {
+    final controller =
+        TextEditingController(text: ApiServerSwitcher.rootRedirectDomain);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: colors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(DesignTokens.radiusLg),
+        ),
+        title: Text(
+          '设置主域名',
+          style: TextStyle(
+            color: colors.onSurface,
+            fontSize: DesignTokens.textH2,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '主域名用于启动时获取最新源站地址。'
+              '若获取失败，可在此修改为新主域名。',
+              style: TextStyle(
+                fontSize: DesignTokens.textLabel,
+                color: colors.onSurfaceMuted,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: DesignTokens.spaceMd),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              keyboardType: TextInputType.url,
+              autocorrect: false,
+              enableSuggestions: false,
+              decoration: InputDecoration(
+                hintText: 'http://example.com',
+                hintStyle: TextStyle(color: colors.onSurfaceMuted),
+                filled: true,
+                fillColor: colors.surfaceVariant,
+                enabledBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: colors.border),
+                ),
+                focusedBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: colors.primary, width: 2),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text('取消', style: TextStyle(color: colors.onSurfaceMuted)),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(controller.text.trim()),
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+
+    if (result == null || result.isEmpty) return;
+
+    final ok = await ApiServerSwitcher.setRootRedirectDomain(result);
+    if (!context.mounted) return;
+    _setStateNextFrame(() {});
+    if (!context.mounted) return;
+    Get.snackbar(
+      ok ? '保存成功' : '保存失败',
+      ok
+          ? '主域名：${ApiServerSwitcher.rootRedirectDomain}'
+          : '请输入合法的 URL（http:// 或 https:// 开头）',
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: ok ? colors.surface : colors.destructive,
+      colorText: ok ? colors.onSurface : colors.surface,
+      duration: const Duration(seconds: 2),
+    );
+  }
+
+  /// 重置主域名为内置默认值（确认对话框，避免误触）
+  Future<void> _resetRootDomainDialog() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: colors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(DesignTokens.radiusLg),
+        ),
+        title: Text(
+          '重置主域名？',
+          style: TextStyle(
+            fontSize: DesignTokens.textH2,
+            fontWeight: FontWeight.w700,
+            color: colors.onSurface,
+          ),
+        ),
+        content: Text(
+          '将主域名重置为内置默认值：\n\n'
+          '${ApiServerSwitcher.defaultRootRedirectDomain}',
+          style: TextStyle(
+            fontSize: DesignTokens.textBody,
+            color: colors.onSurfaceMuted,
+            height: 1.5,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('取消', style: TextStyle(color: colors.onSurfaceMuted)),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: colors.primary,
+              foregroundColor: colors.onPrimary,
+            ),
+            child: const Text('重置'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    await ApiServerSwitcher.resetRootRedirectDomain();
+    if (!context.mounted) return;
+    _setStateNextFrame(() {});
+    if (!context.mounted) return;
+    Get.snackbar(
+      '已重置',
+      '主域名：${ApiServerSwitcher.rootRedirectDomain}',
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: colors.surface,
+      colorText: colors.onSurface,
+      duration: const Duration(seconds: 2),
     );
   }
 

@@ -67,6 +67,7 @@ class AppConstants {
   static const String keyThemePreset = 'theme_preset';
   static const String keyLastCategoryId = 'last_category_id';
   static const String keyApiBaseUrl = 'api_base_url';
+  static const String keyApiRootDomain = 'api_root_domain';
   static const String keySearchHistory = 'search_history';
 
   /// 自定义主题色（仅当 keyThemePreset = 'custom' 时生效）

@@ -83,14 +83,26 @@ class ApiServerSwitcher {
     'http://555973.xyz',
   ];
 
-  /// 根跳转域名 — 永久不变的入口，通过 302 Location 指向最新真实源站
+  /// 默认根跳转域名 — 用户未自定义时使用此内置值
   ///
-  /// 运营方维护此域名，每次源站被封就更新其 302 Location 指向新源站。
-  /// 启动时访问此域名即可拿到最新真实地址，无需维护死链列表。
+  /// 历史上长期使用 `http://68ck.net` 作为根域名。但运营方偶尔也会
+  /// 更换根域名本身（例如换成 `http://952ck.net`），导致固定常量失效。
+  /// 因此改为可变字段：用户可在「服务器管理」中通过「设置主域名」
+  /// 入口修改并持久化，[loadFromPrefs] 启动时从 SP 加载覆盖此默认值。
+  static const String defaultRootRedirectDomain = 'http://68ck.net';
+
+  /// 当前生效的根跳转域名（运行时可被 SP 覆盖，[setRootRedirectDomain] 修改）
   ///
-  /// [resolveLatestFromRoot] 访问此域名并读取 Location header。
-  /// 成功后 [presetMirrors] 精简为 `[此根域名, latest]`。
-  static const String rootRedirectDomain = 'http://68ck.net';
+  /// 运营方维护此域名，每次源站被封就更新其 302 Location（或 JS 跳转壳）
+  /// 指向新源站。启动时 [resolveLatestFromRoot] 访问此域名即可拿到最新
+  /// 真实地址，无需维护死链列表。成功后 [presetMirrors] 精简为
+  /// `[此根域名, latest]`。
+  ///
+  /// **可变性说明**：
+  /// - 不再是 const，初始值为 [defaultRootRedirectDomain]
+  /// - [loadFromPrefs] 启动时从 SP 读取用户保存的根域名覆盖
+  /// - [setRootRedirectDomain] 在设置页 UI 调用，同步持久化
+  static String rootRedirectDomain = defaultRootRedirectDomain;
 
   /// SP key：用户保存的镜像列表（JSON 数组）
   static const String _keyMirrorList = 'api_mirror_list';
@@ -112,6 +124,13 @@ class ApiServerSwitcher {
   /// 启动时自动回退到 [AppConstants.defaultBaseUrl]。
   static Future<void> loadFromPrefs() async {
     final prefs = await SharedPreferences.getInstance();
+
+    // 0. 加载用户保存的根域名（覆盖默认常量）
+    //    用户可在「服务器管理 → 设置主域名」中修改根域名本身
+    final savedRoot = prefs.getString(AppConstants.keyApiRootDomain);
+    if (savedRoot != null && savedRoot.isNotEmpty) {
+      rootRedirectDomain = _normalizeUrl(savedRoot);
+    }
 
     // 1. 加载用户保存的镜像列表（覆盖默认值）
     final savedMirrors = prefs.getStringList(_keyMirrorList);
@@ -151,6 +170,50 @@ class ApiServerSwitcher {
   //
   // 用户反馈：源站域名经常换，每次自动迁移都往列表加新地址，
   // 长期下来过期域名越积越多。提供手动管理能力让用户清理。
+
+  /// 设置 / 修改根跳转域名（用户在「服务器管理 → 设置主域名」中调用）
+  ///
+  /// 主域名（根跳转域名）会因运营方更换而失效，例如 `http://68ck.net`
+  /// → `http://952ck.net`。用户可在 UI 修改后持久化到 SP，下次启动
+  /// 时由 [loadFromPrefs] 自动加载覆盖默认值。
+  ///
+  /// - 规范化 URL（去空白 / 末尾斜杠），不通过则返回 false
+  /// - 与当前根域名相同则无操作返回 true
+  /// - 持久化成功后更新 [rootRedirectDomain]
+  /// - 返回 true 表示已应用（包括"无变化"情况）
+  static Future<bool> setRootRedirectDomain(String url) async {
+    final normalized = _normalizeUrl(url);
+    if (normalized.isEmpty) return false;
+    if (!normalized.startsWith('http://') &&
+        !normalized.startsWith('https://')) {
+      appLogger.w('根域名格式无效：$normalized');
+      return false;
+    }
+    if (normalized == rootRedirectDomain) return true;
+    rootRedirectDomain = normalized;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(AppConstants.keyApiRootDomain, normalized);
+      appLogger.i('根域名已更新：$normalized');
+    } catch (e) {
+      appLogger.w('根域名持久化失败：$e');
+    }
+    return true;
+  }
+
+  /// 重置根域名为内置默认值 [defaultRootRedirectDomain]
+  ///
+  /// 同步持久化（写入空字符串或直接 remove，下次启动会回退到默认）。
+  static Future<void> resetRootRedirectDomain() async {
+    rootRedirectDomain = defaultRootRedirectDomain;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(AppConstants.keyApiRootDomain);
+      appLogger.i('根域名已重置为默认：$defaultRootRedirectDomain');
+    } catch (_) {
+      // 持久化失败不阻断
+    }
+  }
 
   /// 添加一个新镜像到列表头部（不切换 baseUrl）。
   ///
